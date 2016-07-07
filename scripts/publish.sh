@@ -111,13 +111,13 @@ else
 fi
 
 # create temporary directory for POM files
-POM_TEMP_DIR=$(mktemp -d build/pomTempDir.XXXXXX)
+POM_TEMP_DIR=$(mktemp -d dist/pomTempDir.XXXXXX)
 # clean up temporary directory on script termination
 trap 'rm -rf "$POM_TEMP_DIR"' EXIT
 
 for PRODUCT in $PRODUCTS; do
     VERSION_PATH="${REPO}/${PRODUCT}/${VERSION}"
-    PRODUCT_PATH="${VERSION_PATH}/${GROUP_PATH}"
+    PRODUCT_PATH="${VERSION_PATH}/${GROUP_PATH}/${PRODUCT}/${VERSION}"
 
     FILE="$PRODUCT-$VERSION.tgz"
     FILE_PATH="dist/$PRODUCT/build/distributions/$FILE"

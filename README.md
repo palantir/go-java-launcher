@@ -60,3 +60,6 @@ and `<custom.xyz>` refer to the options from the two configuration files, respec
 
 Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typically take precendence; the exact
 behaviour may depend on the Java distribution.
+
+# License
+This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

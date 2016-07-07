@@ -1,0 +1,47 @@
+machine:
+  post:
+    - mkdir -p download
+    - test -e download/$GODIST || wget -O download/$GODIST https://storage.googleapis.com/golang/$GODIST
+    - sudo rm -rf /usr/local/go
+    - sudo tar -C /usr/local -xzf download/$GODIST
+  environment:
+    GODIST: "go1.6.2.linux-amd64.tar.gz"
+    GOPATH: "$HOME/.go_workspace"
+    IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
+    GO_PROJECT_SRC_PATH: "$GOPATH/src/$IMPORT_PATH"
+
+checkout:
+  post:
+    # ensure that up-to-date tags are retrieved
+    - "[[ ! -s \"$(git rev-parse --git-dir)/shallow\" ]] || git fetch --unshallow"
+    - git fetch --tags --all --prune
+
+dependencies:
+  pre:
+    # build script
+    - go get -u -v golang.org/x/tools/go/gcimporter15
+    - go get -u -v github.com/kisielk/errcheck
+    - go get -u -v github.com/mitchellh/gox
+    - go get -u -v golang.org/x/tools/cmd/cover
+    - go get -u -v github.com/mattn/goveralls
+    - go get -u -v github.com/pierrre/gotestcover
+    - go get -u -v github.com/jstemmer/go-junit-report
+    - go get -u -v github.com/mdempsky/unconvert
+    - go get -u -v github.com/remyoudompheng/go-misc/deadcode
+    - go get -u -v github.com/gordonklaus/ineffassign
+    - go get -u -v github.com/opennota/check/cmd/varcheck
+    - go get -u -v github.com/golang/lint/golint
+    # code
+    - go get -u -v gopkg.in/yaml.v2
+  override:
+    - mkdir -p "$GOPATH/src/$IMPORT_PATH"
+    - rsync -az --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+  cache_directories:
+    - ~/download
+
+test:
+  pre:
+    - go version
+  override:
+    - test -d "$GO_PROJECT_SRC_PATH" && cd "$GO_PROJECT_SRC_PATH" && make verify
+    - cp "$GO_PROJECT_SRC_PATH/coverage.out" .

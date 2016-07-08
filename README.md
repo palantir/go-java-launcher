@@ -17,9 +17,9 @@ configType: java
 configVersion: 1
 # The main class to be run
 mainClass: my.package.Main
-# The classpath entries; the final classpath is the ':'-concatenated list in the given order
 # Path to the JRE, defaults to the JAVA_HOME environment variable if unset
 javaHome: javaHome
+# The classpath entries; the final classpath is the ':'-concatenated list in the given order
 classpath:
   - ./foo.jar
 # JVM options to be passed to the java command
@@ -39,12 +39,12 @@ jvmOpts:
   - '-Xmx2g'
 ```
 
-The launcher is invoked as 
+The launcher is invoked as:
 ```
-javalauncher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
+go-java-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
 ```
 
-, where the
+where the
 static configuration file defaults to `./launcher-static.yml` and the custom configuration file defaults to
 `./launcher-custom.yml`. It assembles the configuration options and executes the following command (where `<static.xyz>`
 and `<custom.xyz>` refer to the options from the two configuration files, respectively):

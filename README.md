@@ -41,7 +41,7 @@ jvmOpts:
 
 The launcher is invoked as:
 ```
-javalauncher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
+go-java-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
 ```
 
 where the

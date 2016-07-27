@@ -78,11 +78,18 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	args = append(args, "-classpath", classpath)
 	args = append(args, staticConfig.MainClass)
 	args = append(args, staticConfig.Args...)
-	fmt.Println("Argument list to Java binary:", args)
+	fmt.Printf("Argument list to Java binary: %v\n\n", args)
 
+	execWithChecks(javaCommand, args)
+}
+
+func execWithChecks(javaExecutable string, args []string) {
 	env := os.Environ()
-	execErr := syscall.Exec(javaCommand, args, env)
+	execErr := syscall.Exec(javaExecutable, args, env)
 	if execErr != nil {
+		if os.IsNotExist(execErr) {
+			fmt.Println("Java Executable not found at:", javaExecutable)
+		}
 		panic(execErr)
 	}
 }

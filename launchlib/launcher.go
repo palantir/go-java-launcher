@@ -84,12 +84,12 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 }
 
 func execWithChecks(javaExecutable string, args []string) {
-        env := os.Environ()
-        execErr := syscall.Exec(javaExecutable, args, env)
+	env := os.Environ()
+	execErr := syscall.Exec(javaExecutable, args, env)
 	if execErr != nil {
-                if os.IsNotExist(execErr) {
-                        fmt.Println("Java Executable not found at:", javaExecutable)
-                }
-                panic(execErr)
-        }
+		if os.IsNotExist(execErr) {
+			fmt.Println("Java Executable not found at:", javaExecutable)
+		}
+		panic(execErr)
+	}
 }

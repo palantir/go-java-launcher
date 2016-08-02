@@ -16,8 +16,8 @@
 package launchlib
 
 import (
-	"testing"
 	"os"
+	"testing"
 )
 
 func TestGetJavaHome(t *testing.T) {

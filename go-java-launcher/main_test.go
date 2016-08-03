@@ -15,7 +15,9 @@
 
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestMainMethod(t *testing.T) {
 	LaunchWithConfig("test_resources/launcher-static.yml", "test_resources/launcher-custom.yml")

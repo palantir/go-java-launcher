@@ -37,13 +37,13 @@ args:
   - arg2
 `)
 	expectedConfig := StaticLauncherConfig{
-		ConfigType: "java",
+		ConfigType:    "java",
 		ConfigVersion: 1,
-		MainClass: "mainClass",
-		JavaHome: "javaHome",
-		Classpath: []string{"classpath1", "classpath2" },
-		JvmOpts: []string{"jvmOpt1", "jvmOpt2" },
-		Args: []string{"arg1", "arg2" }}
+		MainClass:     "mainClass",
+		JavaHome:      "javaHome",
+		Classpath:     []string{"classpath1", "classpath2"},
+		JvmOpts:       []string{"jvmOpt1", "jvmOpt2"},
+		Args:          []string{"arg1", "arg2"}}
 
 	config := ParseStaticConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {
@@ -60,9 +60,9 @@ jvmOpts:
   - jvmOpt2
 `)
 	expectedConfig := CustomLauncherConfig{
-		ConfigType: "java",
+		ConfigType:    "java",
 		ConfigVersion: 1,
-		JvmOpts: []string{"jvmOpt1", "jvmOpt2" }}
+		JvmOpts:       []string{"jvmOpt1", "jvmOpt2"}}
 
 	config := ParseCustomConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {

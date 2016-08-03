@@ -16,10 +16,11 @@
 package main
 
 import (
-	"github.com/palantir/go-java-launcher/launchlib"
+	"fmt"
 	"io/ioutil"
 	"os"
-	"fmt"
+
+	"github.com/palantir/go-java-launcher/launchlib"
 )
 
 func LaunchWithConfig(staticConfigFile string, customConfigFile string) {

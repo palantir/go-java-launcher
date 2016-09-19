@@ -40,6 +40,7 @@ type CustomLauncherConfig struct {
 func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {
 	var config StaticLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
+		fmt.Println("Failed to deserialize StaticLauncherConfig, please check the syntax of your configuration file")
 		panic(err)
 	}
 	if (config.ConfigType != "java") {
@@ -54,6 +55,7 @@ func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {
 func ParseCustomConfig(yamlString []byte) CustomLauncherConfig {
 	var config CustomLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
+		fmt.Println("Failed to deserialize CustomLauncherConfig, please check the syntax of your configuration file")
 		panic(err)
 	}
 	if (config.ConfigType != "java") {

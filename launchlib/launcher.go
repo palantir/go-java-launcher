@@ -16,12 +16,29 @@
 package launchlib
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"syscall"
+	"text/template"
 )
+
+const (
+	TemplateDelims = "%%"
+)
+
+type TemplateVars struct {
+	CWD string
+}
+
+type processExecutor interface {
+	Exec(executable string, args []string, env []string) error
+}
+
+type syscallProcessExecutor struct {
+}
 
 // Returns explicitJavaHome if it is not the empty string, or the value of the JAVA_HOME environment variable otherwise.
 // Panics if neither of them is set.
@@ -80,16 +97,50 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	args = append(args, staticConfig.Args...)
 	fmt.Printf("Argument list to Java binary: %v\n\n", args)
 
-	execWithChecks(javaCommand, args)
+	env := make(map[string]string)
+	fillEnvironmentVariables(env, staticConfig.Env)
+	fillEnvironmentVariables(env, customConfig.Env)
+
+	execWithChecks(javaCommand, args, env, &syscallProcessExecutor{})
 }
 
-func execWithChecks(javaExecutable string, args []string) {
+func execWithChecks(javaExecutable string, args []string, customEnv map[string]string, p processExecutor) {
 	env := os.Environ()
-	execErr := syscall.Exec(javaExecutable, args, env)
+	for key, value := range customEnv {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	execErr := p.Exec(javaExecutable, args, env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
 			fmt.Println("Java Executable not found at:", javaExecutable)
 		}
 		panic(execErr)
 	}
+}
+
+func (s *syscallProcessExecutor) Exec(executable string, args []string, env []string) error {
+	return syscall.Exec(executable, args, env)
+}
+
+func fillEnvironmentVariables(env map[string]string, customEnv map[string]string) map[string]string {
+	if customEnv == nil {
+		return env
+	}
+
+	templateVars := TemplateVars{
+		CWD: getWorkingDir(),
+	}
+
+	for key, value := range customEnv {
+		t := template.Must(template.New(key).Delims(TemplateDelims, TemplateDelims).Parse(value))
+		var out bytes.Buffer
+		if err := t.Execute(&out, templateVars); err != nil {
+			fmt.Printf("Unable to parse environment variable template [%s]. Please check format\n", value)
+			panic(err)
+		}
+		env[key] = out.String()
+	}
+
+	return env
 }

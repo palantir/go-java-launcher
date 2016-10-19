@@ -26,6 +26,9 @@ configType: java
 configVersion: 1
 mainClass: mainClass
 javaHome: javaHome
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
 classpath:
   - classpath1
   - classpath2
@@ -41,9 +44,13 @@ args:
 		ConfigVersion: 1,
 		MainClass:     "mainClass",
 		JavaHome:      "javaHome",
-		Classpath:     []string{"classpath1", "classpath2"},
-		JvmOpts:       []string{"jvmOpt1", "jvmOpt2"},
-		Args:          []string{"arg1", "arg2"}}
+		Env: map[string]string{
+			"SOME_ENV_VAR":  "/etc/profile",
+			"OTHER_ENV_VAR": "/etc/redhat-release",
+		},
+		Classpath: []string{"classpath1", "classpath2"},
+		JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+		Args:      []string{"arg1", "arg2"}}
 
 	config := ParseStaticConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {
@@ -52,6 +59,32 @@ args:
 }
 
 func TestParseCustomConfig(t *testing.T) {
+	var data = []byte(`
+configType: java
+configVersion: 1
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+`)
+	expectedConfig := CustomLauncherConfig{
+		ConfigType:    "java",
+		ConfigVersion: 1,
+		Env: map[string]string{
+			"SOME_ENV_VAR":  "/etc/profile",
+			"OTHER_ENV_VAR": "/etc/redhat-release",
+		},
+		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
+
+	config := ParseCustomConfig(data)
+	if !reflect.DeepEqual(config, expectedConfig) {
+		t.Errorf("Expected config %v, found %v", expectedConfig, config)
+	}
+}
+
+func TestParseCustomConfigWithoutEnv(t *testing.T) {
 	var data = []byte(`
 configType: java
 configVersion: 1
@@ -68,4 +101,34 @@ jvmOpts:
 	if !reflect.DeepEqual(config, expectedConfig) {
 		t.Errorf("Expected config %v, found %v", expectedConfig, config)
 	}
+
+	if config.Env != nil {
+		t.Errorf("Expected environment to be nil, but was %v", config.Env)
+	}
+}
+
+func TestParseCustomConfigWithEnvPlaceholder(t *testing.T) {
+	var data = []byte(`
+configType: java
+configVersion: 1
+env:
+  SOME_ENV_VAR: '%%.CWD%%/etc/profile'
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+`)
+
+	expectedConfig := CustomLauncherConfig{
+		ConfigType:    "java",
+		ConfigVersion: 1,
+		Env: map[string]string{
+			"SOME_ENV_VAR": "%%.CWD%%/etc/profile",
+		},
+		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
+
+	config := ParseCustomConfig(data)
+	if !reflect.DeepEqual(config, expectedConfig) {
+		t.Errorf("Expected config %v, found %v", expectedConfig, config)
+	}
+
 }

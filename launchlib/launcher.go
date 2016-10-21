@@ -16,22 +16,16 @@
 package launchlib
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 	"syscall"
-	"text/template"
 )
 
 const (
 	TemplateDelims = "%%"
 )
-
-type TemplateVars struct {
-	CWD string
-}
 
 type processExecutor interface {
 	Exec(executable string, args []string, env []string) error
@@ -128,19 +122,21 @@ func fillEnvironmentVariables(env map[string]string, customEnv map[string]string
 		return env
 	}
 
-	templateVars := TemplateVars{
-		CWD: getWorkingDir(),
-	}
+	replacer := createReplacer()
 
 	for key, value := range customEnv {
-		t := template.Must(template.New(key).Delims(TemplateDelims, TemplateDelims).Parse(value))
-		var out bytes.Buffer
-		if err := t.Execute(&out, templateVars); err != nil {
-			fmt.Printf("Unable to parse environment variable template [%s]. Please check format\n", value)
-			panic(err)
-		}
-		env[key] = out.String()
+		env[key] = replacer.Replace(value)
 	}
 
 	return env
+}
+
+func createReplacer() *strings.Replacer {
+	return strings.NewReplacer(
+		delim("CWD"), getWorkingDir(),
+	)
+}
+
+func delim(str string) string {
+	return fmt.Sprintf("%s%s%s", TemplateDelims, str, TemplateDelims)
 }

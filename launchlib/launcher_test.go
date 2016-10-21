@@ -48,7 +48,7 @@ func TestGetJavaHome(t *testing.T) {
 func TestSetCustomEnvironment(t *testing.T) {
 	originalEnv := make(map[string]string)
 	customEnv := map[string]string{
-		"SOME_PATH": "%%.CWD%%/full/path",
+		"SOME_PATH": "%%CWD%%/full/path",
 		"SOME_VAR":  "CUSTOM_VAR",
 	}
 
@@ -96,7 +96,40 @@ func TestSetCustomEnvironment(t *testing.T) {
 	if !reflect.DeepEqual(m.env, expectedEnv) {
 		t.Errorf("Expected custom environment to be %v, but instead was %v", expectedEnv, m.env)
 	}
+}
 
+func TestUnknownVariablesAreNotExpanded(t *testing.T) {
+	originalEnv := make(map[string]string)
+	customEnv := map[string]string{
+		"SOME_VAR": "%%FOO%%",
+	}
+
+	fillEnvironmentVariables(originalEnv, customEnv)
+
+	if val, ok := originalEnv["SOME_VAR"]; ok {
+		if val != "%%FOO%%" {
+			t.Errorf("For SOME_VAR, expected %s, but got %s", "%%FOO%%", val)
+		}
+	} else {
+		t.Errorf("Expected SOME_VAR to exist in map, but it didn't")
+	}
+}
+
+func TestKeysAreNotExpanded(t *testing.T) {
+	originalEnv := make(map[string]string)
+	customEnv := map[string]string{
+		"%%CWD%%": "Value",
+	}
+
+	fillEnvironmentVariables(originalEnv, customEnv)
+
+	if val, ok := originalEnv["%%CWD%%"]; ok {
+		if val != "Value" {
+			t.Errorf("For %%CWD%%, expected %s, but got %s", "Value", val)
+		}
+	} else {
+		t.Errorf("Expected %%CWD%% to exist in map and not be expanded, but it didn't")
+	}
 }
 
 func (m *mockProcessExecutor) Exec(command string, args []string, env []string) error {

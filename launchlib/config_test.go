@@ -112,7 +112,7 @@ func TestParseCustomConfigWithEnvPlaceholder(t *testing.T) {
 configType: java
 configVersion: 1
 env:
-  SOME_ENV_VAR: '%%.CWD%%/etc/profile'
+  SOME_ENV_VAR: '{{CWD}}/etc/profile'
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
@@ -122,7 +122,7 @@ jvmOpts:
 		ConfigType:    "java",
 		ConfigVersion: 1,
 		Env: map[string]string{
-			"SOME_ENV_VAR": "%%.CWD%%/etc/profile",
+			"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 		},
 		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
 

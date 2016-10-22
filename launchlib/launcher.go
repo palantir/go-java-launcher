@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	TemplateDelims = "%%"
+	TemplateDelimsOpen  = "{{"
+	TemplateDelimsClose = "}}"
 )
 
 type processExecutor interface {
@@ -138,5 +139,5 @@ func createReplacer() *strings.Replacer {
 }
 
 func delim(str string) string {
-	return fmt.Sprintf("%s%s%s", TemplateDelims, str, TemplateDelims)
+	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }

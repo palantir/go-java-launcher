@@ -40,7 +40,7 @@ configVersion: 1
 # Environment variables to be set in the runtime environment
 env:
   CUSTOM_VAR: CUSTOM_VALUE
-  CUSTOM_PATH: '%%CWD%%/some/path'
+  CUSTOM_PATH: '{{CWD}}/some/path'
 # JVM options to be passed to the java command
 jvmOpts:
   - '-Xmx2g'
@@ -69,10 +69,10 @@ Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typica
 behaviour may depend on the Java distribution.
 
 `env` block, both in static and custom configuration, supports restricted set of automatic expansions for values
-assigned to environment variables. Variables are expanded if they are surrounded with `%%` as shown above
+assigned to environment variables. Variables are expanded if they are surrounded with `{{` and `}}` as shown above
 for `CUSTOM_PATH`. The following fixed expansions are supported:
 
-* `%%CWD%%`: The current working directory of the user which executed this process
+* `{{CWD}}`: The current working directory of the user which executed this process
 
 Expansions are only performed on the values. No expansions are performed on the keys.
 

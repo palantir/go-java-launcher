@@ -23,6 +23,18 @@ import (
 	"syscall"
 )
 
+const (
+	TemplateDelimsOpen  = "{{"
+	TemplateDelimsClose = "}}"
+)
+
+type processExecutor interface {
+	Exec(executable string, args []string, env []string) error
+}
+
+type syscallProcessExecutor struct {
+}
+
 // Returns explicitJavaHome if it is not the empty string, or the value of the JAVA_HOME environment variable otherwise.
 // Panics if neither of them is set.
 func getJavaHome(explicitJavaHome string) string {
@@ -80,16 +92,66 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	args = append(args, staticConfig.Args...)
 	fmt.Printf("Argument list to Java binary: %v\n\n", args)
 
-	execWithChecks(javaCommand, args)
+	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
+
+	execWithChecks(javaCommand, args, env, &syscallProcessExecutor{})
 }
 
-func execWithChecks(javaExecutable string, args []string) {
+func execWithChecks(javaExecutable string, args []string, customEnv map[string]string, p processExecutor) {
 	env := os.Environ()
-	execErr := syscall.Exec(javaExecutable, args, env)
+	for key, value := range customEnv {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	execErr := p.Exec(javaExecutable, args, env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
 			fmt.Println("Java Executable not found at:", javaExecutable)
 		}
 		panic(execErr)
 	}
+}
+
+func (s *syscallProcessExecutor) Exec(executable string, args []string, env []string) error {
+	return syscall.Exec(executable, args, env)
+}
+
+// Performs replacement of all replaceable values in env, returning a new
+// map, with the same keys as env, but possibly changed values
+func replaceEnvironmentVariables(env map[string]string) map[string]string {
+	replacer := createReplacer()
+
+	returnMap := make(map[string]string)
+	for key, value := range env {
+		returnMap[key] = replacer.Replace(value)
+	}
+
+	return returnMap
+}
+
+// copy all the keys and values from overrideMap into origMap. If a key already
+// exists in origMap, it's value is overridden
+func merge(origMap map[string]string, overrideMap map[string]string) map[string]string {
+	if overrideMap == nil {
+		return origMap
+	}
+
+	returnMap := make(map[string]string)
+	for key, value := range origMap {
+		returnMap[key] = value
+	}
+	for key, value := range overrideMap {
+		returnMap[key] = value
+	}
+	return returnMap
+}
+
+func createReplacer() *strings.Replacer {
+	return strings.NewReplacer(
+		delim("CWD"), getWorkingDir(),
+	)
+}
+
+func delim(str string) string {
+	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }

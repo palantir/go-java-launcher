@@ -22,6 +22,9 @@ javaHome: javaHome
 # The classpath entries; the final classpath is the ':'-concatenated list in the given order
 classpath:
   - ./foo.jar
+# Environment Variables to be set in the environment
+env:
+  CUSTOM_VAR: CUSTOM_VALUE
 # JVM options to be passed to the java command
 jvmOpts:
   - '-Xmx1g'
@@ -34,6 +37,10 @@ args:
 # CustomLauncherConfig
 configType: java
 configVersion: 1
+# Environment variables to be set in the runtime environment
+env:
+  CUSTOM_VAR: CUSTOM_VALUE
+  CUSTOM_PATH: '{{CWD}}/some/path'
 # JVM options to be passed to the java command
 jvmOpts:
   - '-Xmx2g'
@@ -60,6 +67,14 @@ and `<custom.xyz>` refer to the options from the two configuration files, respec
 
 Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typically take precendence; the exact
 behaviour may depend on the Java distribution.
+
+`env` block, both in static and custom configuration, supports restricted set of automatic expansions for values
+assigned to environment variables. Variables are expanded if they are surrounded with `{{` and `}}` as shown above
+for `CUSTOM_PATH`. The following fixed expansions are supported:
+
+* `{{CWD}}`: The current working directory of the user which executed this process
+
+Expansions are only performed on the values. No expansions are performed on the keys.
 
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

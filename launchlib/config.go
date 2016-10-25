@@ -22,20 +22,22 @@ import (
 )
 
 type StaticLauncherConfig struct {
-	ConfigType    string `yaml:"configType"`
-	ConfigVersion int    `yaml:"configVersion"`
-	ServiceName   string `yaml:"serviceName"`
-	MainClass     string `yaml:"mainClass"`
-	JavaHome      string `yaml:"javaHome"`
+	ConfigType    string            `yaml:"configType"`
+	ConfigVersion int               `yaml:"configVersion"`
+	ServiceName   string            `yaml:"serviceName"`
+	MainClass     string            `yaml:"mainClass"`
+	JavaHome      string            `yaml:"javaHome"`
+	Env           map[string]string `yaml:"env"`
 	Classpath     []string
 	JvmOpts       []string `yaml:"jvmOpts"`
 	Args          []string
 }
 
 type CustomLauncherConfig struct {
-	ConfigType    string   `yaml:"configType"`
-	ConfigVersion int      `yaml:"configVersion"`
-	JvmOpts       []string `yaml:"jvmOpts"`
+	ConfigType    string            `yaml:"configType"`
+	ConfigVersion int               `yaml:"configVersion"`
+	JvmOpts       []string          `yaml:"jvmOpts"`
+	Env           map[string]string `yaml:"env"`
 }
 
 func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {

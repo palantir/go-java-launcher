@@ -16,9 +16,18 @@
 package launchlib
 
 import (
+	"fmt"
 	"os"
+	"reflect"
+	"sort"
 	"testing"
 )
+
+type mockProcessExecutor struct {
+	command string
+	args    []string
+	env     []string
+}
 
 func TestGetJavaHome(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
@@ -34,6 +43,101 @@ func TestGetJavaHome(t *testing.T) {
 	}
 
 	setEnvOrFail("JAVA_HOME", originalJavaHome)
+}
+
+func TestSetCustomEnvironment(t *testing.T) {
+	originalEnv := make(map[string]string)
+	customEnv := map[string]string{
+		"SOME_PATH": "{{CWD}}/full/path",
+		"SOME_VAR":  "CUSTOM_VAR",
+	}
+
+	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
+
+	cwd := getWorkingDir()
+
+	if val, ok := env["SOME_PATH"]; ok {
+		expected := fmt.Sprintf("%s/full/path", cwd)
+		if val != expected {
+			t.Errorf("For SOME_PATH, expected %s, but got %s", expected, val)
+		}
+	} else {
+		t.Errorf("Expected SOME_PATH to exist in map but it didn't")
+	}
+
+	if val, ok := env["SOME_VAR"]; ok {
+		if val != "CUSTOM_VAR" {
+			t.Errorf("For SOME_VAR, expected %s, but got %s", "CUSTOM_VAR", val)
+		}
+	} else {
+		t.Errorf("Expected CUSTOM_VAR to exist in map, but it didn't")
+	}
+
+	m := mockProcessExecutor{}
+	args := []string{"arg1", "arg2"}
+	execWithChecks("my-command", args, env, &m)
+
+	if m.command != "my-command" {
+		t.Errorf("Expected command to be run was %s, but instead was %s", "my-command", m.command)
+	}
+
+	if !reflect.DeepEqual(m.args, args) {
+		t.Errorf("Expected incoming args to be %v, but were %v", args, m.args)
+	}
+
+	startingEnv := os.Environ()
+	expectedEnv := append(startingEnv, []string{
+		fmt.Sprintf("SOME_PATH=%s/full/path", cwd),
+		"SOME_VAR=CUSTOM_VAR",
+	}...)
+
+	sort.Strings(m.env)
+	sort.Strings(expectedEnv)
+	if !reflect.DeepEqual(m.env, expectedEnv) {
+		t.Errorf("Expected custom environment to be %v, but instead was %v", expectedEnv, m.env)
+	}
+}
+
+func TestUnknownVariablesAreNotExpanded(t *testing.T) {
+	originalEnv := make(map[string]string)
+	customEnv := map[string]string{
+		"SOME_VAR": "{{FOO}}",
+	}
+
+	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
+
+	if val, ok := env["SOME_VAR"]; ok {
+		if val != "{{FOO}}" {
+			t.Errorf("For SOME_VAR, expected %s, but got %s", "{{FOO}}", val)
+		}
+	} else {
+		t.Errorf("Expected SOME_VAR to exist in map, but it didn't")
+	}
+}
+
+func TestKeysAreNotExpanded(t *testing.T) {
+	originalEnv := make(map[string]string)
+	customEnv := map[string]string{
+		"{{CWD}}": "Value",
+	}
+
+	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
+
+	if val, ok := env["{{CWD}}"]; ok {
+		if val != "Value" {
+			t.Errorf("For %%CWD%%, expected %s, but got %s", "Value", val)
+		}
+	} else {
+		t.Errorf("Expected %%CWD%% to exist in map and not be expanded, but it didn't")
+	}
+}
+
+func (m *mockProcessExecutor) Exec(command string, args []string, env []string) error {
+	m.command = command
+	m.args = args
+	m.env = env
+
+	return nil
 }
 
 func setEnvOrFail(key string, value string) {

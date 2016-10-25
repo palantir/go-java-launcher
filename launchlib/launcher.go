@@ -92,9 +92,7 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	args = append(args, staticConfig.Args...)
 	fmt.Printf("Argument list to Java binary: %v\n\n", args)
 
-	env := make(map[string]string)
-	fillEnvironmentVariables(env, staticConfig.Env)
-	fillEnvironmentVariables(env, customConfig.Env)
+	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
 	execWithChecks(javaCommand, args, env, &syscallProcessExecutor{})
 }
@@ -118,18 +116,34 @@ func (s *syscallProcessExecutor) Exec(executable string, args []string, env []st
 	return syscall.Exec(executable, args, env)
 }
 
-func fillEnvironmentVariables(env map[string]string, customEnv map[string]string) map[string]string {
-	if customEnv == nil {
-		return env
-	}
-
+// Performs replacement of all replaceable values in env, returning a new
+// map, with the same keys as env, but possibly changed values
+func replaceEnvironmentVariables(env map[string]string) map[string]string {
 	replacer := createReplacer()
 
-	for key, value := range customEnv {
-		env[key] = replacer.Replace(value)
+	returnMap := make(map[string]string)
+	for key, value := range env {
+		returnMap[key] = replacer.Replace(value)
 	}
 
-	return env
+	return returnMap
+}
+
+// copy all the keys and values from overrideMap into origMap. If a key already
+// exists in origMap, it's value is overridden
+func merge(origMap map[string]string, overrideMap map[string]string) map[string]string {
+	if overrideMap == nil {
+		return origMap
+	}
+
+	returnMap := make(map[string]string)
+	for key, value := range origMap {
+		returnMap[key] = value
+	}
+	for key, value := range overrideMap {
+		returnMap[key] = value
+	}
+	return returnMap
 }
 
 func createReplacer() *strings.Replacer {

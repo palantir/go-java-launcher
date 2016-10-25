@@ -52,11 +52,11 @@ func TestSetCustomEnvironment(t *testing.T) {
 		"SOME_VAR":  "CUSTOM_VAR",
 	}
 
-	fillEnvironmentVariables(originalEnv, customEnv)
+	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
 
 	cwd := getWorkingDir()
 
-	if val, ok := originalEnv["SOME_PATH"]; ok {
+	if val, ok := env["SOME_PATH"]; ok {
 		expected := fmt.Sprintf("%s/full/path", cwd)
 		if val != expected {
 			t.Errorf("For SOME_PATH, expected %s, but got %s", expected, val)
@@ -65,7 +65,7 @@ func TestSetCustomEnvironment(t *testing.T) {
 		t.Errorf("Expected SOME_PATH to exist in map but it didn't")
 	}
 
-	if val, ok := originalEnv["SOME_VAR"]; ok {
+	if val, ok := env["SOME_VAR"]; ok {
 		if val != "CUSTOM_VAR" {
 			t.Errorf("For SOME_VAR, expected %s, but got %s", "CUSTOM_VAR", val)
 		}
@@ -75,7 +75,7 @@ func TestSetCustomEnvironment(t *testing.T) {
 
 	m := mockProcessExecutor{}
 	args := []string{"arg1", "arg2"}
-	execWithChecks("my-command", args, originalEnv, &m)
+	execWithChecks("my-command", args, env, &m)
 
 	if m.command != "my-command" {
 		t.Errorf("Expected command to be run was %s, but instead was %s", "my-command", m.command)
@@ -104,9 +104,9 @@ func TestUnknownVariablesAreNotExpanded(t *testing.T) {
 		"SOME_VAR": "{{FOO}}",
 	}
 
-	fillEnvironmentVariables(originalEnv, customEnv)
+	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
 
-	if val, ok := originalEnv["SOME_VAR"]; ok {
+	if val, ok := env["SOME_VAR"]; ok {
 		if val != "{{FOO}}" {
 			t.Errorf("For SOME_VAR, expected %s, but got %s", "{{FOO}}", val)
 		}
@@ -121,9 +121,9 @@ func TestKeysAreNotExpanded(t *testing.T) {
 		"{{CWD}}": "Value",
 	}
 
-	fillEnvironmentVariables(originalEnv, customEnv)
+	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
 
-	if val, ok := originalEnv["{{CWD}}"]; ok {
+	if val, ok := env["{{CWD}}"]; ok {
 		if val != "Value" {
 			t.Errorf("For %%CWD%%, expected %s, but got %s", "Value", val)
 		}

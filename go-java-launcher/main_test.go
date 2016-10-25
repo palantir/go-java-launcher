@@ -23,6 +23,15 @@ func TestMainMethod(t *testing.T) {
 	LaunchWithConfig("test_resources/launcher-static.yml", "test_resources/launcher-custom.yml")
 }
 
+func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("Expected launcher to fail when JAVA_HOME is bad")
+		}
+	}()
+	LaunchWithConfig("test_resources/launcher-static-bad-java-home.yml", "foo")
+}
+
 func TestMainMethodWithoutCustomConfig(t *testing.T) {
 	LaunchWithConfig("test_resources/launcher-static.yml", "foo")
 }

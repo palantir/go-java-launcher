@@ -74,7 +74,8 @@ for `CUSTOM_PATH`. The following fixed expansions are supported:
 
 * `{{CWD}}`: The current working directory of the user which executed this process
 
-Expansions are only performed on the values. No expansions are performed on the keys.
+Expansions are only performed on the values. No expansions are performed on the keys. Note that the JAVA_HOME
+environment cannot be overwritten with this mechanism; use the `javaHome` mechanism in `StaticLauncherConfig` instead.
 
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

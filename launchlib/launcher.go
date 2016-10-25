@@ -21,12 +21,25 @@ import (
 	"path"
 	"strings"
 	"syscall"
+	"regexp"
 )
 
 const (
-	TemplateDelimsOpen  = "{{"
+	TemplateDelimsOpen = "{{"
 	TemplateDelimsClose = "}}"
+	// Matches characters disallowed in paths we allow to be passed to exec()
+	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
+
+// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file
+func verifyPathIsSafeForExec(execPath string) string {
+	unsafe, _ := regexp.MatchString(ExecPathBlackListRegex, execPath)
+	_, statError := os.Stat(execPath)
+	if (unsafe || statError != nil) {
+		panic("Failed to determine is path is safe to execute: " + execPath)
+	}
+	return execPath
+}
 
 type processExecutor interface {
 	Exec(executable string, args []string, env []string) error
@@ -78,7 +91,7 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 
 	javaHome := getJavaHome(staticConfig.JavaHome)
 	fmt.Println("Using JAVA_HOME:", javaHome)
-	javaCommand := path.Join(javaHome, "/bin/java")
+	javaCommand := verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 
 	classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.Classpath))
 	fmt.Println("Classpath:", classpath)

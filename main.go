@@ -22,7 +22,7 @@ import (
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-func LaunchWithConfig(staticConfigFile string, customConfigFile string) {
+func LaunchWithConfig(staticConfigFile, customConfigFile string) {
 	staticData, err := ioutil.ReadFile(staticConfigFile)
 	if err != nil {
 		panic("Failed to read static config file: " + staticConfigFile)

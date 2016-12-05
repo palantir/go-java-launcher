@@ -15,8 +15,9 @@
 package launchlib
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseStaticConfig(t *testing.T) {
@@ -38,11 +39,13 @@ args:
   - arg1
   - arg2
 `)
-	expectedConfig := StaticLauncherConfig{
-		ConfigType:    "java",
-		ConfigVersion: 1,
-		MainClass:     "mainClass",
-		JavaHome:      "javaHome",
+	want := StaticLauncherConfig{
+		LauncherConfig: LauncherConfig{
+			ConfigType:    "java",
+			ConfigVersion: 1,
+		},
+		MainClass: "mainClass",
+		JavaHome:  "javaHome",
 		Env: map[string]string{
 			"SOME_ENV_VAR":  "/etc/profile",
 			"OTHER_ENV_VAR": "/etc/redhat-release",
@@ -51,14 +54,19 @@ args:
 		JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
 		Args:      []string{"arg1", "arg2"}}
 
-	config := ParseStaticConfig(data)
-	if !reflect.DeepEqual(config, expectedConfig) {
-		t.Errorf("Expected config %v, found %v", expectedConfig, config)
-	}
+	got := ParseStaticConfig(data)
+	assert.Equal(t, want, got)
 }
 
 func TestParseCustomConfig(t *testing.T) {
-	var data = []byte(`
+	for i, currCase := range []struct {
+		name string
+		data string
+		want CustomLauncherConfig
+	}{
+		{
+			name: "standard custom config",
+			data: `
 configType: java
 configVersion: 1
 env:
@@ -67,47 +75,37 @@ env:
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
-`)
-	expectedConfig := CustomLauncherConfig{
-		ConfigType:    "java",
-		ConfigVersion: 1,
-		Env: map[string]string{
-			"SOME_ENV_VAR":  "/etc/profile",
-			"OTHER_ENV_VAR": "/etc/redhat-release",
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+				JvmOpts: []string{"jvmOpt1", "jvmOpt2"}},
 		},
-		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
-
-	config := ParseCustomConfig(data)
-	if !reflect.DeepEqual(config, expectedConfig) {
-		t.Errorf("Expected config %v, found %v", expectedConfig, config)
-	}
-}
-
-func TestParseCustomConfigWithoutEnv(t *testing.T) {
-	var data = []byte(`
+		{
+			name: "custom config without env",
+			data: `
 configType: java
 configVersion: 1
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
-`)
-	expectedConfig := CustomLauncherConfig{
-		ConfigType:    "java",
-		ConfigVersion: 1,
-		JvmOpts:       []string{"jvmOpt1", "jvmOpt2"}}
-
-	config := ParseCustomConfig(data)
-	if !reflect.DeepEqual(config, expectedConfig) {
-		t.Errorf("Expected config %v, found %v", expectedConfig, config)
-	}
-
-	if config.Env != nil {
-		t.Errorf("Expected environment to be nil, but was %v", config.Env)
-	}
-}
-
-func TestParseCustomConfigWithEnvPlaceholder(t *testing.T) {
-	var data = []byte(`
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				JvmOpts: []string{"jvmOpt1", "jvmOpt2"}},
+		},
+		{
+			name: "custom config with env placeholder",
+			data: `
 configType: java
 configVersion: 1
 env:
@@ -115,19 +113,19 @@ env:
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
-`)
-
-	expectedConfig := CustomLauncherConfig{
-		ConfigType:    "java",
-		ConfigVersion: 1,
-		Env: map[string]string{
-			"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+				},
+				JvmOpts: []string{"jvmOpt1", "jvmOpt2"}},
 		},
-		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
-
-	config := ParseCustomConfig(data)
-	if !reflect.DeepEqual(config, expectedConfig) {
-		t.Errorf("Expected config %v, found %v", expectedConfig, config)
+	} {
+		got := ParseCustomConfig([]byte(currCase.data))
+		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
-
 }

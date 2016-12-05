@@ -1,53 +1,52 @@
 machine:
-  post:
-    - mkdir -p download
-    - test -e download/$GODIST || wget -O download/$GODIST https://storage.googleapis.com/golang/$GODIST
-    - sudo rm -rf /usr/local/go
-    - sudo tar -C /usr/local -xzf download/$GODIST
   environment:
-    GODIST: "go1.6.2.linux-amd64.tar.gz"
+    GODIST: "go1.7.3.linux-amd64.tar.gz"
     GOPATH: "$HOME/.go_workspace"
     IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     GO_PROJECT_SRC_PATH: "$GOPATH/src/$IMPORT_PATH"
+  post:
+    - mkdir -p download
+    - test -e "download/$GODIST" || wget -O "download/$GODIST" "https://storage.googleapis.com/golang/$GODIST"
+    # create custom Go distribution with packages built for darwin-amd64 if it is not present
+    - |
+      if [ ! -e "download/$GODIST-custom.tgz" ]; then
+        sudo rm -rf /usr/local/go && \
+        sudo tar -C /usr/local -xzf "download/$GODIST" && \
+        sudo env GOOS=linux GOARCH=amd64 /usr/local/go/bin/go install std && \
+        sudo env GOOS=darwin GOARCH=amd64 /usr/local/go/bin/go install std && \
+        tar -C /usr/local -czf "download/$GODIST-custom.tgz" go
+      fi
+    - sudo rm -rf /usr/local/go
+    - sudo tar -C /usr/local -xzf "download/$GODIST-custom.tgz"
 
 checkout:
   post:
-    # ensure that up-to-date tags are retrieved
-    - "[[ ! -s \"$(git rev-parse --git-dir)/shallow\" ]] || git fetch --unshallow"
-    - git fetch --tags --all --prune
+    # ensure all tags are fetched and up-to-date
+    - git tag -l | xargs git tag -d && git fetch -t
 
 dependencies:
-  pre:
-    # build script
-    - go get -u -v golang.org/x/tools/go/gcimporter15
-    - go get -u -v github.com/kisielk/errcheck
-    - go get -u -v github.com/mitchellh/gox
-    - go get -u -v golang.org/x/tools/cmd/cover
-    - go get -u -v github.com/mattn/goveralls
-    - go get -u -v github.com/pierrre/gotestcover
-    - go get -u -v github.com/jstemmer/go-junit-report
-    - go get -u -v github.com/mdempsky/unconvert
-    - go get -u -v github.com/remyoudompheng/go-misc/deadcode
-    - go get -u -v github.com/gordonklaus/ineffassign
-    - go get -u -v github.com/opennota/check/cmd/varcheck
-    - go get -u -v github.com/golang/lint/golint
-    # code
-    - go get -u -v gopkg.in/yaml.v2
   override:
     - mkdir -p "$GOPATH/src/$IMPORT_PATH"
     - rsync -az --delete ./ "$GOPATH/src/$IMPORT_PATH/"
+    - cd "$GO_PROJECT_SRC_PATH" && ./godelw version
   cache_directories:
+    - ~/.godel
     - ~/download
 
 test:
   pre:
     - go version
   override:
-    - test -d "$GO_PROJECT_SRC_PATH" && cd "$GO_PROJECT_SRC_PATH" && make verify
-    - cp "$GO_PROJECT_SRC_PATH/coverage.out" .
+    - cd "$GO_PROJECT_SRC_PATH" && go install $(./godelw packages)
+    - mkdir -p "$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME"
+    - cd "$GO_PROJECT_SRC_PATH" && ./godelw verify --apply=false --junit-output="$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME/$CIRCLE_PROJECT_REPONAME-tests.xml"
+    - mkdir -p "$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME-integration"
+    - cd "$GO_PROJECT_SRC_PATH" && ./godelw test --tags=integration --junit-output="$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME/$CIRCLE_PROJECT_REPONAME-integration.xml"
+    - cd "$GO_PROJECT_SRC_PATH" && ./godelw dist
 
 deployment:
   release:
     tag: /[0-9]+(\.[0-9]+)+(-rc[0-9]+)?/
+    owner: palantir
     commands:
-      - cd "$GO_PROJECT_SRC_PATH" && make build dist publish
+      - cd "$GO_PROJECT_SRC_PATH" && ./godelw publish bintray --url https://api.bintray.com --subject palantir --repository releases --user "$BINTRAY_USERNAME" --password "$BINTRAY_PASSWORD" --publish --downloads-list

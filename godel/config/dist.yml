@@ -1,0 +1,19 @@
+products:
+  go-java-launcher:
+    build:
+      main-pkg: .
+      os-archs:
+        - os: darwin
+          arch: amd64
+        - os: linux
+          arch: amd64
+    dist:
+      dist-type:
+        type: bin
+        info:
+          omit-init-sh: true
+      script: |
+              set -euo pipefail
+              mkdir $DIST_DIR/service
+              mv $DIST_DIR/bin $DIST_DIR/service/bin
+group-id: com.palantir.launching

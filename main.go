@@ -16,27 +16,14 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-func LaunchWithConfig(staticConfigFile, customConfigFile string) {
-	staticData, err := ioutil.ReadFile(staticConfigFile)
-	if err != nil {
-		panic("Failed to read static config file: " + staticConfigFile)
-	}
-	staticConfig := launchlib.ParseStaticConfig(staticData)
-
-	var customConfig launchlib.CustomLauncherConfig
-	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
-		fmt.Println("Failed to read custom config file, assuming no custom config:", customConfigFile)
-	} else {
-		customConfig = launchlib.ParseCustomConfig(customData)
-	}
-
-	launchlib.Launch(&staticConfig, &customConfig)
+func Exit1WithMessage(message string) {
+	fmt.Fprintln(os.Stderr, message)
+	os.Exit((1))
 }
 
 func main() {
@@ -45,7 +32,7 @@ func main() {
 
 	switch numArgs := len(os.Args); {
 	case numArgs > 3:
-		panic("Usage: javalauncher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]")
+		Exit1WithMessage("Usage: go-java-launcher <path to StaticLauncherConfig> [<path to CustomLauncherConfig>]")
 	case numArgs == 2:
 		staticConfigFile = os.Args[1]
 	case numArgs == 3:
@@ -53,5 +40,8 @@ func main() {
 		customConfigFile = os.Args[2]
 	}
 
-	LaunchWithConfig(staticConfigFile, customConfigFile)
+	launchErr := launchlib.LaunchWithConfig(staticConfigFile, customConfigFile)
+	if launchErr != nil {
+		Exit1WithMessage(launchErr.Error())
+	}
 }

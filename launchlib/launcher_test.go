@@ -34,10 +34,12 @@ func TestGetJavaHome(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
 	require.NoError(t, os.Setenv("JAVA_HOME", "foo"))
 
-	javaHome := getJavaHome("")
+	javaHome, javaHomeErr := getJavaHome("")
 	assert.Equal(t, "foo", javaHome, "JAVA_HOME incorrect")
-	javaHome = getJavaHome("explicit javahome")
+	assert.NoError(t, javaHomeErr, "getJavaHome correctly returns nil")
+	javaHome, javaHomeErr = getJavaHome("explicit javahome")
 	assert.Equal(t, "explicit javahome", javaHome, "JAVA_HOME incorrect")
+	assert.NoError(t, javaHomeErr, "getJavaHome correctly returns nil")
 
 	require.NoError(t, os.Setenv("JAVA_HOME", originalJavaHome))
 }

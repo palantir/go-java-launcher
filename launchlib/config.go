@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"path"
 
 	"gopkg.in/yaml.v2"
 )
@@ -25,23 +26,61 @@ type LauncherConfig struct {
 	ConfigVersion int    `yaml:"configVersion"`
 }
 
-func (config *LauncherConfig) validate() {
-	if config.ConfigType != "java" {
-		panic(fmt.Sprintf("Can handle configType=java only, found %s", config.ConfigType))
+type AllowedLauncherConfigValues struct {
+	ConfigTypes    map[string]struct{}
+	ConfigVersions map[int]struct{}
+	Executables    map[string]struct{}
+}
+
+var allowedLauncherConfigs = AllowedLauncherConfigValues{
+	ConfigTypes:    map[string]struct{}{"java": {}, "executable": {}},
+	ConfigVersions: map[int]struct{}{1: {}},
+	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}},
+}
+
+func (config *LauncherConfig) validateLauncherConfig() error {
+	if _, typeOk := allowedLauncherConfigs.ConfigTypes[config.ConfigType]; !typeOk {
+		allowedConfigTypes := make([]string, 0, len(allowedLauncherConfigs.ConfigTypes))
+		for k := range allowedLauncherConfigs.ConfigTypes {
+			allowedConfigTypes = append(allowedConfigTypes, k)
+		}
+
+		return fmt.Errorf("Can handle configType=%v only, found %s", allowedConfigTypes, config.ConfigType)
 	}
-	if config.ConfigVersion != 1 {
-		panic(fmt.Sprintf("Can handle configVersion=1 only, found %d", config.ConfigVersion))
+	if _, versionOk := allowedLauncherConfigs.ConfigVersions[config.ConfigVersion]; !versionOk {
+		allowedConfigVersions := make([]int, 0, len(allowedLauncherConfigs.ConfigVersions))
+		for k := range allowedLauncherConfigs.ConfigVersions {
+			allowedConfigVersions = append(allowedConfigVersions, k)
+		}
+
+		return fmt.Errorf("Can handle configVersion=%v only, found %d", allowedConfigVersions, config.ConfigVersion)
 	}
+	return nil
+}
+
+type JavaConfig struct {
+	JavaHome  string   `yaml:"javaHome"`
+	MainClass string   `yaml:"mainClass"`
+	JvmOpts   []string `yaml:"jvmOpts"`
+	Classpath []string `yaml:"classpath"`
+}
+
+func validateJavaConfig(config JavaConfig) error {
+	if config.MainClass == "" {
+		return fmt.Errorf("Config type \"java\" requires top-level \"mainClass:\" value")
+	}
+	if len(config.Classpath) == 0 {
+		return fmt.Errorf("Config type \"java\" requires top-level \"classpath:\" array")
+	}
+	return nil
 }
 
 type StaticLauncherConfig struct {
 	LauncherConfig `yaml:",inline"`
+	JavaConfig     `yaml:",inline"`
 	ServiceName    string            `yaml:"serviceName"`
-	MainClass      string            `yaml:"mainClass"`
-	JavaHome       string            `yaml:"javaHome"`
 	Env            map[string]string `yaml:"env"`
-	Classpath      []string          `yaml:"classpath"`
-	JvmOpts        []string          `yaml:"jvmOpts"`
+	Executable     string            `yaml:"executable,omitempty"`
 	Args           []string          `yaml:"args"`
 }
 
@@ -51,25 +90,50 @@ type CustomLauncherConfig struct {
 	Env            map[string]string `yaml:"env"`
 }
 
-func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {
+func validateExecutableConfig(executable string) error {
+	if executable == "" {
+		return fmt.Errorf("Config type \"executable\" requires top-level \"executable:\" value")
+	}
+	if _, executableOk := allowedLauncherConfigs.Executables[path.Base(executable)]; !executableOk {
+		allowedExecutables := make([]string, 0, len(allowedLauncherConfigs.Executables))
+		for k := range allowedLauncherConfigs.Executables {
+			allowedExecutables = append(allowedExecutables, k)
+		}
+
+		return fmt.Errorf("Can handle executable=%v only, found %v", allowedExecutables, executable)
+	}
+	return nil
+}
+
+func ParseStaticConfig(yamlString []byte) (StaticLauncherConfig, error) {
 	var config StaticLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
-		unmarshalErrPanic("StaticLauncherConfig", err)
+		return StaticLauncherConfig{}, fmt.Errorf("Failed to deserialize Static Launcher Config, please check the syntax of your configuration file\n")
 	}
-	config.LauncherConfig.validate()
-	return config
+	if launcherConfigOk := config.LauncherConfig.validateLauncherConfig(); launcherConfigOk != nil {
+		return StaticLauncherConfig{}, launcherConfigOk
+	}
+
+	if config.ConfigType == "java" {
+		if javaConfigOk := validateJavaConfig(config.JavaConfig); javaConfigOk != nil {
+			return StaticLauncherConfig{}, javaConfigOk
+		}
+		config.Executable = "java"
+	}
+
+	if executableConfigOk := validateExecutableConfig(config.Executable); executableConfigOk != nil {
+		return StaticLauncherConfig{}, executableConfigOk
+	}
+	return config, nil
 }
 
-func ParseCustomConfig(yamlString []byte) CustomLauncherConfig {
+func ParseCustomConfig(yamlString []byte) (CustomLauncherConfig, error) {
 	var config CustomLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
-		unmarshalErrPanic("CustomLauncherConfig", err)
+		return CustomLauncherConfig{}, fmt.Errorf("Failed to deserialize Custom Launcher Config, please check the syntax of your configuration file\n")
 	}
-	config.LauncherConfig.validate()
-	return config
-}
-
-func unmarshalErrPanic(structName string, err error) {
-	fmt.Printf("Failed to deserialize %s, please check the syntax of your configuration file\n", structName)
-	panic(err)
+	if launcherConfigOk := config.LauncherConfig.validateLauncherConfig(); launcherConfigOk != nil {
+		return CustomLauncherConfig{}, launcherConfigOk
+	}
+	return config, nil
 }

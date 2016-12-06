@@ -30,12 +30,17 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
+func exit1WithMessage(message string) {
+	fmt.Fprintln(os.Stderr, message)
+	os.Exit((1))
+}
+
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
 func verifyPathIsSafeForExec(execPath string) string {
 	unsafe, _ := regexp.MatchString(ExecPathBlackListRegex, execPath)
 	_, statError := os.Stat(execPath)
 	if unsafe || statError != nil {
-		panic("Failed to determine is path is safe to execute: " + execPath)
+		exit1WithMessage("Failed to determine is path is safe to execute: " + execPath)
 	}
 	return execPath
 }
@@ -55,7 +60,7 @@ func getJavaHome(explicitJavaHome string) string {
 
 	javaHome := os.Getenv("JAVA_HOME")
 	if len(javaHome) == 0 {
-		panic("JAVA_HOME environment variable not set")
+		exit1WithMessage("JAVA_HOME environment variable not set")
 	}
 	return javaHome
 }
@@ -87,37 +92,47 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	workingDir := getWorkingDir()
 	fmt.Println("Working directory:", workingDir)
 
-	javaHome := getJavaHome(staticConfig.JavaHome)
-	fmt.Println("Using JAVA_HOME:", javaHome)
-	javaCommand := verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
-
-	classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.Classpath))
-	fmt.Println("Classpath:", classpath)
-
 	var args []string
-	args = append(args, javaCommand) // 0th argument is the command itself
-	args = append(args, staticConfig.JvmOpts...)
-	args = append(args, customConfig.JvmOpts...)
-	args = append(args, "-classpath", classpath)
-	args = append(args, staticConfig.MainClass)
+	var executable string
+
+	if staticConfig.ConfigType == "java" {
+		javaHome := getJavaHome(staticConfig.JavaConfig.JavaHome)
+		fmt.Println("Using JAVA_HOME:", javaHome)
+
+		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
+		fmt.Println("Classpath:", classpath)
+
+		executable = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+		args = append(args, executable) // 0th argument is the command itself
+		args = append(args, staticConfig.JavaConfig.JvmOpts...)
+		args = append(args, customConfig.JvmOpts...)
+		args = append(args, "-classpath", classpath)
+		args = append(args, staticConfig.JavaConfig.MainClass)
+	} else if staticConfig.ConfigType == "executable" {
+		executable = verifyPathIsSafeForExec(staticConfig.Executable)
+		args = append(args, executable) // 0th argument is the command itself
+	} else {
+		exit1WithMessage(fmt.Sprintf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType))
+	}
+
 	args = append(args, staticConfig.Args...)
-	fmt.Printf("Argument list to Java binary: %v\n\n", args)
+	fmt.Printf("Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
-	execWithChecks(javaCommand, args, env, &syscallProcessExecutor{})
+	execWithChecks(executable, args, env, &syscallProcessExecutor{})
 }
 
-func execWithChecks(javaExecutable string, args []string, customEnv map[string]string, p processExecutor) {
+func execWithChecks(executable string, args []string, customEnv map[string]string, p processExecutor) {
 	env := os.Environ()
 	for key, value := range customEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	execErr := p.Exec(javaExecutable, args, env)
+	execErr := p.Exec(executable, args, env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
-			fmt.Println("Java Executable not found at:", javaExecutable)
+			fmt.Println("Executable not found at:", executable)
 		}
 		panic(execErr)
 	}

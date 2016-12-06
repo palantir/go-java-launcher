@@ -1,5 +1,5 @@
 products:
-  go-java-launcher:
+  go-launcher:
     build:
       main-pkg: .
       os-archs:

@@ -1,9 +1,10 @@
 configType: java
-configVersion: 1
-mainClass: Main
-classpath:
-  - ./test_resources/
-jvmOpts:
-  - '-Xmx4M'
+configVersion: 2
 args:
   - arg1
+java:
+  mainClass: Main
+  classpath:
+    - ./test_resources/
+  jvmOpts:
+    - '-Xmx4M'

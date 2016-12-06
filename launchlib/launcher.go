@@ -88,19 +88,19 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	workingDir := getWorkingDir()
 	fmt.Println("Working directory:", workingDir)
 
-	javaHome := getJavaHome(staticConfig.JavaHome)
+	javaHome := getJavaHome(staticConfig.JavaConfig.JavaHome)
 	fmt.Println("Using JAVA_HOME:", javaHome)
 	javaCommand := verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 
-	classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.Classpath))
+	classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
 	fmt.Println("Classpath:", classpath)
 
 	var args []string
 	args = append(args, javaCommand) // 0th argument is the command itself
-	args = append(args, staticConfig.JvmOpts...)
-	args = append(args, customConfig.JvmOpts...)
+	args = append(args, staticConfig.JavaConfig.JvmOpts...)
+	args = append(args, customConfig.JavaConfig.JvmOpts...)
 	args = append(args, "-classpath", classpath)
-	args = append(args, staticConfig.MainClass)
+	args = append(args, staticConfig.JavaConfig.MainClass)
 	args = append(args, staticConfig.Args...)
 	fmt.Printf("Argument list to Java binary: %v\n\n", args)
 

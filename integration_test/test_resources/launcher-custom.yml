@@ -1,4 +1,5 @@
 configType: java
-configVersion: 1
-jvmOpts:
-  - '-Xmx1g'
+configVersion: 2
+java:
+  jvmOpts:
+    - '-Xmx1g'

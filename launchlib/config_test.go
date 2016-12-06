@@ -22,34 +22,38 @@ import (
 func TestParseStaticConfig(t *testing.T) {
 	var data = []byte(`
 configType: java
-configVersion: 1
-mainClass: mainClass
-javaHome: javaHome
+configVersion: 2
 env:
   SOME_ENV_VAR: /etc/profile
   OTHER_ENV_VAR: /etc/redhat-release
-classpath:
-  - classpath1
-  - classpath2
-jvmOpts:
-  - jvmOpt1
-  - jvmOpt2
 args:
   - arg1
   - arg2
+java:
+  mainClass: mainClass
+  javaHome: javaHome
+  classpath:
+    - classpath1
+    - classpath2
+  jvmOpts:
+    - jvmOpt1
+    - jvmOpt2
+
 `)
 	expectedConfig := StaticLauncherConfig{
 		ConfigType:    "java",
-		ConfigVersion: 1,
-		MainClass:     "mainClass",
-		JavaHome:      "javaHome",
+		ConfigVersion: 2,
 		Env: map[string]string{
 			"SOME_ENV_VAR":  "/etc/profile",
 			"OTHER_ENV_VAR": "/etc/redhat-release",
 		},
-		Classpath: []string{"classpath1", "classpath2"},
-		JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
-		Args:      []string{"arg1", "arg2"}}
+		Args:      []string{"arg1", "arg2"},
+		JavaConfig:	JavaConfig{
+			MainClass:     "mainClass",
+			JavaHome:      "javaHome",
+			Classpath: []string{"classpath1", "classpath2"},
+			JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+		}}
 
 	config := ParseStaticConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {
@@ -60,22 +64,24 @@ args:
 func TestParseCustomConfig(t *testing.T) {
 	var data = []byte(`
 configType: java
-configVersion: 1
+configVersion: 2
 env:
   SOME_ENV_VAR: /etc/profile
   OTHER_ENV_VAR: /etc/redhat-release
-jvmOpts:
-  - jvmOpt1
-  - jvmOpt2
+java:
+  jvmOpts:
+    - jvmOpt1
+    - jvmOpt2
 `)
 	expectedConfig := CustomLauncherConfig{
 		ConfigType:    "java",
-		ConfigVersion: 1,
+		ConfigVersion: 2,
 		Env: map[string]string{
 			"SOME_ENV_VAR":  "/etc/profile",
 			"OTHER_ENV_VAR": "/etc/redhat-release",
 		},
-		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
+		JavaConfig:	JavaConfig{
+			JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}}
 
 	config := ParseCustomConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {
@@ -86,15 +92,17 @@ jvmOpts:
 func TestParseCustomConfigWithoutEnv(t *testing.T) {
 	var data = []byte(`
 configType: java
-configVersion: 1
-jvmOpts:
-  - jvmOpt1
-  - jvmOpt2
+configVersion: 2
+java:
+  jvmOpts:
+    - jvmOpt1
+    - jvmOpt2
 `)
 	expectedConfig := CustomLauncherConfig{
 		ConfigType:    "java",
-		ConfigVersion: 1,
-		JvmOpts:       []string{"jvmOpt1", "jvmOpt2"}}
+		ConfigVersion: 2,
+		JavaConfig:	JavaConfig{
+			JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}}
 
 	config := ParseCustomConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {
@@ -109,21 +117,23 @@ jvmOpts:
 func TestParseCustomConfigWithEnvPlaceholder(t *testing.T) {
 	var data = []byte(`
 configType: java
-configVersion: 1
+configVersion: 2
 env:
   SOME_ENV_VAR: '{{CWD}}/etc/profile'
-jvmOpts:
-  - jvmOpt1
-  - jvmOpt2
+java:
+  jvmOpts:
+    - jvmOpt1
+    - jvmOpt2
 `)
 
 	expectedConfig := CustomLauncherConfig{
 		ConfigType:    "java",
-		ConfigVersion: 1,
+		ConfigVersion: 2,
 		Env: map[string]string{
 			"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 		},
-		JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}
+		JavaConfig:	JavaConfig{
+			JvmOpts: []string{"jvmOpt1", "jvmOpt2"}}}
 
 	config := ParseCustomConfig(data)
 	if !reflect.DeepEqual(config, expectedConfig) {

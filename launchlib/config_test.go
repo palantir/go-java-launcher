@@ -21,7 +21,14 @@ import (
 )
 
 func TestParseStaticConfig(t *testing.T) {
-	var data = []byte(`
+	for i, currCase := range []struct {
+		name string
+		data string
+		want StaticLauncherConfig
+	}{
+		{
+			name: "java static config",
+			data: `
 configType: java
 configVersion: 1
 mainClass: mainClass
@@ -38,25 +45,56 @@ jvmOpts:
 args:
   - arg1
   - arg2
-`)
-	want := StaticLauncherConfig{
-		LauncherConfig: LauncherConfig{
-			ConfigType:    "java",
-			ConfigVersion: 1,
+`,
+			want: StaticLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+				Executable: "java",
+				Args:       []string{"arg1", "arg2"},
+				JavaConfig: JavaConfig{
+					MainClass: "mainClass",
+					JavaHome:  "javaHome",
+					Classpath: []string{"classpath1", "classpath2"},
+					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+				},
+			},
 		},
-		MainClass: "mainClass",
-		JavaHome:  "javaHome",
-		Env: map[string]string{
-			"SOME_ENV_VAR":  "/etc/profile",
-			"OTHER_ENV_VAR": "/etc/redhat-release",
+		{
+			name: "executable static config",
+			data: `
+configType: executable
+configVersion: 1
+executable: /usr/bin/postgres
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+args:
+  - arg1
+  - arg2
+`,
+			want: StaticLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "executable",
+					ConfigVersion: 1,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+				Executable: "/usr/bin/postgres",
+				Args:       []string{"arg1", "arg2"},
+			},
 		},
-		Classpath: []string{"classpath1", "classpath2"},
-		JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
-		Args:      []string{"arg1", "arg2"},
+	} {
+		got, _ := ParseStaticConfig([]byte(currCase.data))
+		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
-
-	got := ParseStaticConfig(data)
-	assert.Equal(t, want, got)
 }
 
 func TestParseCustomConfig(t *testing.T) {
@@ -66,7 +104,7 @@ func TestParseCustomConfig(t *testing.T) {
 		want CustomLauncherConfig
 	}{
 		{
-			name: "standard custom config",
+			name: "java custom config",
 			data: `
 configType: java
 configVersion: 1
@@ -90,7 +128,7 @@ jvmOpts:
 			},
 		},
 		{
-			name: "custom config without env",
+			name: "java custom config without env",
 			data: `
 configType: java
 configVersion: 1
@@ -107,7 +145,7 @@ jvmOpts:
 			},
 		},
 		{
-			name: "custom config with env placeholder",
+			name: "java custom config with env placeholder v1",
 			data: `
 configType: java
 configVersion: 1
@@ -128,8 +166,104 @@ jvmOpts:
 				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 			},
 		},
+		{
+			name: "executable custom config",
+			data: `
+configType: executable
+configVersion: 1
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "executable",
+					ConfigVersion: 1,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+			},
+		},
 	} {
-		got := ParseCustomConfig([]byte(currCase.data))
+		got, _ := ParseCustomConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
+	}
+}
+
+func TestParseStaticConfigFailures(t *testing.T) {
+	for i, currCase := range []struct {
+		name string
+		data string
+	}{
+		{
+			name: "bad YAML",
+			data: `
+bad: yaml:
+`,
+		},
+		{
+			name: "invalid config type",
+			data: `
+configType: config
+configVersion: 1
+executable: postgres
+`,
+		},
+		{
+			name: "invalid config version",
+			data: `
+configType: executable
+configVersion: 2
+executable: postgres
+`,
+		},
+		{
+			name: "invalid executable",
+			data: `
+configType: executable
+configVersion: 1
+executable: /bin/rm
+args:
+  - "-rf"
+  - "/"
+`,
+		},
+		{
+			name: "missing executable",
+			data: `
+configType: executable
+configVersion: 1
+`,
+		},
+		{
+			name: "missing java main class and classpath",
+			data: `
+configType: java
+configVersion: 1
+`,
+		},
+		{
+			name: "missing java main class",
+			data: `
+configType: java
+configVersion: 1
+classpath:
+  - thing1
+  - thing2
+`,
+		},
+		{
+			name: "missing java classpatg",
+			data: `
+configType: java
+configVersion: 1
+mainClass: hello.world
+`,
+		},
+	} {
+		_, err := ParseStaticConfig([]byte(currCase.data))
+		assert.NotEqual(t, err, nil, "Case %d: %s had no errors", i, currCase.name)
 	}
 }

@@ -3,7 +3,8 @@
 
 # go-java-launcher
 
-A simple Go program for launching Java programs from a fixed configuration. This program replaces Gradle-generated Bash
+
+A simple Go program for launching programs from a fixed configuration. This program replaces Gradle-generated Bash
 launch scripts which are susceptible to attacks via injection of environment variables of the form `JAVA_OPTS='$(rm -rf
 /)'`.
 
@@ -28,7 +29,9 @@ env:
 # JVM options to be passed to the java command
 jvmOpts:
   - '-Xmx1g'
-# Arguments passed to the main method of the main class
+# The full path to the executable file, ignored if configType is "java", limited to whitelisted values (java, postgres, influxd, grafana-server)
+executable: "{{CWD}}/service/bin/postgres"
+# Arguments passed to the main method of the excutable or main class
 args:
   - arg1
 ```

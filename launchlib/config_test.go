@@ -21,7 +21,14 @@ import (
 )
 
 func TestParseStaticConfig(t *testing.T) {
-	var data = []byte(`
+	for i, currCase := range []struct {
+		name string
+		data string
+		want StaticLauncherConfig
+	}{
+		{
+			name: "java static config v1",
+			data:`
 configType: java
 configVersion: 1
 mainClass: mainClass
@@ -38,25 +45,93 @@ jvmOpts:
 args:
   - arg1
   - arg2
-`)
-	want := StaticLauncherConfig{
-		LauncherConfig: LauncherConfig{
-			ConfigType:    "java",
-			ConfigVersion: 1,
+`,
+			want: StaticLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+				Args:      []string{"arg1", "arg2"},
+				JavaConfig:        JavaConfig{
+					MainClass:     "mainClass",
+					JavaHome:      "javaHome",
+					Classpath: []string{"classpath1", "classpath2"},
+					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+				},
+			},
 		},
-		MainClass: "mainClass",
-		JavaHome:  "javaHome",
-		Env: map[string]string{
-			"SOME_ENV_VAR":  "/etc/profile",
-			"OTHER_ENV_VAR": "/etc/redhat-release",
+		{
+			name: "java static config v2",
+			data:`
+configType: java
+configVersion: 2
+mainClass: mainClass
+javaHome: javaHome
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+classpath:
+  - classpath1
+  - classpath2
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+args:
+  - arg1
+  - arg2
+`,
+			want: StaticLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 2,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+				Args:      []string{"arg1", "arg2"},
+				JavaConfig:        JavaConfig{
+					MainClass:     "mainClass",
+					JavaHome:      "javaHome",
+					Classpath: []string{"classpath1", "classpath2"},
+					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+				},
+			},
 		},
-		Classpath: []string{"classpath1", "classpath2"},
-		JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
-		Args:      []string{"arg1", "arg2"},
+		{
+			name: "executable static config v2",
+			data:`
+configType: executable
+configVersion: 2
+executable: /bin/bash
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+args:
+  - arg1
+  - arg2
+`,
+			want: StaticLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "executable",
+					ConfigVersion: 2,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
+				Args:      []string{"arg1", "arg2"},
+				Executable: "/bin/bash",
+			},
+		},
+	} {
+		got := ParseStaticConfig([]byte(currCase.data))
+		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
-
-	got := ParseStaticConfig(data)
-	assert.Equal(t, want, got)
 }
 
 func TestParseCustomConfig(t *testing.T) {
@@ -66,7 +141,7 @@ func TestParseCustomConfig(t *testing.T) {
 		want CustomLauncherConfig
 	}{
 		{
-			name: "standard custom config",
+			name: "java custom config v1",
 			data: `
 configType: java
 configVersion: 1
@@ -86,11 +161,13 @@ jvmOpts:
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				JavaConfig: JavaConfig{
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
 			},
 		},
 		{
-			name: "custom config without env",
+			name: "java custom config without env v1",
 			data: `
 configType: java
 configVersion: 1
@@ -103,11 +180,13 @@ jvmOpts:
 					ConfigType:    "java",
 					ConfigVersion: 1,
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				JavaConfig:	JavaConfig{
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
 			},
 		},
 		{
-			name: "custom config with env placeholder",
+			name: "java custom config with env placeholder v1",
 			data: `
 configType: java
 configVersion: 1
@@ -125,7 +204,29 @@ jvmOpts:
 				Env: map[string]string{
 					"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				JavaConfig:	JavaConfig{
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
+			},
+		},
+		{
+			name: "executable custom config v2",
+			data: `
+configType: executable
+configVersion: 2
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "executable",
+					ConfigVersion: 2,
+				},
+				Env: map[string]string{
+					"SOME_ENV_VAR":  "/etc/profile",
+					"OTHER_ENV_VAR": "/etc/redhat-release",
+				},
 			},
 		},
 	} {

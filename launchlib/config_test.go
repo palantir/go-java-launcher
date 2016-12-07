@@ -19,7 +19,7 @@ import (
 	"testing"
 )
 
-func TestParseStaticConfig(t *testing.T) {
+func TestJavaParseStaticConfig(t *testing.T) {
 	var data = []byte(`
 configType: java
 configVersion: 2
@@ -61,7 +61,7 @@ java:
 	}
 }
 
-func TestParseCustomConfig(t *testing.T) {
+func TestJavaParseCustomConfig(t *testing.T) {
 	var data = []byte(`
 configType: java
 configVersion: 2
@@ -89,7 +89,7 @@ java:
 	}
 }
 
-func TestParseCustomConfigWithoutEnv(t *testing.T) {
+func TestJavaParseCustomConfigWithoutEnv(t *testing.T) {
 	var data = []byte(`
 configType: java
 configVersion: 2
@@ -114,7 +114,7 @@ java:
 	}
 }
 
-func TestParseCustomConfigWithEnvPlaceholder(t *testing.T) {
+func TestJavaParseCustomConfigWithEnvPlaceholder(t *testing.T) {
 	var data = []byte(`
 configType: java
 configVersion: 2
@@ -140,4 +140,79 @@ java:
 		t.Errorf("Expected config %v, found %v", expectedConfig, config)
 	}
 
+}
+
+func TestShellParseStaticConfig(t *testing.T) {
+	var data = []byte(`
+configType: shell
+configVersion: 2
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+args:
+  - arg1
+  - arg2
+shell:
+  executable: /bin/bash
+`)
+	expectedConfig := StaticLauncherConfig{
+		ConfigType:    "shell",
+		ConfigVersion: 2,
+		Env: map[string]string{
+			"SOME_ENV_VAR":  "/etc/profile",
+			"OTHER_ENV_VAR": "/etc/redhat-release",
+		},
+		Args:      []string{"arg1", "arg2"},
+		ShellConfig:	ShellConfig{
+			Executable: "/bin/bash"}}
+
+	config := ParseStaticConfig(data)
+	if !reflect.DeepEqual(config, expectedConfig) {
+		t.Errorf("Expected config %v, found %v", expectedConfig, config)
+	}
+}
+
+func TestShellParseStaticConfigWithoutEnv(t *testing.T) {
+	var data = []byte(`
+configType: shell
+configVersion: 2
+args:
+  - arg1
+  - arg2
+shell:
+  executable: /bin/bash
+`)
+	expectedConfig := StaticLauncherConfig{
+		ConfigType:    "shell",
+		ConfigVersion: 2,
+		Args:      []string{"arg1", "arg2"},
+		ShellConfig:	ShellConfig{
+			Executable: "/bin/bash"}}
+
+	config := ParseStaticConfig(data)
+	if !reflect.DeepEqual(config, expectedConfig) {
+		t.Errorf("Expected config %v, found %v", expectedConfig, config)
+	}
+}
+
+func TestShellParseCustomConfigWithoutEnv(t *testing.T) {
+	var data = []byte(`
+configType: shell
+configVersion: 2
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+`)
+	expectedConfig := CustomLauncherConfig{
+		ConfigType:    "shell",
+		ConfigVersion: 2,
+		Env: map[string]string{
+			"SOME_ENV_VAR":  "/etc/profile",
+			"OTHER_ENV_VAR": "/etc/redhat-release",
+		}}
+
+	config := ParseCustomConfig(data)
+	if !reflect.DeepEqual(config, expectedConfig) {
+		t.Errorf("Expected config %v, found %v", expectedConfig, config)
+	}
 }

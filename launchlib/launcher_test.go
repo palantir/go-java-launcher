@@ -17,9 +17,11 @@ package launchlib
 import (
 	"fmt"
 	"os"
-	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockProcessExecutor struct {
@@ -30,18 +32,14 @@ type mockProcessExecutor struct {
 
 func TestGetJavaHome(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
-	setEnvOrFail("JAVA_HOME", "foo")
+	require.NoError(t, os.Setenv("JAVA_HOME", "foo"))
 
 	javaHome := getJavaHome("")
-	if javaHome != "foo" {
-		t.Error("Expected JAVA_HOME='foo', found", javaHome)
-	}
+	assert.Equal(t, "foo", javaHome, "JAVA_HOME incorrect")
 	javaHome = getJavaHome("explicit javahome")
-	if javaHome != "explicit javahome" {
-		t.Error("Expected JAVA_HOME='explicit javahome', found", javaHome)
-	}
+	assert.Equal(t, "explicit javahome", javaHome, "JAVA_HOME incorrect")
 
-	setEnvOrFail("JAVA_HOME", originalJavaHome)
+	require.NoError(t, os.Setenv("JAVA_HOME", originalJavaHome))
 }
 
 func TestSetCustomEnvironment(t *testing.T) {
@@ -52,22 +50,17 @@ func TestSetCustomEnvironment(t *testing.T) {
 	}
 
 	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
-
 	cwd := getWorkingDir()
 
-	if val, ok := env["SOME_PATH"]; ok {
-		expected := fmt.Sprintf("%s/full/path", cwd)
-		if val != expected {
-			t.Errorf("For SOME_PATH, expected %s, but got %s", expected, val)
-		}
+	if got, ok := env["SOME_PATH"]; ok {
+		want := fmt.Sprintf("%s/full/path", cwd)
+		assert.Equal(t, want, got, "SOME_PATH environment variable incorrect")
 	} else {
 		t.Errorf("Expected SOME_PATH to exist in map but it didn't")
 	}
 
-	if val, ok := env["SOME_VAR"]; ok {
-		if val != "CUSTOM_VAR" {
-			t.Errorf("For SOME_VAR, expected %s, but got %s", "CUSTOM_VAR", val)
-		}
+	if got, ok := env["SOME_VAR"]; ok {
+		assert.Equal(t, "CUSTOM_VAR", got, "SOME_VAR environment variable incorrect")
 	} else {
 		t.Errorf("Expected CUSTOM_VAR to exist in map, but it didn't")
 	}
@@ -76,25 +69,18 @@ func TestSetCustomEnvironment(t *testing.T) {
 	args := []string{"arg1", "arg2"}
 	execWithChecks("my-command", args, env, &m)
 
-	if m.command != "my-command" {
-		t.Errorf("Expected command to be run was %s, but instead was %s", "my-command", m.command)
-	}
-
-	if !reflect.DeepEqual(m.args, args) {
-		t.Errorf("Expected incoming args to be %v, but were %v", args, m.args)
-	}
+	assert.Equal(t, "my-command", m.command, "Command to be run was incorrect")
+	assert.Equal(t, args, m.args)
 
 	startingEnv := os.Environ()
-	expectedEnv := append(startingEnv, []string{
+	wantEnv := append(startingEnv, []string{
 		fmt.Sprintf("SOME_PATH=%s/full/path", cwd),
 		"SOME_VAR=CUSTOM_VAR",
 	}...)
 
 	sort.Strings(m.env)
-	sort.Strings(expectedEnv)
-	if !reflect.DeepEqual(m.env, expectedEnv) {
-		t.Errorf("Expected custom environment to be %v, but instead was %v", expectedEnv, m.env)
-	}
+	sort.Strings(wantEnv)
+	assert.Equal(t, wantEnv, m.env)
 }
 
 func TestUnknownVariablesAreNotExpanded(t *testing.T) {
@@ -104,11 +90,8 @@ func TestUnknownVariablesAreNotExpanded(t *testing.T) {
 	}
 
 	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
-
-	if val, ok := env["SOME_VAR"]; ok {
-		if val != "{{FOO}}" {
-			t.Errorf("For SOME_VAR, expected %s, but got %s", "{{FOO}}", val)
-		}
+	if got, ok := env["SOME_VAR"]; ok {
+		assert.Equal(t, "{{FOO}}", got, "SOME_VAR environment variable incorrect")
 	} else {
 		t.Errorf("Expected SOME_VAR to exist in map, but it didn't")
 	}
@@ -121,27 +104,16 @@ func TestKeysAreNotExpanded(t *testing.T) {
 	}
 
 	env := replaceEnvironmentVariables(merge(originalEnv, customEnv))
-
-	if val, ok := env["{{CWD}}"]; ok {
-		if val != "Value" {
-			t.Errorf("For %%CWD%%, expected %s, but got %s", "Value", val)
-		}
+	if got, ok := env["{{CWD}}"]; ok {
+		assert.Equal(t, "Value", got, "%%CWD%% environment variable incorrect")
 	} else {
 		t.Errorf("Expected %%CWD%% to exist in map and not be expanded, but it didn't")
 	}
 }
 
-func (m *mockProcessExecutor) Exec(command string, args []string, env []string) error {
+func (m *mockProcessExecutor) Exec(command string, args, env []string) error {
 	m.command = command
 	m.args = args
 	m.env = env
-
 	return nil
-}
-
-func setEnvOrFail(key string, value string) {
-	err := os.Setenv(key, value)
-	if err != nil {
-		panic("Failed to set env var: " + key)
-	}
 }

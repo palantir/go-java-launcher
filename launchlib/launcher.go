@@ -30,7 +30,7 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file
+// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
 func verifyPathIsSafeForExec(execPath string) string {
 	unsafe, _ := regexp.MatchString(ExecPathBlackListRegex, execPath)
 	_, statError := os.Stat(execPath)
@@ -44,8 +44,7 @@ type processExecutor interface {
 	Exec(executable string, args []string, env []string) error
 }
 
-type syscallProcessExecutor struct {
-}
+type syscallProcessExecutor struct{}
 
 // Returns explicitJavaHome if it is not the empty string, or the value of the JAVA_HOME environment variable otherwise.
 // Panics if neither of them is set.
@@ -124,12 +123,12 @@ func execWithChecks(javaExecutable string, args []string, customEnv map[string]s
 	}
 }
 
-func (s *syscallProcessExecutor) Exec(executable string, args []string, env []string) error {
+func (s *syscallProcessExecutor) Exec(executable string, args, env []string) error {
 	return syscall.Exec(executable, args, env)
 }
 
 // Performs replacement of all replaceable values in env, returning a new
-// map, with the same keys as env, but possibly changed values
+// map, with the same keys as env, but possibly changed values.
 func replaceEnvironmentVariables(env map[string]string) map[string]string {
 	replacer := createReplacer()
 
@@ -142,9 +141,9 @@ func replaceEnvironmentVariables(env map[string]string) map[string]string {
 }
 
 // copy all the keys and values from overrideMap into origMap. If a key already
-// exists in origMap, it's value is overridden
-func merge(origMap map[string]string, overrideMap map[string]string) map[string]string {
-	if overrideMap == nil {
+// exists in origMap, its value is overridden.
+func merge(origMap, overrideMap map[string]string) map[string]string {
+	if len(overrideMap) == 0 {
 		return origMap
 	}
 

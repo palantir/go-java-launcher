@@ -88,37 +88,47 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	workingDir := getWorkingDir()
 	fmt.Println("Working directory:", workingDir)
 
-	javaHome := getJavaHome(staticConfig.JavaConfig.JavaHome)
-	fmt.Println("Using JAVA_HOME:", javaHome)
-	javaCommand := verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
-
-	classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
-	fmt.Println("Classpath:", classpath)
-
 	var args []string
-	args = append(args, javaCommand) // 0th argument is the command itself
-	args = append(args, staticConfig.JavaConfig.JvmOpts...)
-	args = append(args, customConfig.JavaConfig.JvmOpts...)
-	args = append(args, "-classpath", classpath)
-	args = append(args, staticConfig.JavaConfig.MainClass)
+	var executable string
+
+	if staticConfig.ConfigType == "java" {
+		javaHome := getJavaHome(staticConfig.JavaConfig.JavaHome)
+		fmt.Println("Using JAVA_HOME:", javaHome)
+
+		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
+		fmt.Println("Classpath:", classpath)
+
+		executable = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+		args = append(args, executable) // 0th argument is the command itself
+		args = append(args, staticConfig.JavaConfig.JvmOpts...)
+		args = append(args, customConfig.JavaConfig.JvmOpts...)
+		args = append(args, "-classpath", classpath)
+		args = append(args, staticConfig.JavaConfig.MainClass)
+	} else if staticConfig.ConfigType == "shell" {
+		executable = verifyPathIsSafeForExec(staticConfig.ShellConfig.Executable)
+		args = append(args, executable) // 0th argument is the command itself
+	} else{
+		panic(fmt.Sprintf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType))
+	}
+
 	args = append(args, staticConfig.Args...)
-	fmt.Printf("Argument list to Java binary: %v\n\n", args)
+	fmt.Printf("Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
-	execWithChecks(javaCommand, args, env, &syscallProcessExecutor{})
+	execWithChecks(executable, args, env, &syscallProcessExecutor{})
 }
 
-func execWithChecks(javaExecutable string, args []string, customEnv map[string]string, p processExecutor) {
+func execWithChecks(executable string, args []string, customEnv map[string]string, p processExecutor) {
 	env := os.Environ()
 	for key, value := range customEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	execErr := p.Exec(javaExecutable, args, env)
+	execErr := p.Exec(executable, args, env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
-			fmt.Println("Java Executable not found at:", javaExecutable)
+			fmt.Println("Executable not found at:", executable)
 		}
 		panic(execErr)
 	}

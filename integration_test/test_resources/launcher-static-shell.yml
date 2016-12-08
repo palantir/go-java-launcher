@@ -1,0 +1,9 @@
+configType: shell
+configVersion: 2
+args:
+  - "-l"
+  - "-a"
+env:
+  PATH: ".."
+shell:
+  executable: /bin/ls

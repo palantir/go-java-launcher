@@ -16,6 +16,8 @@ package launchlib
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path"
 
 	"gopkg.in/yaml.v2"
@@ -127,6 +129,18 @@ func ParseStaticConfig(yamlString []byte) (StaticLauncherConfig, error) {
 	return config, nil
 }
 
+func GetStaticConfigFromFile(staticConfigFile string) (StaticLauncherConfig, error) {
+	staticData, err := ioutil.ReadFile(staticConfigFile)
+	if err != nil {
+		return StaticLauncherConfig{}, fmt.Errorf("Failed to read static config file: " + staticConfigFile)
+	}
+	staticConfig, staticConfigOk := ParseStaticConfig(staticData)
+	if staticConfigOk != nil {
+		return StaticLauncherConfig{}, staticConfigOk
+	}
+	return staticConfig, nil
+}
+
 func ParseCustomConfig(yamlString []byte) (CustomLauncherConfig, error) {
 	var config CustomLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
@@ -136,4 +150,17 @@ func ParseCustomConfig(yamlString []byte) (CustomLauncherConfig, error) {
 		return CustomLauncherConfig{}, launcherConfigOk
 	}
 	return config, nil
+}
+
+func GetCustomConfigFromFile(customConfigFile string) (CustomLauncherConfig, error) {
+	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
+		fmt.Fprintln(os.Stderr, "Failed to read custom config file, assuming no custom config:", customConfigFile)
+		return CustomLauncherConfig{}, nil
+	} else {
+		customConfig, customConfigOk := ParseCustomConfig(customData)
+		if customConfigOk != nil {
+			return CustomLauncherConfig{}, customConfigOk
+		}
+		return customConfig, nil
+	}
 }

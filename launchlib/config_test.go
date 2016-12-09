@@ -125,7 +125,6 @@ jvmOpts:
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
 				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
-
 			},
 		},
 		{

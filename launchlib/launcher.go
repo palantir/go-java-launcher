@@ -35,6 +35,20 @@ func exit1WithMessage(message string) {
 	os.Exit((1))
 }
 
+func LaunchWithConfig(staticConfigFile, customConfigFile string) {
+	staticConfig, staticConfigOk := GetStaticConfigFromFile(staticConfigFile)
+	if staticConfigOk != nil {
+		exit1WithMessage(staticConfigOk.Error())
+	}
+
+	customConfig, customConfigOk := GetCustomConfigFromFile(customConfigFile)
+	if customConfigOk != nil {
+		exit1WithMessage(customConfigOk.Error())
+	}
+
+	Launch(&staticConfig, &customConfig)
+}
+
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
 func verifyPathIsSafeForExec(execPath string) string {
 	unsafe, _ := regexp.MatchString(ExecPathBlackListRegex, execPath)

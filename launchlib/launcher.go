@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
@@ -29,6 +30,23 @@ const (
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
+
+func LaunchWithConfig(staticConfigFile, customConfigFile string) {
+	staticData, err := ioutil.ReadFile(staticConfigFile)
+	if err != nil {
+		panic("Failed to read static config file: " + staticConfigFile)
+	}
+	staticConfig := ParseStaticConfig(staticData)
+
+	var customConfig CustomLauncherConfig
+	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
+		fmt.Println("Failed to read custom config file, assuming no custom config:", customConfigFile)
+	} else {
+		customConfig = ParseCustomConfig(customData)
+	}
+
+	Launch(&staticConfig, &customConfig)
+}
 
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
 func verifyPathIsSafeForExec(execPath string) string {

@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"regexp"
@@ -33,6 +34,30 @@ const (
 func exit1WithMessage(message string) {
 	fmt.Fprintln(os.Stderr, message)
 	os.Exit((1))
+}
+
+func LaunchWithConfig(staticConfigFile, customConfigFile string) {
+	staticData, err := ioutil.ReadFile(staticConfigFile)
+	if err != nil {
+		exit1WithMessage(fmt.Sprintf("Failed to read static config file: " + staticConfigFile))
+	}
+	staticConfig, staticConfigOk := ParseStaticConfig(staticData)
+	if staticConfigOk != nil {
+		exit1WithMessage(staticConfigOk.Error())
+	}
+
+	var customConfig CustomLauncherConfig
+	var customConfigOk error
+	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
+		fmt.Println("Failed to read custom config file, assuming no custom config:", customConfigFile)
+	} else {
+		customConfig, customConfigOk = ParseCustomConfig(customData)
+		if customConfigOk != nil {
+			exit1WithMessage(customConfigOk.Error())
+		}
+	}
+
+	Launch(&staticConfig, &customConfig)
 }
 
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.

@@ -28,7 +28,7 @@ func TestMainMethod(t *testing.T) {
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to Java binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to Java binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-launcher/integration_test/test_resources Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }
@@ -44,13 +44,13 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
-	assert.Regexp(t, `Argument list to Java binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to Java binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-launcher/integration_test/test_resources Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }
 
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (string, error) {
-	cli, err := products.Bin("go-java-launcher")
+	cli, err := products.Bin("go-launcher")
 	require.NoError(t, err)
 
 	cmd := exec.Command(cli, staticConfigFile, customConfigFile)

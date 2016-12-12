@@ -17,7 +17,7 @@ package main
 import (
 	"os"
 
-	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/palantir/go-launcher/launchlib"
 )
 
 func main() {

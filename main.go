@@ -26,7 +26,7 @@ func main() {
 
 	switch numArgs := len(os.Args); {
 	case numArgs > 3:
-		panic("Usage: go-java-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]")
+		panic("Usage: go-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]")
 	case numArgs == 2:
 		staticConfigFile = os.Args[1]
 	case numArgs == 3:

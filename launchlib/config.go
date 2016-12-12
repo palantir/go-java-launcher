@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"path"
 
 	"gopkg.in/yaml.v2"
 )
@@ -28,11 +29,13 @@ type LauncherConfig struct {
 type AllowedLauncherConfigValues struct {
 	ConfigTypes    	map[string]struct{}
 	ConfigVersions 	map[int]struct{}
+	Executables    	map[string]struct{}
 }
 
 var allowedLauncherConfigs = AllowedLauncherConfigValues{
 	ConfigTypes: 	map[string]struct{}{"java":{},"executable":{}},
 	ConfigVersions: map[int]struct{}{1:{},2:{}},
+	Executables: 	map[string]struct{}{"java":{},"postgres":{},"influxd":{},"grafana-server":{}},
 }
 
 func (config *LauncherConfig) validateLauncherConfig(){
@@ -92,6 +95,13 @@ func validateExecutableConfig(executable string){
 	if len(executable) <= 0 {
 		panic(fmt.Sprintf("Config type \"executable\" requires top-level \"executable:\" value"))
 	}
+	_, executableOk := allowedLauncherConfigs.Executables[path.Base(executable)]
+	if ! executableOk {
+		allowedExecutables := make([]string, 0, len(allowedLauncherConfigs.Executables))
+		for k := range allowedLauncherConfigs.Executables { allowedExecutables = append(allowedExecutables, k) }
+
+		panic(fmt.Sprintf("Can handle executable=%v only, found %v", allowedExecutables, executable))
+	}
 }
 
 func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {
@@ -99,9 +109,12 @@ func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
 		unmarshalErrPanic("StaticLauncherConfig", err)
 	}
+	if config.ConfigType == "java" {
+		validateJavaConfig(config.JavaConfig)
+		config.Executable = "java"
+	}
+	validateExecutableConfig(config.Executable)
 	config.LauncherConfig.validateLauncherConfig()
-	if config.ConfigType == "java" { validateJavaConfig(config.JavaConfig) }
-	if config.ConfigType == "executable" { validateExecutableConfig(config.Executable) }
 	return config
 }
 

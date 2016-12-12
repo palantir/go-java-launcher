@@ -55,6 +55,7 @@ args:
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
+				Executable: "java",
 				Args:      []string{"arg1", "arg2"},
 				JavaConfig:        JavaConfig{
 					MainClass:     "mainClass",
@@ -93,6 +94,7 @@ args:
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
+				Executable: "java",
 				Args:      []string{"arg1", "arg2"},
 				JavaConfig:        JavaConfig{
 					MainClass:     "mainClass",
@@ -107,7 +109,7 @@ args:
 			data:`
 configType: executable
 configVersion: 2
-executable: /bin/bash
+executable: /usr/bin/postgres
 env:
   SOME_ENV_VAR: /etc/profile
   OTHER_ENV_VAR: /etc/redhat-release
@@ -124,8 +126,8 @@ args:
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
+				Executable: "/usr/bin/postgres",
 				Args:      []string{"arg1", "arg2"},
-				Executable: "/bin/bash",
 			},
 		},
 	} {

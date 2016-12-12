@@ -124,7 +124,7 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	} else if staticConfig.ConfigType == "executable" {
 		executable = verifyPathIsSafeForExec(staticConfig.Executable)
 		args = append(args, executable) // 0th argument is the command itself
-	} else{
+	} else {
 		panic(fmt.Sprintf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType))
 	}
 

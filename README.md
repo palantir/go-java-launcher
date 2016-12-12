@@ -3,7 +3,7 @@
 
 # go-launcher
 
-A simple Go program for launching  programs from a fixed configuration. This program replaces Gradle-generated Bash
+A simple Go program for launching programs from a fixed configuration. This program replaces Gradle-generated Bash
 launch scripts which are susceptible to attacks via injection of environment variables of the form `JAVA_OPTS='$(rm -rf
 /)'`.
 
@@ -13,7 +13,7 @@ The launcher accepts as configuration two YAML files as follows:
 # StaticLauncherConfig
 # The type of configuration, must be the string "java" or "executable"
 configType: java
-# The version of the configuration format, must be the integer 1 or 2
+# The version of the configuration format, must be the integer 1
 configVersion: 1
 # The main class to be run if running a Java Program
 mainClass: my.package.Main
@@ -29,7 +29,7 @@ env:
 jvmOpts:
   - '-Xmx1g'
 # The full path to the executable file, ignored if configType is "java", limited to whitelisted values (java, postgres, influxd, grafana-server)
-executable: /usr/bin/postgres
+executable: "{{CWD}}/service/bin/postgres"
 # Arguments passed to the main method of the excutable or main class
 args:
   - arg1

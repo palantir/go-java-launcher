@@ -27,8 +27,8 @@ func TestParseStaticConfig(t *testing.T) {
 		want StaticLauncherConfig
 	}{
 		{
-			name: "java static config v1",
-			data:`
+			name: "java static config",
+			data: `
 configType: java
 configVersion: 1
 mainClass: mainClass
@@ -56,59 +56,20 @@ args:
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
 				Executable: "java",
-				Args:      []string{"arg1", "arg2"},
-				JavaConfig:        JavaConfig{
-					MainClass:     "mainClass",
-					JavaHome:      "javaHome",
+				Args:       []string{"arg1", "arg2"},
+				JavaConfig: JavaConfig{
+					MainClass: "mainClass",
+					JavaHome:  "javaHome",
 					Classpath: []string{"classpath1", "classpath2"},
 					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
 				},
 			},
 		},
 		{
-			name: "java static config v2",
-			data:`
-configType: java
-configVersion: 2
-mainClass: mainClass
-javaHome: javaHome
-env:
-  SOME_ENV_VAR: /etc/profile
-  OTHER_ENV_VAR: /etc/redhat-release
-classpath:
-  - classpath1
-  - classpath2
-jvmOpts:
-  - jvmOpt1
-  - jvmOpt2
-args:
-  - arg1
-  - arg2
-`,
-			want: StaticLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 2,
-				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
-				},
-				Executable: "java",
-				Args:      []string{"arg1", "arg2"},
-				JavaConfig:        JavaConfig{
-					MainClass:     "mainClass",
-					JavaHome:      "javaHome",
-					Classpath: []string{"classpath1", "classpath2"},
-					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
-				},
-			},
-		},
-		{
-			name: "executable static config v2",
-			data:`
+			name: "executable static config",
+			data: `
 configType: executable
-configVersion: 2
+configVersion: 1
 executable: /usr/bin/postgres
 env:
   SOME_ENV_VAR: /etc/profile
@@ -120,14 +81,14 @@ args:
 			want: StaticLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "executable",
-					ConfigVersion: 2,
+					ConfigVersion: 1,
 				},
 				Env: map[string]string{
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
 				Executable: "/usr/bin/postgres",
-				Args:      []string{"arg1", "arg2"},
+				Args:       []string{"arg1", "arg2"},
 			},
 		},
 	} {
@@ -143,7 +104,7 @@ func TestParseCustomConfig(t *testing.T) {
 		want CustomLauncherConfig
 	}{
 		{
-			name: "java custom config v1",
+			name: "java custom config",
 			data: `
 configType: java
 configVersion: 1
@@ -169,7 +130,7 @@ jvmOpts:
 			},
 		},
 		{
-			name: "java custom config without env v1",
+			name: "java custom config without env",
 			data: `
 configType: java
 configVersion: 1
@@ -182,7 +143,7 @@ jvmOpts:
 					ConfigType:    "java",
 					ConfigVersion: 1,
 				},
-				JavaConfig:	JavaConfig{
+				JavaConfig: JavaConfig{
 					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
 			},
@@ -206,16 +167,16 @@ jvmOpts:
 				Env: map[string]string{
 					"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 				},
-				JavaConfig:	JavaConfig{
+				JavaConfig: JavaConfig{
 					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
 			},
 		},
 		{
-			name: "executable custom config v2",
+			name: "executable custom config",
 			data: `
 configType: executable
-configVersion: 2
+configVersion: 1
 env:
   SOME_ENV_VAR: /etc/profile
   OTHER_ENV_VAR: /etc/redhat-release
@@ -223,7 +184,7 @@ env:
 			want: CustomLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "executable",
-					ConfigVersion: 2,
+					ConfigVersion: 1,
 				},
 				Env: map[string]string{
 					"SOME_ENV_VAR":  "/etc/profile",

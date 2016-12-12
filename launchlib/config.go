@@ -27,48 +27,50 @@ type LauncherConfig struct {
 }
 
 type AllowedLauncherConfigValues struct {
-	ConfigTypes    	map[string]struct{}
-	ConfigVersions 	map[int]struct{}
-	Executables    	map[string]struct{}
+	ConfigTypes    map[string]struct{}
+	ConfigVersions map[int]struct{}
+	Executables    map[string]struct{}
 }
 
 var allowedLauncherConfigs = AllowedLauncherConfigValues{
-	ConfigTypes: 	map[string]struct{}{"java":{},"executable":{}},
-	ConfigVersions: map[int]struct{}{1:{},2:{}},
-	Executables: 	map[string]struct{}{"java":{},"postgres":{},"influxd":{},"grafana-server":{}},
+	ConfigTypes:    map[string]struct{}{"java": {}, "executable": {}},
+	ConfigVersions: map[int]struct{}{1: {}},
+	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}},
 }
 
-func (config *LauncherConfig) validateLauncherConfig(){
-	_, typeOk := allowedLauncherConfigs.ConfigTypes[config.ConfigType]
-	_, versionOk := allowedLauncherConfigs.ConfigVersions[config.ConfigVersion]
-	if ! typeOk {
+func (config *LauncherConfig) validateLauncherConfig() {
+	if _, typeOk := allowedLauncherConfigs.ConfigTypes[config.ConfigType]; !typeOk {
 		allowedConfigTypes := make([]string, 0, len(allowedLauncherConfigs.ConfigTypes))
-		for k := range allowedLauncherConfigs.ConfigTypes { allowedConfigTypes = append(allowedConfigTypes, k) }
+		for k := range allowedLauncherConfigs.ConfigTypes {
+			allowedConfigTypes = append(allowedConfigTypes, k)
+		}
 
-		panic(fmt.Sprintf("Can handle configType=%v only, found %v", allowedConfigTypes, config.ConfigType))
+		panic(fmt.Sprintf("Can handle configType=%v only, found %s", allowedConfigTypes, config.ConfigType))
 	}
-	if ! versionOk {
+	if _, versionOk := allowedLauncherConfigs.ConfigVersions[config.ConfigVersion]; !versionOk {
 		allowedConfigVersions := make([]int, 0, len(allowedLauncherConfigs.ConfigVersions))
-		for k := range allowedLauncherConfigs.ConfigVersions { allowedConfigVersions = append(allowedConfigVersions, k) }
+		for k := range allowedLauncherConfigs.ConfigVersions {
+			allowedConfigVersions = append(allowedConfigVersions, k)
+		}
 
-		panic(fmt.Sprintf("Can handle configVersion=%v only, found %v", allowedConfigVersions, config.ConfigVersion))
+		panic(fmt.Sprintf("Can handle configVersion=%v only, found %d", allowedConfigVersions, config.ConfigVersion))
 	}
 }
 
 type JavaConfig struct {
-	JavaHome      string            `yaml:"javaHome"`
-	MainClass     string            `yaml:"mainClass"`
-	JvmOpts       []string 		`yaml:"jvmOpts"`
-	Classpath     []string 		`yaml:"classpath"`
+	JavaHome  string   `yaml:"javaHome"`
+	MainClass string   `yaml:"mainClass"`
+	JvmOpts   []string `yaml:"jvmOpts"`
+	Classpath []string `yaml:"classpath"`
 }
 
 type StaticLauncherConfig struct {
 	LauncherConfig `yaml:",inline"`
+	JavaConfig     `yaml:",inline",validate:"nonzero"`
 	ServiceName    string            `yaml:"serviceName"`
-	JavaConfig     `yaml:",inline"`
 	Env            map[string]string `yaml:"env"`
 	Executable     string            `yaml:"executable,omitempty"`
-	Args           []string 	 `yaml:"args"`
+	Args           []string          `yaml:"args"`
 }
 
 type CustomLauncherConfig struct {
@@ -77,28 +79,15 @@ type CustomLauncherConfig struct {
 	Env            map[string]string `yaml:"env"`
 }
 
-func (jc *JavaConfig) isEmpty() bool {
-	if len(jc.JavaHome) > 0 {return false}
-	if len(jc.MainClass) > 0 {return false}
-	if len(jc.JvmOpts) > 0 {return false}
-	if len(jc.Classpath) > 0 {return false}
-	return true
-}
-
-func validateJavaConfig(javaConfig JavaConfig){
-	if javaConfig.isEmpty() {
-		panic(fmt.Sprintf("Config type \"java\" requires top-level \"java:\" block"))
-	}
-}
-
-func validateExecutableConfig(executable string){
-	if len(executable) <= 0 {
+func validateExecutableConfig(executable string) {
+	if executable == "" {
 		panic(fmt.Sprintf("Config type \"executable\" requires top-level \"executable:\" value"))
 	}
-	_, executableOk := allowedLauncherConfigs.Executables[path.Base(executable)]
-	if ! executableOk {
+	if _, executableOk := allowedLauncherConfigs.Executables[path.Base(executable)]; !executableOk {
 		allowedExecutables := make([]string, 0, len(allowedLauncherConfigs.Executables))
-		for k := range allowedLauncherConfigs.Executables { allowedExecutables = append(allowedExecutables, k) }
+		for k := range allowedLauncherConfigs.Executables {
+			allowedExecutables = append(allowedExecutables, k)
+		}
 
 		panic(fmt.Sprintf("Can handle executable=%v only, found %v", allowedExecutables, executable))
 	}
@@ -110,7 +99,6 @@ func ParseStaticConfig(yamlString []byte) StaticLauncherConfig {
 		unmarshalErrPanic("StaticLauncherConfig", err)
 	}
 	if config.ConfigType == "java" {
-		validateJavaConfig(config.JavaConfig)
 		config.Executable = "java"
 	}
 	validateExecutableConfig(config.Executable)
@@ -124,7 +112,6 @@ func ParseCustomConfig(yamlString []byte) CustomLauncherConfig {
 		unmarshalErrPanic("CustomLauncherConfig", err)
 	}
 	config.LauncherConfig.validateLauncherConfig()
-	if config.ConfigType == "java" { validateJavaConfig(config.JavaConfig) }
 	return config
 }
 

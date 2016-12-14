@@ -1,8 +1,7 @@
-[![CircleCI Build Status](https://circleci.com/gh/palantir/go-java-launcher/tree/develop.svg?style=shield)](https://circleci.com/gh/palantir/go-java-launcher)
-[![Download](https://api.bintray.com/packages/palantir/releases/go-java-launcher/images/download.svg) ](https://bintray.com/palantir/releases/go-java-launcher/_latestVersion)
+[![CircleCI Build Status](https://circleci.com/gh/palantir/go-launcher/tree/develop.svg?style=shield)](https://circleci.com/gh/palantir/go-launcher)
+[![Download](https://api.bintray.com/packages/palantir/releases/go-launcher/images/download.svg) ](https://bintray.com/palantir/releases/go-launcher/_latestVersion)
 
-# go-java-launcher
-
+# go-launcher
 
 A simple Go program for launching programs from a fixed configuration. This program replaces Gradle-generated Bash
 launch scripts which are susceptible to attacks via injection of environment variables of the form `JAVA_OPTS='$(rm -rf
@@ -11,47 +10,63 @@ launch scripts which are susceptible to attacks via injection of environment var
 The launcher accepts as configuration two YAML files as follows:
 
 ```yaml
-# StaticLauncherConfig
-# The type of configuration, must be the string "java"
+# StaticLauncherConfig - java version
+# REQUIRED - The type of configuration, must be the string "java"
 configType: java
-# The version of the configuration format, must be the integer 1
+# REQUIRED - The version of the configuration format, must be the integer 1
 configVersion: 1
-# The main class to be run
+# REQUIRED - The main class to be run
 mainClass: my.package.Main
-# Path to the JRE, defaults to the JAVA_HOME environment variable if unset
+# OPTIONAL - Path to the JRE, defaults to the JAVA_HOME environment variable if unset
 javaHome: javaHome
-# The classpath entries; the final classpath is the ':'-concatenated list in the given order
+# REQUIRED - The classpath entries; the final classpath is the ':'-concatenated list in the given order
 classpath:
   - ./foo.jar
-# Environment Variables to be set in the environment
+# OPTIONAL - Environment Variables to be set in the environment (Note: cannot be referenced on args list)
 env:
   CUSTOM_VAR: CUSTOM_VALUE
-# JVM options to be passed to the java command
+# OPTIONAL - JVM options to be passed to the java command
 jvmOpts:
   - '-Xmx1g'
-# The full path to the executable file, ignored if configType is "java", limited to whitelisted values (java, postgres, influxd, grafana-server)
+# OPTIONAL - Arguments passed to the main method of the main class
+args:
+  - arg1
+```
+
+```yaml
+# StaticLauncherConfig - executable version
+# REQUIRED - The type of configuration, must be the string "executable"
+configType: java
+# REQUIRED - The version of the configuration format, must be the integer 1
+configVersion: 1
+# OPTIONAL - Environment Variables to be set in the environment (Note: cannot be referenced on args list)
+env:
+  CUSTOM_VAR: CUSTOM_VALUE
+# REQUIRED - The full path to the executable file, limited to whitelisted values (java, postgres, influxd, grafana-server)
 executable: "{{CWD}}/service/bin/postgres"
-# Arguments passed to the main method of the excutable or main class
+# OPTIONAL - Arguments passed to the main method of the excutable or main class
 args:
   - arg1
 ```
 
 ```yaml
 # CustomLauncherConfig
+# REQUIRED - The type of configuration, must be the string "java" or "executable"
 configType: java
+# REQUIRED - The version of the configuration format, must be the integer 1
 configVersion: 1
-# Environment variables to be set in the runtime environment
+# OPTIONAL - Environment Variables to be set in the environment, will override defaults in static config (Note: cannot be referenced on args list)
 env:
   CUSTOM_VAR: CUSTOM_VALUE
   CUSTOM_PATH: '{{CWD}}/some/path'
-# JVM options to be passed to the java command
+# Additional JVM options to be passed to the java command, will override defaults in static config. Ignored if configType is "executable"
 jvmOpts:
   - '-Xmx2g'
 ```
 
 The launcher is invoked as:
 ```
-go-java-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
+go-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
 ```
 
 where the

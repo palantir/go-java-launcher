@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/palantir/go-launcher/launchlib"
 )
 
 func Exit1WithMessage(message string) {

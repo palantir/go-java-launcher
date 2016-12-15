@@ -10,7 +10,7 @@
 			"revisionTime": "2016-11-17T07:43:51Z"
 		},
 		{
-			"path": "github.com/palantir/go-java-launcher/launchlib",
+			"path": "github.com/palantir/go-launcher/launchlib",
 			"revision": ""
 		},
 		{
@@ -57,5 +57,5 @@
 			"revisionTime": "2016-03-01T20:40:22Z"
 		}
 	],
-	"rootPath": "github.com/palantir/go-java-launcher"
+	"rootPath": "github.com/palantir/go-launcher"
 }

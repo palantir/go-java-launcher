@@ -30,14 +30,35 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
-func verifyPathIsSafeForExec(execPath string) string {
-	unsafe, _ := regexp.MatchString(ExecPathBlackListRegex, execPath)
-	_, statError := os.Stat(execPath)
-	if unsafe || statError != nil {
-		panic("Failed to determine is path is safe to execute: " + execPath)
+func LaunchWithConfig(staticConfigFile, customConfigFile string) error {
+	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
+	if staticConfigErr != nil {
+		return staticConfigErr
 	}
-	return execPath
+
+	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile)
+	if customConfigErr != nil {
+		return customConfigErr
+	}
+
+	launchErr := Launch(&staticConfig, &customConfig)
+	if launchErr != nil {
+		return launchErr
+	}
+	return nil
+}
+
+// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
+func verifyPathIsSafeForExec(execPath string) (string, error) {
+	if unsafe, err := regexp.MatchString(ExecPathBlackListRegex, execPath); err != nil {
+		return "", err
+	} else if unsafe {
+		return "", fmt.Errorf("Unsafe execution path: %q ", execPath)
+	} else if _, statErr := os.Stat(execPath); statErr != nil {
+		return "", statErr
+	}
+
+	return execPath, nil
 }
 
 type processExecutor interface {
@@ -48,16 +69,16 @@ type syscallProcessExecutor struct{}
 
 // Returns explicitJavaHome if it is not the empty string, or the value of the JAVA_HOME environment variable otherwise.
 // Panics if neither of them is set.
-func getJavaHome(explicitJavaHome string) string {
+func getJavaHome(explicitJavaHome string) (string, error) {
 	if explicitJavaHome != "" {
-		return explicitJavaHome
+		return explicitJavaHome, nil
 	}
 
 	javaHome := os.Getenv("JAVA_HOME")
 	if len(javaHome) == 0 {
-		panic("JAVA_HOME environment variable not set")
+		return "", fmt.Errorf("JAVA_HOME environment variable not set")
 	}
-	return javaHome
+	return javaHome, nil
 }
 
 func getWorkingDir() string {
@@ -81,43 +102,64 @@ func joinClasspathEntries(classpathEntries []string) string {
 	return strings.Join(classpathEntries, ":")
 }
 
-func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) {
+func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) error {
 	fmt.Printf("Launching with static configuration %v and custom configuration %v\n", *staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
 	fmt.Println("Working directory:", workingDir)
 
-	javaHome := getJavaHome(staticConfig.JavaHome)
-	fmt.Println("Using JAVA_HOME:", javaHome)
-	javaCommand := verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
-
-	classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.Classpath))
-	fmt.Println("Classpath:", classpath)
-
 	var args []string
-	args = append(args, javaCommand) // 0th argument is the command itself
-	args = append(args, staticConfig.JvmOpts...)
-	args = append(args, customConfig.JvmOpts...)
-	args = append(args, "-classpath", classpath)
-	args = append(args, staticConfig.MainClass)
+	var executable string
+	var executableErr error
+
+	if staticConfig.ConfigType == "java" {
+		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
+		if javaHomeErr != nil {
+			return javaHomeErr
+		}
+		fmt.Println("Using JAVA_HOME:", javaHome)
+
+		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
+		fmt.Println("Classpath:", classpath)
+
+		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+		if executableErr != nil {
+			return executableErr
+		}
+		args = append(args, executable) // 0th argument is the command itself
+		args = append(args, staticConfig.JavaConfig.JvmOpts...)
+		args = append(args, customConfig.JvmOpts...)
+		args = append(args, "-classpath", classpath)
+		args = append(args, staticConfig.JavaConfig.MainClass)
+	} else if staticConfig.ConfigType == "executable" {
+		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
+		if executableErr != nil {
+			return executableErr
+		}
+		args = append(args, executable) // 0th argument is the command itself
+	} else {
+		return fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
+	}
+
 	args = append(args, staticConfig.Args...)
-	fmt.Printf("Argument list to Java binary: %v\n\n", args)
+	fmt.Printf("Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
-	execWithChecks(javaCommand, args, env, &syscallProcessExecutor{})
+	execWithChecks(executable, args, env, &syscallProcessExecutor{})
+	return nil
 }
 
-func execWithChecks(javaExecutable string, args []string, customEnv map[string]string, p processExecutor) {
+func execWithChecks(executable string, args []string, customEnv map[string]string, p processExecutor) {
 	env := os.Environ()
 	for key, value := range customEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	execErr := p.Exec(javaExecutable, args, env)
+	execErr := p.Exec(executable, args, env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
-			fmt.Println("Java Executable not found at:", javaExecutable)
+			fmt.Println("Executable not found at:", executable)
 		}
 		panic(execErr)
 	}

@@ -28,14 +28,14 @@ func TestMainMethod(t *testing.T) {
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to Java binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
 	_, err := runMainWithArgs(t, "test_resources/launcher-static-bad-java-home.yml", "foo")
-	require.Error(t, err, "panic: Failed to determine is path is safe to execute: /foo/bar/bin/java")
+	require.Error(t, err, "error: Failed to determine is path is safe to execute: /foo/bar/bin/java")
 }
 
 func TestMainMethodWithoutCustomConfig(t *testing.T) {
@@ -44,7 +44,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
-	assert.Regexp(t, `Argument list to Java binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }

@@ -36,7 +36,7 @@ args:
 ```yaml
 # StaticLauncherConfig - executable version
 # REQUIRED - The type of configuration, must be the string "executable"
-configType: java
+configType: executable
 # REQUIRED - The version of the configuration format, must be the integer 1
 configVersion: 1
 # OPTIONAL - Environment Variables to be set in the environment (Note: cannot be referenced on args list)

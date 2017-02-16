@@ -27,7 +27,7 @@ const (
 	TemplateDelimsOpen  = "{{"
 	TemplateDelimsClose = "}}"
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
-	ExecPathBlackListRegex = `[^\w.\/_\-]`
+	ExecPathBlackListRegex = `[^\w.\/_\-~]`
 )
 
 func LaunchWithConfig(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {
@@ -122,7 +122,8 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.ConfigType == "executable" {
-		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
+		replacer := createReplacer()
+		executable, executableErr = verifyPathIsSafeForExec(replacer.Replace(staticConfig.Executable))
 		if executableErr != nil {
 			return nil, executableErr
 		}

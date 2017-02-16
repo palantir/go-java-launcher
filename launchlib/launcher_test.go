@@ -68,7 +68,7 @@ func TestSetCustomEnvironment(t *testing.T) {
 	}
 
 	args := []string{"arg1", "arg2"}
-	cmd, err := execWithChecks("my-command", args, env)
+	cmd, err := createCmd("my-command", args, env)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "my-command", cmd.Path, "Command to be run was incorrect")

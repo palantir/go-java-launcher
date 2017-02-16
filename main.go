@@ -41,7 +41,7 @@ func main() {
 		customConfigFile = os.Args[2]
 	}
 
-	cmd, err := launchlib.LaunchWithConfig(staticConfigFile, customConfigFile)
+	cmd, err := launchlib.CompileCmdFromConfigFiles(staticConfigFile, customConfigFile)
 	if err != nil {
 		fmt.Println("Failed to assemble executable metadata", cmd, err)
 		panic(err)

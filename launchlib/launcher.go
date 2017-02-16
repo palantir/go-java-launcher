@@ -30,7 +30,7 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-func LaunchWithConfig(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {
+func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {
 	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
 	if staticConfigErr != nil {
 		return nil, staticConfigErr
@@ -41,7 +41,54 @@ func LaunchWithConfig(staticConfigFile, customConfigFile string) (*exec.Cmd, err
 		return nil, customConfigErr
 	}
 
-	return Launch(&staticConfig, &customConfig)
+	return CompileCmdFromConfig(&staticConfig, &customConfig)
+}
+
+func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) (*exec.Cmd, error) {
+	fmt.Printf("Launching with static configuration %v and custom configuration %v\n", *staticConfig, *customConfig)
+
+	workingDir := getWorkingDir()
+	fmt.Println("Working directory:", workingDir)
+
+	var args []string
+	var executable string
+	var executableErr error
+
+	if staticConfig.ConfigType == "java" {
+		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
+		if javaHomeErr != nil {
+			return nil, javaHomeErr
+		}
+		fmt.Println("Using JAVA_HOME:", javaHome)
+
+		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
+		fmt.Println("Classpath:", classpath)
+
+		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+		if executableErr != nil {
+			return nil, executableErr
+		}
+		args = append(args, executable) // 0th argument is the command itself
+		args = append(args, staticConfig.JavaConfig.JvmOpts...)
+		args = append(args, customConfig.JvmOpts...)
+		args = append(args, "-classpath", classpath)
+		args = append(args, staticConfig.JavaConfig.MainClass)
+	} else if staticConfig.ConfigType == "executable" {
+		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
+		if executableErr != nil {
+			return nil, executableErr
+		}
+		args = append(args, executable) // 0th argument is the command itself
+	} else {
+		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
+	}
+
+	args = append(args, staticConfig.Args...)
+	fmt.Printf("Argument list to executable binary: %v\n\n", args)
+
+	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
+
+	return createCmd(executable, args, env)
 }
 
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
@@ -92,54 +139,7 @@ func joinClasspathEntries(classpathEntries []string) string {
 	return strings.Join(classpathEntries, ":")
 }
 
-func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) (*exec.Cmd, error) {
-	fmt.Printf("Launching with static configuration %v and custom configuration %v\n", *staticConfig, *customConfig)
-
-	workingDir := getWorkingDir()
-	fmt.Println("Working directory:", workingDir)
-
-	var args []string
-	var executable string
-	var executableErr error
-
-	if staticConfig.ConfigType == "java" {
-		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
-		if javaHomeErr != nil {
-			return nil, javaHomeErr
-		}
-		fmt.Println("Using JAVA_HOME:", javaHome)
-
-		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
-		fmt.Println("Classpath:", classpath)
-
-		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
-		if executableErr != nil {
-			return nil, executableErr
-		}
-		args = append(args, executable) // 0th argument is the command itself
-		args = append(args, staticConfig.JavaConfig.JvmOpts...)
-		args = append(args, customConfig.JvmOpts...)
-		args = append(args, "-classpath", classpath)
-		args = append(args, staticConfig.JavaConfig.MainClass)
-	} else if staticConfig.ConfigType == "executable" {
-		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
-		if executableErr != nil {
-			return nil, executableErr
-		}
-		args = append(args, executable) // 0th argument is the command itself
-	} else {
-		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
-	}
-
-	args = append(args, staticConfig.Args...)
-	fmt.Printf("Argument list to executable binary: %v\n\n", args)
-
-	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
-
-	return execWithChecks(executable, args, env)
-}
-
-func execWithChecks(executable string, args []string, customEnv map[string]string) (*exec.Cmd, error) {
+func createCmd(executable string, args []string, customEnv map[string]string) (*exec.Cmd, error) {
 	env := os.Environ()
 	for key, value := range customEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))

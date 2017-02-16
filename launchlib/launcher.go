@@ -17,10 +17,10 @@ package launchlib
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"strings"
-	"syscall"
 )
 
 const (
@@ -30,22 +30,18 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-func LaunchWithConfig(staticConfigFile, customConfigFile string) error {
+func LaunchWithConfig(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {
 	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
 	if staticConfigErr != nil {
-		return staticConfigErr
+		return nil, staticConfigErr
 	}
 
 	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile)
 	if customConfigErr != nil {
-		return customConfigErr
+		return nil, customConfigErr
 	}
 
-	launchErr := Launch(&staticConfig, &customConfig)
-	if launchErr != nil {
-		return launchErr
-	}
-	return nil
+	return Launch(&staticConfig, &customConfig)
 }
 
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
@@ -60,12 +56,6 @@ func verifyPathIsSafeForExec(execPath string) (string, error) {
 
 	return execPath, nil
 }
-
-type processExecutor interface {
-	Exec(executable string, args []string, env []string) error
-}
-
-type syscallProcessExecutor struct{}
 
 // Returns explicitJavaHome if it is not the empty string, or the value of the JAVA_HOME environment variable otherwise.
 // Panics if neither of them is set.
@@ -102,7 +92,7 @@ func joinClasspathEntries(classpathEntries []string) string {
 	return strings.Join(classpathEntries, ":")
 }
 
-func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) error {
+func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) (*exec.Cmd, error) {
 	fmt.Printf("Launching with static configuration %v and custom configuration %v\n", *staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
@@ -115,7 +105,7 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	if staticConfig.ConfigType == "java" {
 		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 		if javaHomeErr != nil {
-			return javaHomeErr
+			return nil, javaHomeErr
 		}
 		fmt.Println("Using JAVA_HOME:", javaHome)
 
@@ -124,7 +114,7 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
-			return executableErr
+			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
 		args = append(args, staticConfig.JavaConfig.JvmOpts...)
@@ -134,11 +124,11 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 	} else if staticConfig.ConfigType == "executable" {
 		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
 		if executableErr != nil {
-			return executableErr
+			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
 	} else {
-		return fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
+		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
 	}
 
 	args = append(args, staticConfig.Args...)
@@ -146,27 +136,22 @@ func Launch(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConf
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
-	execWithChecks(executable, args, env, &syscallProcessExecutor{})
-	return nil
+	return execWithChecks(executable, args, env)
 }
 
-func execWithChecks(executable string, args []string, customEnv map[string]string, p processExecutor) {
+func execWithChecks(executable string, args []string, customEnv map[string]string) (*exec.Cmd, error) {
 	env := os.Environ()
 	for key, value := range customEnv {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	execErr := p.Exec(executable, args, env)
-	if execErr != nil {
-		if os.IsNotExist(execErr) {
-			fmt.Println("Executable not found at:", executable)
-		}
-		panic(execErr)
+	cmd := &exec.Cmd{
+		Path: executable,
+		Args: args,
+		Env:  env,
 	}
-}
 
-func (s *syscallProcessExecutor) Exec(executable string, args, env []string) error {
-	return syscall.Exec(executable, args, env)
+	return cmd, nil
 }
 
 // Performs replacement of all replaceable values in env, returning a new

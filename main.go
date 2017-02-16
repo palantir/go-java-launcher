@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 )
@@ -40,8 +41,17 @@ func main() {
 		customConfigFile = os.Args[2]
 	}
 
-	launchErr := launchlib.LaunchWithConfig(staticConfigFile, customConfigFile)
-	if launchErr != nil {
-		Exit1WithMessage(launchErr.Error())
+	cmd, err := launchlib.LaunchWithConfig(staticConfigFile, customConfigFile)
+	if err != nil {
+		fmt.Println("Failed to assemble executable metadata", cmd, err)
+		panic(err)
+	}
+
+	execErr := syscall.Exec(cmd.Path, cmd.Args, cmd.Env)
+	if execErr != nil {
+		if os.IsNotExist(execErr) {
+			fmt.Println("Executable not found at:", cmd.Path)
+		}
+		panic(execErr)
 	}
 }

@@ -67,12 +67,12 @@ func TestSetCustomEnvironment(t *testing.T) {
 		t.Errorf("Expected CUSTOM_VAR to exist in map, but it didn't")
 	}
 
-	m := mockProcessExecutor{}
 	args := []string{"arg1", "arg2"}
-	execWithChecks("my-command", args, env, &m)
+	cmd, err := execWithChecks("my-command", args, env)
+	assert.NoError(t, err)
 
-	assert.Equal(t, "my-command", m.command, "Command to be run was incorrect")
-	assert.Equal(t, args, m.args)
+	assert.Equal(t, "my-command", cmd.Path, "Command to be run was incorrect")
+	assert.Equal(t, args, cmd.Args)
 
 	startingEnv := os.Environ()
 	wantEnv := append(startingEnv, []string{
@@ -80,9 +80,9 @@ func TestSetCustomEnvironment(t *testing.T) {
 		"SOME_VAR=CUSTOM_VAR",
 	}...)
 
-	sort.Strings(m.env)
+	sort.Strings(cmd.Env)
 	sort.Strings(wantEnv)
-	assert.Equal(t, wantEnv, m.env)
+	assert.Equal(t, wantEnv, cmd.Env)
 }
 
 func TestUnknownVariablesAreNotExpanded(t *testing.T) {
@@ -111,11 +111,4 @@ func TestKeysAreNotExpanded(t *testing.T) {
 	} else {
 		t.Errorf("Expected %%CWD%% to exist in map and not be expanded, but it didn't")
 	}
-}
-
-func (m *mockProcessExecutor) Exec(command string, args, env []string) error {
-	m.command = command
-	m.args = args
-	m.env = env
-	return nil
 }

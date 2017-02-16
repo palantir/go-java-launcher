@@ -1,7 +1,7 @@
 products:
   go-java-launcher:
     build:
-      main-pkg: .
+      main-pkg: ./launcher/main
       os-archs:
         - os: darwin
           arch: amd64

@@ -19,7 +19,7 @@ import (
 	"os"
 	"syscall"
 
-	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/palantir/go-launcher/launchlib"
 )
 
 func Exit1WithMessage(message string) {
@@ -33,7 +33,7 @@ func main() {
 
 	switch numArgs := len(os.Args); {
 	case numArgs > 3:
-		Exit1WithMessage("Usage: go-java-launcher <path to StaticLauncherConfig> [<path to CustomLauncherConfig>]")
+		Exit1WithMessage("Usage: go-launcher <path to StaticLauncherConfig> [<path to CustomLauncherConfig>]")
 	case numArgs == 2:
 		staticConfigFile = os.Args[1]
 	case numArgs == 3:

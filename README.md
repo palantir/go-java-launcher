@@ -1,7 +1,7 @@
-[![CircleCI Build Status](https://circleci.com/gh/palantir/go-java-launcher/tree/develop.svg?style=shield)](https://circleci.com/gh/palantir/go-java-launcher)
-[![Download](https://api.bintray.com/packages/palantir/releases/go-java-launcher/images/download.svg) ](https://bintray.com/palantir/releases/go-java-launcher/_latestVersion)
+[![CircleCI Build Status](https://circleci.com/gh/palantir/go-launcher/tree/develop.svg?style=shield)](https://circleci.com/gh/palantir/go-launcher)
+[![Download](https://api.bintray.com/packages/palantir/releases/go-launcher/images/download.svg) ](https://bintray.com/palantir/releases/go-launcher/_latestVersion)
 
-# go-java-launcher
+# go-launcher
 
 A simple Go program for launching programs from a fixed configuration. This program replaces Gradle-generated Bash
 launch scripts which are susceptible to attacks via injection of environment variables of the form `JAVA_OPTS='$(rm -rf
@@ -66,7 +66,7 @@ jvmOpts:
 
 The launcher is invoked as:
 ```
-go-java-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
+go-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
 ```
 
 where the

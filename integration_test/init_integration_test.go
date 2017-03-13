@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/palantir/godel/pkg/products"
 	"github.com/stretchr/testify/assert"
@@ -37,20 +38,49 @@ func TestInitStatus(t *testing.T) {
 	assert.Equal(t, exitCode, 3)
 
 	// Valid pidfile, but corresponding process doesn't exist
-	assert.NoError(t, ioutil.WriteFile("pidfile", []byte("99999"), os.ModePerm))
+	assert.NoError(t, ioutil.WriteFile("pidfile", []byte("99999"), 0644))
 	stdout, stderr, exitCode = runInit("status", "pidfile")
 	assert.Empty(t, stdout)
 	assert.Empty(t, stderr)
 	assert.Equal(t, exitCode, 1)
 
 	// Valid pidfile, process exists
-	assert.NoError(t, ioutil.WriteFile("pidfile", []byte(strconv.Itoa(os.Getpid())), os.ModeAppend))
+	assert.NoError(t, ioutil.WriteFile("pidfile", []byte(strconv.Itoa(os.Getpid())), 0644))
 	stdout, stderr, exitCode = runInit("status", "pidfile")
 	assert.Empty(t, stdout)
 	assert.Empty(t, stderr)
 	assert.Equal(t, exitCode, 0)
 
 	assert.NoError(t, os.Remove("pidfile"))
+}
+
+func TestInitStart(t *testing.T) {
+	pidFile, _ := ioutil.TempFile("", "pid")
+	stdoutFile, _ := ioutil.TempFile("", "stdout")
+
+	// Capture stdout from test context
+	originalStdout := os.Stdout
+	testStdoutFile, _ := ioutil.TempFile("", "testStdout")
+	os.Stdout = testStdoutFile
+
+	stdout, stderr, exitCode := runInit(
+		"start",
+		"test_resources/launcher-static.yml",
+		"test_resources/launcher-custom.yml",
+		pidFile.Name(),
+		stdoutFile.Name())
+
+	assert.Empty(t, stdout)
+	assert.Empty(t, stderr)
+	assert.Equal(t, exitCode, 0)
+
+	time.Sleep(time.Second) // Wait for JVM to start and print output
+	out, _ := ioutil.ReadFile(stdoutFile.Name())
+	assert.Contains(t, string(out), "Using JAVA_HOME") // command assembly debug output was redirected
+	assert.Contains(t, string(out), "main method")     // command output was redirected
+
+	// Reset stdout
+	os.Stdout = originalStdout
 }
 
 // Adapted from Stack Overflow: http://stackoverflow.com/questions/10385551/get-exit-code-go

@@ -12,32 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cli
+package lib
 
 import (
-	"github.com/palantir/pkg/cli"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"os/exec"
+	"strconv"
 )
 
-func handleError(ctx cli.Context, err error) int {
-	switch theError := err.(type) {
-	case nil:
-		return 0 // No error
-	case *ErrorResponse:
-		ctx.Errorf(theError.Error())
-		return theError.exitCode
-	case *SuccessResponse:
-		return theError.exitCode
-	default:
-		return 1 // Some other, unknown error
+func StartCommandWithOutputRedirectionAndPidFile(cmd *exec.Cmd, stdoutFile *os.File, pidFileName string) (int, error) {
+	cmd.Stdout = stdoutFile
+	cmd.Stderr = stdoutFile
+	err := cmd.Start()
+	if err != nil {
+		return -1, err
 	}
-}
 
-func App() *cli.App {
-	app := cli.NewApp()
-	app.Name = "go-init"
-	app.Usage = "A simple init.sh - style service launcher CLI"
-	app.ErrorHandler = handleError
+	pid := cmd.Process.Pid
+	err = ioutil.WriteFile(pidFileName, []byte(strconv.Itoa(pid)), 0644)
+	if err != nil {
+		return pid, fmt.Errorf("Failed to write pid file: %s", pidFileName)
+	}
 
-	app.Subcommands = []cli.Command{statusCommand(), startCommand()}
-	return app
+	return pid, nil
 }

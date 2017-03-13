@@ -14,30 +14,9 @@
 
 package cli
 
-import (
-	"github.com/palantir/pkg/cli"
+const (
+	pidfileParameter            = "pidFile"
+	outFileParameter            = "outFile"
+	launcherStaticFileParameter = "launcherStaticFile"
+	launcherCustomFileParameter = "launcherCustomFile"
 )
-
-func handleError(ctx cli.Context, err error) int {
-	switch theError := err.(type) {
-	case nil:
-		return 0 // No error
-	case *ErrorResponse:
-		ctx.Errorf(theError.Error())
-		return theError.exitCode
-	case *SuccessResponse:
-		return theError.exitCode
-	default:
-		return 1 // Some other, unknown error
-	}
-}
-
-func App() *cli.App {
-	app := cli.NewApp()
-	app.Name = "go-init"
-	app.Usage = "A simple init.sh - style service launcher CLI"
-	app.ErrorHandler = handleError
-
-	app.Subcommands = []cli.Command{statusCommand(), startCommand()}
-	return app
-}

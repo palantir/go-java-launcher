@@ -23,10 +23,6 @@ import (
 	"github.com/palantir/go-java-launcher/init/lib"
 )
 
-const (
-	pidfileParameter = "pidfile"
-)
-
 func statusCommand() cli.Command {
 	return cli.Command{
 		Name: "status",

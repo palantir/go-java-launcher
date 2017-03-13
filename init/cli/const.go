@@ -20,3 +20,7 @@ const (
 	launcherStaticFileParameter = "launcherStaticFile"
 	launcherCustomFileParameter = "launcherCustomFile"
 )
+
+const (
+	defaultPidFile = "var/run/service.pid"
+)

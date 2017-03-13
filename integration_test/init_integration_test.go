@@ -31,7 +31,7 @@ import (
 
 func TestInitStatus(t *testing.T) {
 	// No valid pidfile
-	stdout, stderr, exitCode := runInit("status", "bogus-file")
+	stdout, stderr, exitCode := runInit("status", "--pidFile", "bogus-file")
 	assert.Empty(t, stdout)
 	assert.Equal(t, stderr, "Failed to determine whether process is running for pid-file: bogus-file. Exit code: 3. "+
 		"Underlying error: open bogus-file: no such file or directory")
@@ -39,14 +39,14 @@ func TestInitStatus(t *testing.T) {
 
 	// Valid pidfile, but corresponding process doesn't exist
 	assert.NoError(t, ioutil.WriteFile("pidfile", []byte("99999"), 0644))
-	stdout, stderr, exitCode = runInit("status", "pidfile")
+	stdout, stderr, exitCode = runInit("status", "--pidFile", "pidfile")
 	assert.Empty(t, stdout)
 	assert.Empty(t, stderr)
 	assert.Equal(t, exitCode, 1)
 
 	// Valid pidfile, process exists
 	assert.NoError(t, ioutil.WriteFile("pidfile", []byte(strconv.Itoa(os.Getpid())), 0644))
-	stdout, stderr, exitCode = runInit("status", "pidfile")
+	stdout, stderr, exitCode = runInit("status", "--pidFile", "pidfile")
 	assert.Empty(t, stdout)
 	assert.Empty(t, stderr)
 	assert.Equal(t, exitCode, 0)
@@ -65,10 +65,10 @@ func TestInitStart(t *testing.T) {
 
 	stdout, stderr, exitCode := runInit(
 		"start",
-		"test_resources/launcher-static.yml",
-		"test_resources/launcher-custom.yml",
-		pidFile.Name(),
-		stdoutFile.Name())
+		"--launcherStaticFile", "test_resources/launcher-static.yml",
+		"--launcherCustomFile", "test_resources/launcher-custom.yml",
+		"--pidFile", pidFile.Name(),
+		"--outFile", stdoutFile.Name())
 
 	assert.Empty(t, stdout)
 	assert.Empty(t, stderr)

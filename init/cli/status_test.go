@@ -15,37 +15,21 @@
 package cli
 
 import (
-	"fmt"
+	"testing"
 
-	"github.com/palantir/pkg/cli"
 	"github.com/palantir/pkg/cli/flag"
-
-	"github.com/palantir/go-java-launcher/init/lib"
+	"github.com/stretchr/testify/assert"
 )
 
-func statusCommand() cli.Command {
-	return cli.Command{
-		Name: "status",
-		Usage: `
-Determines the status of the process whose PID is contained in the given pid-file. Returns 0 if the
-process is running, 1 if the pid-file exists but the process is not running, and 3 if the pid-file
-does not exist`,
-		Flags: []flag.Flag{
+func TestInitStatus_DefaultParameters(t *testing.T) {
+	// Test to prevent accidental changes to parameter default values
+	cmd := statusCommand()
+	assert.Equal(t,
+		cmd.Flags,
+		[]flag.Flag{
 			flag.StringFlag{
 				Name:  pidfileParameter,
 				Usage: "The path to a file containing the PID of for which the status is to be determined",
 				Value: defaultPidFile},
-		},
-		Action: doStatus,
-	}
-}
-
-func doStatus(ctx cli.Context) error {
-	pidfile := ctx.String(pidfileParameter)
-	isRunning, err := lib.IsRunningByPidFile(pidfile)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to determine whether process is running for pid-file: %s", pidfile)
-		return respondError(msg, err, isRunning)
-	}
-	return respondSuccess(isRunning)
+		})
 }

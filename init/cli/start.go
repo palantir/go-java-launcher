@@ -33,18 +33,21 @@ Runs the command defined by the given static and custom configurations and store
 the given pid file.
 `,
 		Flags: []flag.Flag{
-			flag.StringParam{
+			flag.StringFlag{
 				Name:  launcherStaticFileParameter,
-				Usage: ""},
-			flag.StringParam{
+				Value: "service/bin/launcher-static.yml",
+				Usage: "The location of the LauncherStatic file configuration the started command"},
+			flag.StringFlag{
 				Name:  launcherCustomFileParameter,
-				Usage: ""},
-			flag.StringParam{
+				Usage: "The location of the LauncherCustom file configuration the started command"},
+			flag.StringFlag{
 				Name:  pidfileParameter,
-				Usage: ""},
-			flag.StringParam{
+				Value: "var/run/service.pid",
+				Usage: "The location of the file storing the process ID of the started command"},
+			flag.StringFlag{
 				Name:  outFileParameter,
-				Usage: ""},
+				Value: "var/log/startup.log",
+				Usage: "The location of the file to which STDOUT and STDERR of the started command are redirected"},
 		},
 		Action: doStart,
 	}

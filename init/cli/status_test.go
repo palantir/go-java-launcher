@@ -29,7 +29,7 @@ func TestInitStatus_DefaultParameters(t *testing.T) {
 		[]flag.Flag{
 			flag.StringFlag{
 				Name:  pidfileParameter,
-				Usage: "The path to a file containing the PID of for which the status is to be determined",
+				Usage: "The path to a file containing the PID for which the status is to be determined",
 				Value: defaultPidFile},
 		})
 }

@@ -39,12 +39,7 @@ func isRunning(pid int) bool {
 // - 1 if the pid-file exists but the process is not running, and
 // - 3 if the pid-file does not exist or cannot be read; returns a non-nil error explaining the underlying error.
 func IsRunningByPidFile(pidFile string) (int, error) {
-	bytes, err := ioutil.ReadFile(pidFile)
-	if err != nil {
-		return 3, err
-	}
-
-	pid, err := strconv.Atoi(string(bytes[:]))
+	pid, err := GetPid(pidFile)
 	if err != nil {
 		return 3, err
 	}
@@ -53,4 +48,17 @@ func IsRunningByPidFile(pidFile string) (int, error) {
 		return 1, nil
 	}
 	return 0, nil
+}
+
+func GetPid(pidFile string) (int, error) {
+	bytes, err := ioutil.ReadFile(pidFile)
+	if err != nil {
+		return -1, err
+	}
+	pid, err := strconv.Atoi(string(bytes[:]))
+	if err != nil {
+		return -1, err
+	}
+
+	return pid, nil
 }

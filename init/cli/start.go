@@ -36,11 +36,11 @@ the given pid file.
 			flag.StringFlag{
 				Name:  launcherStaticFileParameter,
 				Value: "service/bin/launcher-static.yml",
-				Usage: "The location of the LauncherStatic file configuration the started command"},
+				Usage: "The location of the LauncherStatic file configuration of the started command"},
 			flag.StringFlag{
 				Name:  launcherCustomFileParameter,
 				Value: "var/conf/launcher-custom.yml",
-				Usage: "The location of the LauncherCustom file configuration the started command"},
+				Usage: "The location of the LauncherCustom file configuration of the started command"},
 			flag.StringFlag{
 				Name:  pidfileParameter,
 				Value: "var/run/service.pid",
@@ -58,28 +58,30 @@ func doStart(ctx cli.Context) error {
 	launcherStaticFile := ctx.String(launcherStaticFileParameter)
 	launcherCustomFile := ctx.String(launcherCustomFileParameter)
 	pidfile := ctx.String(pidfileParameter)
-	stdoutfileName := ctx.String(outFileParameter)
+	stdoutFileName := ctx.String(outFileParameter)
 
-	stdoutfile, err := os.Create(stdoutfileName)
+	stdoutFile, err := os.Create(stdoutFileName)
 	if err != nil {
 		msg := fmt.Sprintln("Failed to create startup log file", err)
 		return respondError(msg, err, 1)
 	}
 
 	originalStdout := os.Stdout
-	os.Stdout = stdoutfile // log command assembly output to file instead of stdout
+	os.Stdout = stdoutFile // log command assembly output to file instead of stdout
+	defer func() {
+		os.Stdout = originalStdout
+	}()
 	cmd, err := launchlib.CompileCmdFromConfigFiles(launcherStaticFile, launcherCustomFile)
 	if err != nil {
 		msg := fmt.Sprintln("Failed to assemble Command object from static and custom configuration files", err)
 		return respondError(msg, err, 1)
 	}
-	os.Stdout = originalStdout
 
-	_, err = lib.StartCommandWithOutputRedirectionAndPidFile(cmd, stdoutfile, pidfile)
+	pid, err := lib.StartCommandWithOutputRedirectionAndPidFile(cmd, stdoutFile, pidfile)
 	if err != nil {
 		msg := fmt.Sprintln("Failed to start process", err)
 		return respondError(msg, err, 1)
 	}
 
-	return respondSuccess(0)
+	return respondSuccess(0, fmt.Sprintf("Started (%d)\n", pid))
 }

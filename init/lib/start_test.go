@@ -25,13 +25,29 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStart(t *testing.T) {
-	stdoutFile, _ := ioutil.TempFile("", "stdout")
-	pidFile, _ := ioutil.TempFile("", "pid")
+var stdoutFile *os.File
+var testStdoutFile *os.File
+var pidFile *os.File
 
-	// Capture stdout from test context
-	originalStdout := os.Stdout
-	testStdoutFile, _ := ioutil.TempFile("", "testStdout")
+func setup() {
+	var err error
+	pidFile, err = ioutil.TempFile("", "pid")
+	if err != nil {
+		panic(err)
+	}
+	stdoutFile, err = ioutil.TempFile("", "stdout")
+	if err != nil {
+		panic(err)
+	}
+	testStdoutFile, err = ioutil.TempFile("", "testStdout")
+	if err != nil {
+		panic(err)
+	}
+	os.Stdout = testStdoutFile
+}
+
+func TestStart(t *testing.T) {
+	setup()
 	os.Stdout = testStdoutFile
 
 	cmd := &exec.Cmd{Path: "/bin/ls"}
@@ -46,10 +62,55 @@ func TestStart(t *testing.T) {
 	assert.Empty(t, string(testStdout))
 
 	// Assert that pidfile was written
-	writtenPid, _ := ioutil.ReadFile(pidFile.Name())
-	writtenPidAsInt, _ := strconv.Atoi(string(writtenPid))
-	assert.Equal(t, pid, writtenPidAsInt)
+	assert.Equal(t, pid, readPid(pidFile.Name()))
+}
 
-	// Reset stdout
-	os.Stdout = originalStdout
+func TestStart_DoesNotStartAlreadyRunningService(t *testing.T) {
+	setup()
+	writePid(pidFile.Name(), os.Getpid())
+
+	cmd := &exec.Cmd{Path: "/bin/ls"}
+	pid, err := StartCommandWithOutputRedirectionAndPidFile(cmd, stdoutFile, pidFile.Name())
+	assert.NoError(t, err)
+
+	// Assert that command was not run since it's already running
+	time.Sleep(time.Second) // Wait for forked process to start and print output
+	cmdStdout, _ := ioutil.ReadFile(stdoutFile.Name())
+	assert.Empty(t, string(cmdStdout))
+
+	// Assert that pidfile was not overwritten
+	assert.Equal(t, os.Getpid(), readPid(pidFile.Name()))
+	assert.Equal(t, os.Getpid(), pid)
+}
+
+func TestStart_RestartsTheServiceWhenPidFilePidIsStale(t *testing.T) {
+	setup()
+	deadPid := 99999
+	writePid(pidFile.Name(), deadPid)
+
+	cmd := &exec.Cmd{Path: "/bin/ls"}
+	pid, err := StartCommandWithOutputRedirectionAndPidFile(cmd, stdoutFile, pidFile.Name())
+	assert.NoError(t, err)
+
+	// Assert that command was not run since it's already running
+	time.Sleep(time.Second) // Wait for forked process to start and print output
+	cmdStdout, _ := ioutil.ReadFile(stdoutFile.Name())
+	assert.Contains(t, string(cmdStdout), "start.go")
+
+	// Assert that pidfile was overwritten
+	assert.Equal(t, pid, readPid(pidFile.Name()))
+	assert.NotEqual(t, deadPid, pid)
+}
+
+func writePid(fileName string, pid int) {
+	err := ioutil.WriteFile(fileName, []byte(strconv.Itoa(pid)), 0644)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func readPid(fileName string) int {
+	writtenPid, _ := ioutil.ReadFile(fileName)
+	writtenPidAsInt, _ := strconv.Atoi(string(writtenPid))
+	return writtenPidAsInt
 }

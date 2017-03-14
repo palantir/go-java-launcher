@@ -16,6 +16,7 @@ package integration_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -27,6 +28,8 @@ import (
 
 	"github.com/palantir/godel/pkg/products"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/palantir/go-java-launcher/init/lib"
 )
 
 func TestInitStatus(t *testing.T) {
@@ -35,21 +38,22 @@ func TestInitStatus(t *testing.T) {
 	assert.Empty(t, stdout)
 	assert.Equal(t, stderr, "Failed to determine whether process is running for pid-file: bogus-file. Exit code: 3. "+
 		"Underlying error: open bogus-file: no such file or directory")
-	assert.Equal(t, exitCode, 3)
+	assert.Equal(t, 3, exitCode)
 
 	// Valid pidfile, but corresponding process doesn't exist
 	assert.NoError(t, ioutil.WriteFile("pidfile", []byte("99999"), 0644))
 	stdout, stderr, exitCode = runInit("status", "--pidFile", "pidfile")
-	assert.Empty(t, stdout)
+	assert.Equal(t, "Process dead but pidfile exists\n", stdout)
 	assert.Empty(t, stderr)
-	assert.Equal(t, exitCode, 1)
+	assert.Equal(t, 1, exitCode)
 
 	// Valid pidfile, process exists
-	assert.NoError(t, ioutil.WriteFile("pidfile", []byte(strconv.Itoa(os.Getpid())), 0644))
+	pid := strconv.Itoa(os.Getpid())
+	assert.NoError(t, ioutil.WriteFile("pidfile", []byte(pid), 0644))
 	stdout, stderr, exitCode = runInit("status", "--pidFile", "pidfile")
-	assert.Empty(t, stdout)
+	assert.Equal(t, fmt.Sprintf("Running (%s)\n", pid), stdout)
 	assert.Empty(t, stderr)
-	assert.Equal(t, exitCode, 0)
+	assert.Equal(t, 0, exitCode)
 
 	assert.NoError(t, os.Remove("pidfile"))
 }
@@ -62,6 +66,9 @@ func TestInitStart(t *testing.T) {
 	originalStdout := os.Stdout
 	testStdoutFile, _ := ioutil.TempFile("", "testStdout")
 	os.Stdout = testStdoutFile
+	defer func() {
+		os.Stdout = originalStdout
+	}()
 
 	stdout, stderr, exitCode := runInit(
 		"start",
@@ -70,7 +77,8 @@ func TestInitStart(t *testing.T) {
 		"--pidFile", pidFile.Name(),
 		"--outFile", stdoutFile.Name())
 
-	assert.Empty(t, stdout)
+	pid, _ := lib.GetPid(pidFile.Name())
+	assert.Equal(t, fmt.Sprintf("Started (%d)\n", pid), stdout)
 	assert.Empty(t, stderr)
 	assert.Equal(t, exitCode, 0)
 
@@ -78,9 +86,6 @@ func TestInitStart(t *testing.T) {
 	out, _ := ioutil.ReadFile(stdoutFile.Name())
 	assert.Contains(t, string(out), "Using JAVA_HOME") // command assembly debug output was redirected
 	assert.Contains(t, string(out), "main method")     // command output was redirected
-
-	// Reset stdout
-	os.Stdout = originalStdout
 }
 
 // Adapted from Stack Overflow: http://stackoverflow.com/questions/10385551/get-exit-code-go

@@ -30,6 +30,7 @@ func (e *ErrorResponse) Error() string {
 
 type SuccessResponse struct {
 	exitCode int // the exit to use when exiting the init program
+	msg      string
 }
 
 func (e *SuccessResponse) Error() string {
@@ -40,6 +41,6 @@ func respondError(msg string, err error, exitCode int) error {
 	return &ErrorResponse{msg, err, exitCode}
 }
 
-func respondSuccess(exitCode int) error {
-	return &SuccessResponse{exitCode}
+func respondSuccess(exitCode int, msg string) error {
+	return &SuccessResponse{exitCode, msg}
 }

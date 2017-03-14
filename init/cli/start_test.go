@@ -30,11 +30,11 @@ func TestInitStart_DefaultParameters(t *testing.T) {
 			flag.StringFlag{
 				Name:  launcherStaticFileParameter,
 				Value: "service/bin/launcher-static.yml",
-				Usage: "The location of the LauncherStatic file configuration the started command"},
+				Usage: "The location of the LauncherStatic file configuration of the started command"},
 			flag.StringFlag{
 				Name:  launcherCustomFileParameter,
 				Value: "var/conf/launcher-custom.yml",
-				Usage: "The location of the LauncherCustom file configuration the started command"},
+				Usage: "The location of the LauncherCustom file configuration of the started command"},
 			flag.StringFlag{
 				Name:  pidfileParameter,
 				Value: "var/run/service.pid",

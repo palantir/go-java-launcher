@@ -23,6 +23,12 @@ import (
 )
 
 func StartCommandWithOutputRedirectionAndPidFile(cmd *exec.Cmd, stdoutFile *os.File, pidFileName string) (int, error) {
+	isRunning, _ := IsRunningByPidFile(pidFileName)
+	if isRunning == 0 {
+		pid, _ := GetPid(pidFileName)
+		return pid, nil
+	}
+
 	cmd.Stdout = stdoutFile
 	cmd.Stderr = stdoutFile
 	err := cmd.Start()

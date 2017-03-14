@@ -15,6 +15,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/palantir/pkg/cli"
@@ -33,7 +34,7 @@ does not exist`,
 		Flags: []flag.Flag{
 			flag.StringFlag{
 				Name:  pidfileParameter,
-				Usage: "The path to a file containing the PID of for which the status is to be determined",
+				Usage: "The path to a file containing the PID for which the status is to be determined",
 				Value: defaultPidFile},
 		},
 		Action: doStatus,
@@ -41,11 +42,20 @@ does not exist`,
 }
 
 func doStatus(ctx cli.Context) error {
-	pidfile := ctx.String(pidfileParameter)
-	isRunning, err := lib.IsRunningByPidFile(pidfile)
+	pidFile := ctx.String(pidfileParameter)
+	isRunning, err := lib.IsRunningByPidFile(pidFile)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to determine whether process is running for pid-file: %s", pidfile)
+		msg := fmt.Sprintf("Failed to determine whether process is running for pid-file: %s", pidFile)
 		return respondError(msg, err, isRunning)
 	}
-	return respondSuccess(isRunning)
+
+	switch isRunning {
+	case 0:
+		pid, _ := lib.GetPid(pidFile)
+		return respondSuccess(isRunning, fmt.Sprintf("Running (%d)\n", pid))
+	case 1:
+		return respondSuccess(isRunning, "Process dead but pidfile exists\n")
+	}
+
+	return errors.New("Internal error, failed to determine status")
 }

@@ -26,6 +26,9 @@ func handleError(ctx cli.Context, err error) int {
 		ctx.Errorf(theError.Error())
 		return theError.exitCode
 	case *SuccessResponse:
+		if theError.msg != "" {
+			ctx.Printf(theError.msg)
+		}
 		return theError.exitCode
 	default:
 		return 1 // Some other, unknown error

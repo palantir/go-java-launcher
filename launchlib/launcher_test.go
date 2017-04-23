@@ -112,3 +112,22 @@ func TestKeysAreNotExpanded(t *testing.T) {
 		t.Errorf("Expected %%CWD%% to exist in map and not be expanded, but it didn't")
 	}
 }
+
+func TestMkdirChecksDirectorySyntax(t *testing.T) {
+	err := MkDirs([]string{"abc/def1"})
+	assert.NoError(t, err)
+
+	err = MkDirs([]string{"abc"})
+	assert.NoError(t, err)
+
+	require.NoError(t, os.RemoveAll("abc"))
+
+	err = MkDirs([]string{"^&*"})
+	assert.Error(t, err)
+
+	err = MkDirs([]string{"abc//def"})
+	assert.Error(t, err)
+
+	err = MkDirs([]string{"abc/../def"})
+	assert.Error(t, err)
+}

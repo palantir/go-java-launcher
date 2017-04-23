@@ -91,6 +91,22 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 	return createCmd(executable, args, env)
 }
 
+func MkDirs(dirs []string) error {
+	isDirMatcher := regexp.MustCompile(`^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$`).MatchString
+	for _, dir := range dirs {
+		if !isDirMatcher(dir) {
+			return fmt.Errorf("Cannot create directory with non [A-Za-z0-9] characters: %s", dir)
+		}
+
+		fmt.Printf("Creating directory: %s\n", dir)
+		err := os.MkdirAll(dir, 0700)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
 func verifyPathIsSafeForExec(execPath string) (string, error) {
 	if unsafe, err := regexp.MatchString(ExecPathBlackListRegex, execPath); err != nil {

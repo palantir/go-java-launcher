@@ -15,6 +15,7 @@
 package integration_test
 
 import (
+	"os"
 	"os/exec"
 	"testing"
 
@@ -47,6 +48,21 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
+}
+
+func TestCreatesDirs(t *testing.T) {
+	output, err := runMainWithArgs(t, "test_resources/launcher-static-with-dirs.yml", "foo")
+	require.NoError(t, err, "failed: %s", output)
+
+	dir, err := os.Stat("foo")
+	assert.NoError(t, err)
+	assert.True(t, dir.IsDir())
+	require.NoError(t, os.RemoveAll("foo"))
+
+	dir, err = os.Stat("bar/baz")
+	assert.NoError(t, err)
+	assert.True(t, dir.IsDir())
+	require.NoError(t, os.RemoveAll("bar"))
 }
 
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (string, error) {

@@ -41,12 +41,32 @@ func main() {
 		customConfigFile = os.Args[2]
 	}
 
-	cmd, err := launchlib.CompileCmdFromConfigFiles(staticConfigFile, customConfigFile)
+	// Read configuration
+	staticConfig, err := launchlib.GetStaticConfigFromFile(staticConfigFile)
+	if err != nil {
+		fmt.Println("Failed to read static config file", err)
+		panic(err)
+	}
+	customConfig, err := launchlib.GetCustomConfigFromFile(customConfigFile)
+	if err != nil {
+		fmt.Println("Failed to read custom config file", err)
+		panic(err)
+	}
+
+	// Create configured directories
+	if err := launchlib.MkDirs(staticConfig.Dirs); err != nil {
+		fmt.Println("Failed to create directories", err)
+		panic(err)
+	}
+
+	// Compile command
+	cmd, err := launchlib.CompileCmdFromConfig(&staticConfig, &customConfig)
 	if err != nil {
 		fmt.Println("Failed to assemble executable metadata", cmd, err)
 		panic(err)
 	}
 
+	// Execute command
 	execErr := syscall.Exec(cmd.Path, cmd.Args, cmd.Env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {

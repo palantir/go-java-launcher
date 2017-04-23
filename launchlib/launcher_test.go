@@ -112,3 +112,23 @@ func TestKeysAreNotExpanded(t *testing.T) {
 		t.Errorf("Expected %%CWD%% to exist in map and not be expanded, but it didn't")
 	}
 }
+
+func TestMkdirChecksDirectorySyntax(t *testing.T) {
+	err := MkDirs([]string{"abc/def1"})
+	assert.NoError(t, err)
+
+	err = MkDirs([]string{"abc"})
+	assert.NoError(t, err)
+
+	require.NoError(t, os.RemoveAll("abc"))
+
+	badCases := []string{
+		"^&*",
+		"abc//def",
+		"abc/../def",
+	}
+	for _, dir := range badCases {
+		err = MkDirs([]string{dir})
+		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
+	}
+}

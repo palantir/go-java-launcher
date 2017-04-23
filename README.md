@@ -31,6 +31,10 @@ jvmOpts:
 # OPTIONAL - Arguments passed to the main method of the main class
 args:
   - arg1
+# OPTIONAL - A list of directories to be created before executing the command. Must be relative to CWD and over [A-Za-z0-9].
+args:
+  - var/data/tmp
+  - var/log
 ```
 
 ```yaml
@@ -47,6 +51,10 @@ executable: "{{CWD}}/service/bin/postgres"
 # OPTIONAL - Arguments passed to the main method of the excutable or main class
 args:
   - arg1
+# OPTIONAL - A list of directories to be created before executing the command. Must be relative to CWD and over [A-Za-z0-9].
+args:
+  - var/data/tmp
+  - var/log
 ```
 
 ```yaml

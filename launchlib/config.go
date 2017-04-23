@@ -41,6 +41,7 @@ type StaticLauncherConfig struct {
 	Env            map[string]string `yaml:"env"`
 	Executable     string            `yaml:"executable,omitempty"`
 	Args           []string          `yaml:"args"`
+	Dirs           []string          `yaml:"dirs"`
 }
 
 type CustomLauncherConfig struct {

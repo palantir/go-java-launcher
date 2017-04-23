@@ -54,9 +54,9 @@ func main() {
 	}
 
 	// Create configured directories
-	err = launchlib.MkDirs(staticConfig.Dirs)
-	if err != nil {
+	if err := launchlib.MkDirs(staticConfig.Dirs); err != nil {
 		fmt.Println("Failed to create directories", err)
+		panic(err)
 	}
 
 	// Compile command

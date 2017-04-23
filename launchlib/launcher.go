@@ -99,8 +99,7 @@ func MkDirs(dirs []string) error {
 		}
 
 		fmt.Printf("Creating directory: %s\n", dir)
-		err := os.MkdirAll(dir, 0700)
-		if err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}
 	}

@@ -122,12 +122,13 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 
 	require.NoError(t, os.RemoveAll("abc"))
 
-	err = MkDirs([]string{"^&*"})
-	assert.Error(t, err)
-
-	err = MkDirs([]string{"abc//def"})
-	assert.Error(t, err)
-
-	err = MkDirs([]string{"abc/../def"})
-	assert.Error(t, err)
+	badCases := []string{
+		"^&*",
+		"abc//def",
+		"abc/../def",
+	}
+	for _, dir := range badCases {
+		err = MkDirs([]string{dir})
+		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
+	}
 }

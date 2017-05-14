@@ -32,7 +32,7 @@ jvmOpts:
 args:
   - arg1
 # OPTIONAL - A list of directories to be created before executing the command. Must be relative to CWD and over [A-Za-z0-9].
-args:
+dirs:
   - var/data/tmp
   - var/log
 ```
@@ -52,7 +52,7 @@ executable: "{{CWD}}/service/bin/postgres"
 args:
   - arg1
 # OPTIONAL - A list of directories to be created before executing the command. Must be relative to CWD and over [A-Za-z0-9].
-args:
+dirs:
   - var/data/tmp
   - var/log
 ```

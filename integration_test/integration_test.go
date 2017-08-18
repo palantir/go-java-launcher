@@ -34,6 +34,16 @@ func TestMainMethod(t *testing.T) {
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }
 
+func TestMainMethodWithClasspath(t *testing.T) {
+	output, err := runMainWithArgs(t, "test_resources/launcher-static.yml", "test_resources/launcher-custom-classpath.yml")
+	require.NoError(t, err, "failed: %s", output)
+
+	// part of expected output from launcher
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources:/home/palantir/github.com/palantir/classpath Main arg1\]`, output)
+	// expected output of Java program
+	assert.Regexp(t, `\nmain method\n`, string(output))
+}
+
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
 	_, err := runMainWithArgs(t, "test_resources/launcher-static-bad-java-home.yml", "foo")
 	require.Error(t, err, "error: Failed to determine is path is safe to execute: /foo/bar/bin/java")

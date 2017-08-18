@@ -48,6 +48,7 @@ type CustomLauncherConfig struct {
 	LauncherConfig `yaml:",inline"`
 	JvmOpts        []string          `yaml:"jvmOpts"`
 	Env            map[string]string `yaml:"env"`
+	Classpath      []string          `yaml:"classpath"`
 }
 
 type LauncherConfig struct {

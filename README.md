@@ -40,7 +40,7 @@ dirs:
 ```yaml
 # StaticLauncherConfig - executable version
 # REQUIRED - The type of configuration, must be the string "executable"
-configType: java
+configType: executable
 # REQUIRED - The version of the configuration format, must be the integer 1
 configVersion: 1
 # OPTIONAL - Environment Variables to be set in the environment (Note: cannot be referenced on args list)
@@ -70,6 +70,10 @@ env:
 # Additional JVM options to be passed to the java command, will override defaults in static config. Ignored if configType is "executable"
 jvmOpts:
   - '-Xmx2g'
+# Additional classpath entries to be appended to the existing classpath list in the static config.
+# Append only. Unlike the static config, this must be an absolute path to the resource.
+classpath
+  - /path/to/additional/resource
 ```
 
 The launcher is invoked as:

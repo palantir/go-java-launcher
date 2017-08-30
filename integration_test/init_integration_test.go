@@ -36,8 +36,8 @@ func TestInitStatus(t *testing.T) {
 	// No valid pidfile
 	stdout, stderr, exitCode := runInit("status", "--pidFile", "bogus-file")
 	assert.Empty(t, stdout)
-	assert.Equal(t, stderr, "Failed to determine whether process is running for pid-file: bogus-file. Exit code: 3. "+
-		"Underlying error: open bogus-file: no such file or directory")
+	assert.Equal(t, "Failed to determine whether process is running for pid-file: bogus-file. Exit code: 3. "+
+		"Underlying error: open bogus-file: no such file or directory", stderr)
 	assert.Equal(t, 3, exitCode)
 
 	// Valid pidfile, but corresponding process doesn't exist

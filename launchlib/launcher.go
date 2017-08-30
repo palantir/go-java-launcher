@@ -61,7 +61,9 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		}
 		fmt.Println("Using JAVA_HOME:", javaHome)
 
-		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
+		staticEntries := absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath)
+		customEntries := customConfig.Classpath
+		classpath := joinClasspathEntries(append(staticEntries, customEntries...))
 		fmt.Println("Classpath:", classpath)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))

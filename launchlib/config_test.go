@@ -114,6 +114,9 @@ env:
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
+classpath:
+  - classpath1
+  - classpath2
 `,
 			want: CustomLauncherConfig{
 				LauncherConfig: LauncherConfig{
@@ -124,11 +127,12 @@ jvmOpts:
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+				Classpath: []string{"classpath1", "classpath2"},
 			},
 		},
 		{
-			name: "java custom config without env",
+			name: "java custom config with jvmOpts",
 			data: `
 configType: java
 configVersion: 1
@@ -142,6 +146,23 @@ jvmOpts:
 					ConfigVersion: 1,
 				},
 				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+			},
+		},
+		{
+			name: "java custom config with classpath",
+			data: `
+configType: java
+configVersion: 1
+classpath:
+  - classpath1
+  - classpath2
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				Classpath: []string{"classpath1", "classpath2"},
 			},
 		},
 		{

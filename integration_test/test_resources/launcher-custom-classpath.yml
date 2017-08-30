@@ -1,0 +1,4 @@
+configType: java
+configVersion: 1
+classpath:
+  - /home/palantir/github.com/palantir/classpath

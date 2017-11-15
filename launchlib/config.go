@@ -64,7 +64,7 @@ type AllowedLauncherConfigValues struct {
 var allowedLauncherConfigs = AllowedLauncherConfigValues{
 	ConfigTypes:    map[string]struct{}{"java": {}, "executable": {}},
 	ConfigVersions: map[int]struct{}{1: {}},
-	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}},
+	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}, "envoy": {}},
 }
 
 func ParseStaticConfig(yamlString []byte) (StaticLauncherConfig, error) {

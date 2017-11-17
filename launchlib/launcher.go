@@ -27,7 +27,7 @@ const (
 	TemplateDelimsOpen  = "{{"
 	TemplateDelimsClose = "}}"
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
-	ExecPathBlackListRegex = `[^\w.\/_\-]`
+	ExecPathBlackListRegex = `^~|[^\w.\/_\-\~]`
 )
 
 func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {

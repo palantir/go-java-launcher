@@ -70,6 +70,8 @@ env:
 # Additional JVM options to be passed to the java command, will override defaults in static config. Ignored if configType is "executable"
 jvmOpts:
   - '-Xmx2g'
+# Attaches Yourkit agent to JVM if true. Currently assumes file is in {{CWD}}/service/lib/linux-x86-64/libyjpagent.so
+enableYourkit: false
 ```
 
 The launcher is invoked as:

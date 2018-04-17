@@ -125,6 +125,7 @@ jvmOpts:
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
 				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				EnableYourkit: false,
 			},
 		},
 		{
@@ -142,6 +143,7 @@ jvmOpts:
 					ConfigVersion: 1,
 				},
 				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				EnableYourkit: false,
 			},
 		},
 		{
@@ -164,6 +166,22 @@ jvmOpts:
 					"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 				},
 				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				EnableYourkit: false,
+			},
+		},
+		{
+			name: "java custom config with Yourkit enabled",
+			data: `
+configType: java
+configVersion: 1
+enableYourkit: true
+`,
+			want: CustomLauncherConfig{
+				LauncherConfig: LauncherConfig{
+					ConfigType:    "java",
+					ConfigVersion: 1,
+				},
+				EnableYourkit: true,
 			},
 		},
 		{
@@ -184,6 +202,7 @@ env:
 					"SOME_ENV_VAR":  "/etc/profile",
 					"OTHER_ENV_VAR": "/etc/redhat-release",
 				},
+				EnableYourkit: false,
 			},
 		},
 	} {

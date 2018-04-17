@@ -71,6 +71,13 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		args = append(args, executable) // 0th argument is the command itself
 		args = append(args, staticConfig.JavaConfig.JvmOpts...)
 		args = append(args, customConfig.JvmOpts...)
+
+		if customConfig.EnableYourkit {
+			yourkitLib := path.Join(workingDir, "/service/lib/linux-x86-64/libyjpagent.so")
+			fmt.Println("Using Yourkit Agent:", yourkitLib)
+			args = append(args, path.Join("-agentpath:", yourkitLib))
+		}
+
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.ConfigType == "executable" {

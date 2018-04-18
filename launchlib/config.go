@@ -48,6 +48,7 @@ type CustomLauncherConfig struct {
 	LauncherConfig `yaml:",inline"`
 	JvmOpts        []string          `yaml:"jvmOpts"`
 	Env            map[string]string `yaml:"env"`
+	EnableYourkit  bool              `yaml:"enableYourkit" default:"false"`
 }
 
 type LauncherConfig struct {

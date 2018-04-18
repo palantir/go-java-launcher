@@ -75,7 +75,7 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		if customConfig.EnableYourkit {
 			yourkitLib := path.Join(workingDir, "/service/lib/linux-x86-64/libyjpagent.so")
 			fmt.Println("Using Yourkit Agent:", yourkitLib)
-			args = append(args, path.Join("-agentpath:", yourkitLib))
+			args = append(args, "-agentpath:"+yourkitLib+"=builtinprobes=none")
 		}
 
 		args = append(args, "-classpath", classpath)

@@ -19,7 +19,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/palantir/godel/pkg/products"
+	"github.com/palantir/godel/pkg/products/v2/products"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

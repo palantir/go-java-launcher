@@ -14,16 +14,27 @@
   revision = "ad45545899c7b13c020ea92b2072220eefad42b8"
 
 [[projects]]
+  name = "github.com/palantir/go-java-launcher"
+  packages = [
+    "init/cli",
+    "init/lib",
+    "launchlib",
+  ]
+  revision = "709e3b1bfb5f34b670ceea04cf09bb19928a096b"
+  version = "1.3.0"
+
+[[projects]]
   name = "github.com/palantir/godel"
-  packages = ["pkg/products"]
-  revision = "72980152c87cea9b2d523d853fa0bf7ae103b675"
+  packages = ["pkg/products/v2/products"]
+  revision = "c916c66e63f61a496e86087c820896aad763abb2"
+  version = "v2.3.0"
 
 [[projects]]
   name = "github.com/palantir/pkg"
   packages = [
     "cli",
     "cli/completion",
-    "cli/flag"
+    "cli/flag",
   ]
   revision = "4681eba9db5e148762f0ffa37ac6589bfe6c1368"
 
@@ -42,7 +53,7 @@
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
-    "require"
+    "require",
   ]
   revision = "18a02ba4a312f95da08ff4cfc0055750ce50ae9e"
 
@@ -69,6 +80,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3b8a34d5bdd7ef465b01c91574f3395b417d775dbf4009e3c0c13604283ad2a5"
+  inputs-digest = "dc58f4b146da3cc374c162a82e54281d4e3059aacbb18b6f045fb3f378582f62"
   solver-name = "gps-cdcl"
   solver-version = 1

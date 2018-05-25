@@ -3,9 +3,9 @@
 set -euo pipefail
 
 # Version and checksums for godel. Values are populated by the godel "dist" task.
-VERSION=0.11.1
-DARWIN_CHECKSUM=c6a2e803afbdad1a2ee918e34f886a92534a7d191a87bb8eac33164cd23cdbbf
-LINUX_CHECKSUM=4874e222083c69adfe8a715063033061f1299a9fd52f94cee045bcefa3885c8a
+VERSION=2.3.0
+DARWIN_CHECKSUM=6175cb7e08a5a13cf063894ef3635ea3daad6c773a7992b4c387ffc37a92dc0b
+LINUX_CHECKSUM=1102aa65892746252bb5fc37ce8890f889244633320ae0e6d9186eff008ed610
 
 # Downloads file at URL to destination path using wget or curl. Prints an error and exits if wget or curl is not present.
 function download {
@@ -144,7 +144,7 @@ function verify_godel_version {
     local os=$3
 
     local expected_output="godel version $version"
-    local version_output=$($base_dir/godel-$version/bin/$os-amd64/godel --verify-path=false version)
+    local version_output=$($base_dir/godel-$version/bin/$os-amd64/godel version)
 
     if [ "$expected_output" != "$version_output" ]; then
         echo "Version reported by godel executable did not match expected version: expected \"$expected_output\", was \"$version_output\""

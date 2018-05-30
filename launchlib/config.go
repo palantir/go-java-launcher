@@ -44,10 +44,20 @@ type StaticLauncherConfig struct {
 	Dirs           []string          `yaml:"dirs"`
 }
 
+type PrimaryStaticLauncherConfig struct {
+	StaticLauncherConfig `yaml:",inline"`
+	Secondaries          map[string]StaticLauncherConfig `yaml:"secondaries"`
+}
+
 type CustomLauncherConfig struct {
 	LauncherConfig `yaml:",inline"`
 	JvmOpts        []string          `yaml:"jvmOpts"`
 	Env            map[string]string `yaml:"env"`
+}
+
+type PrimaryCustomLauncherConfig struct {
+	CustomLauncherConfig `yaml:",inline"`
+	Secondaries          map[string]CustomLauncherConfig `yaml:"secondaries"`
 }
 
 type LauncherConfig struct {
@@ -67,59 +77,92 @@ var allowedLauncherConfigs = AllowedLauncherConfigValues{
 	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}, "envoy": {}},
 }
 
-func ParseStaticConfig(yamlString []byte) (StaticLauncherConfig, error) {
-	var config StaticLauncherConfig
+func ParseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
+	var config PrimaryStaticLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
-		return StaticLauncherConfig{},
-			errors.Wrap(err, "Failed to deserialize Static Launcher Config, please check the syntax of your configuration file")
+		return PrimaryStaticLauncherConfig{},
+			errors.Wrap(err, "Failed to deserialize Static Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
 	}
 
+	if err := ValidateStaticConfig(config.StaticLauncherConfig); err != nil {
+		return PrimaryStaticLauncherConfig{}, err
+	}
+
+	for name, secondary := range config.Secondaries {
+		if err := ValidateStaticConfig(secondary); err != nil {
+			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
+				"failed to validate secondary launcher configuration '%s'", name)
+		}
+	}
+	return config, nil
+}
+
+func ValidateStaticConfig(config StaticLauncherConfig) error {
 	if err := config.LauncherConfig.validateLauncherConfig(); err != nil {
-		return StaticLauncherConfig{}, err
+		return err
 	}
 
 	if config.ConfigType == "java" {
 		config.Executable = "java"
 		if err := validator.Validate(config.JavaConfig); err != nil {
-			return StaticLauncherConfig{}, err
+			return err
 		}
 	}
 
 	if err := validateExecutableConfig(config.Executable); err != nil {
-		return StaticLauncherConfig{}, err
+		return err
 	}
-	return config, nil
+	return nil
 }
 
-func GetStaticConfigFromFile(staticConfigFile string) (StaticLauncherConfig, error) {
+func GetStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConfig, error) {
 	if staticData, err := ioutil.ReadFile(staticConfigFile); err != nil {
-		return StaticLauncherConfig{}, errors.Wrap(err, "Failed to read static config file: "+staticConfigFile)
+		return PrimaryStaticLauncherConfig{}, errors.Wrap(err, "Failed to read static config file: "+staticConfigFile)
 	} else if staticConfig, err := ParseStaticConfig(staticData); err != nil {
-		return StaticLauncherConfig{}, err
+		return PrimaryStaticLauncherConfig{}, err
 	} else {
 		return staticConfig, nil
 	}
-
 }
 
-func ParseCustomConfig(yamlString []byte) (CustomLauncherConfig, error) {
-	var config CustomLauncherConfig
+func ParseCustomConfig(yamlString []byte, staticConfig PrimaryStaticLauncherConfig) (PrimaryCustomLauncherConfig, error) {
+	var config PrimaryCustomLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
-		return CustomLauncherConfig{},
-			errors.Wrap(err, "Failed to deserialize Custom Launcher Config, please check the syntax of your configuration file")
+		return PrimaryCustomLauncherConfig{},
+			errors.Wrap(err, "Failed to deserialize Custom Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
 	}
 	if err := config.LauncherConfig.validateLauncherConfig(); err != nil {
-		return CustomLauncherConfig{}, err
+		return PrimaryCustomLauncherConfig{}, err
+	}
+
+	for name, secondary := range config.Secondaries {
+		if err := secondary.LauncherConfig.validateLauncherConfig(); err != nil {
+			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid launch config in custom "+
+				"secondary config %s", name)
+		}
+
+		if _, ok := staticConfig.Secondaries[name]; !ok {
+			return PrimaryCustomLauncherConfig{}, errors.Errorf(
+				"custom secondary config '%s' does not exist in the static config file", name)
+		}
+	}
+
+	for name := range staticConfig.Secondaries {
+		if _, ok := config.Secondaries[name]; !ok {
+			return PrimaryCustomLauncherConfig{}, errors.Errorf(
+				"no custom config exists for secondary '%s' defined in the static config file", name)
+		}
 	}
 	return config, nil
 }
 
-func GetCustomConfigFromFile(customConfigFile string, stdout io.Writer) (CustomLauncherConfig, error) {
+<<<<<<< 9332b10cf3b3dea1e0b7cf083ac92f5b15257825
+func GetCustomConfigFromFile(customConfigFile string, staticConfig PrimaryStaticLauncherConfig, stdout io.Writer) (CustomLauncherConfig, error) {
 	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
 		fmt.Fprintln(stdout, "Failed to read custom config file, assuming no custom config:", customConfigFile)
-		return CustomLauncherConfig{}, nil
-	} else if customConfig, err := ParseCustomConfig(customData); err != nil {
-		return CustomLauncherConfig{}, err
+		return PrimaryCustomLauncherConfig{}, nil
+	} else if customConfig, err := ParseCustomConfig(customData, staticConfig); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
 	} else {
 		return customConfig, nil
 	}

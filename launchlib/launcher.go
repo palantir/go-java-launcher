@@ -22,6 +22,8 @@ import (
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -31,18 +33,40 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (*exec.Cmd, error) {
+type ServiceCommands struct {
+	Primary     *exec.Cmd
+	Secondaries map[string]*exec.Cmd
+}
+
+func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (*exec.Cmd, error) {
 	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
 	if staticConfigErr != nil {
-		return nil, staticConfigErr
+		return ServiceCommands{}, staticConfigErr
 	}
 
-	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile, stdout)
+	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile, staticConfig, stdout)
 	if customConfigErr != nil {
-		return nil, customConfigErr
+		return ServiceCommands{}, customConfigErr
 	}
 
-	return CompileCmdFromConfig(&staticConfig, &customConfig, stdout)
+	return CompileCmdsFromConfig(&staticConfig, &customConfig)
+}
+
+func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig) (ServiceCommands, error) {
+	cmds := ServiceCommands{
+		Secondaries: make(map[string]*exec.Cmd),
+	}
+	var err error
+	if cmds.Primary, err = CompileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, stdout); err != nil {
+		return ServiceCommands{}, err
+	}
+
+	for name, static := range staticConfig.Secondaries {
+		if cmds.Secondaries[name], err = CompileCmdFromConfig(&static, &customConfig[name]); err != nil {
+			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for secondary config '%s'", name)
+		}
+	}
+	return cmds, nil
 }
 
 func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,

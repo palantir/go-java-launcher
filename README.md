@@ -35,6 +35,10 @@ args:
 dirs:
   - var/data/tmp
   - var/log
+# OPTIONAL - A map of configurations of secondary processes to launch
+secondaries:
+  name:
+    StaticLauncherConfig
 ```
 
 ```yaml
@@ -55,6 +59,10 @@ args:
 dirs:
   - var/data/tmp
   - var/log
+# OPTIONAL - A map of configurations of secondary processes to launch
+secondaries:
+  name:
+    StaticLauncherConfig
 ```
 
 ```yaml
@@ -70,6 +78,10 @@ env:
 # Additional JVM options to be passed to the java command, will override defaults in static config. Ignored if configType is "executable"
 jvmOpts:
   - '-Xmx2g'
+# OPTIONAL - A map of configurations of secondary processes to launch
+secondaries:
+  name:
+    CustomLauncherConfig
 ```
 
 The launcher is invoked as:

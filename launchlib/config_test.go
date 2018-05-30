@@ -24,7 +24,7 @@ func TestParseStaticConfig(t *testing.T) {
 	for i, currCase := range []struct {
 		name string
 		data string
-		want StaticLauncherConfig
+		want PrimaryStaticLauncherConfig
 	}{
 		{
 			name: "java static config",
@@ -46,7 +46,7 @@ args:
   - arg1
   - arg2
 `,
-			want: StaticLauncherConfig{
+			want: PrimaryStaticLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "java",
 					ConfigVersion: 1,
@@ -78,7 +78,7 @@ args:
   - arg1
   - arg2
 `,
-			want: StaticLauncherConfig{
+			want: PrimaryStaticLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "executable",
 					ConfigVersion: 1,
@@ -101,7 +101,7 @@ func TestParseCustomConfig(t *testing.T) {
 	for i, currCase := range []struct {
 		name string
 		data string
-		want CustomLauncherConfig
+		want PrimaryCustomLauncherConfig
 	}{
 		{
 			name: "java custom config",
@@ -115,7 +115,7 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 `,
-			want: CustomLauncherConfig{
+			want: PrimaryCustomLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "java",
 					ConfigVersion: 1,
@@ -136,7 +136,7 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 `,
-			want: CustomLauncherConfig{
+			want: PrimaryCustomLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "java",
 					ConfigVersion: 1,
@@ -155,7 +155,7 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 `,
-			want: CustomLauncherConfig{
+			want: PrimaryCustomLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "java",
 					ConfigVersion: 1,
@@ -175,7 +175,7 @@ env:
   SOME_ENV_VAR: /etc/profile
   OTHER_ENV_VAR: /etc/redhat-release
 `,
-			want: CustomLauncherConfig{
+			want: PrimaryCustomLauncherConfig{
 				LauncherConfig: LauncherConfig{
 					ConfigType:    "executable",
 					ConfigVersion: 1,
@@ -200,7 +200,7 @@ func TestParseStaticConfigFailures(t *testing.T) {
 	}{
 		{
 			name: "bad YAML",
-			msg:  `Failed to deserialize Static Launcher Config, please check the syntax of your configuration file`,
+			msg:  `Failed to deserialize Static Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file`,
 			data: `
 bad: yaml:
 `,

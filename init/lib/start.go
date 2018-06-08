@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Starts the given command, outputting to var/log/startup.log and writing the resulting process's PID to
+// StartCommand starts the given command, outputting to var/log/startup.log and writing the resulting process's PID to
 // var/run/service.pid.
 func StartCommand(cmd *exec.Cmd, outputFile *os.File) error {
 	cmd.Stdout = outputFile

@@ -22,7 +22,7 @@ import (
 	"syscall"
 )
 
-// Determines the status of the process whose PID is written to var/run/service.pid.
+// GetProcessStatus determines the status of the process whose PID is written to var/run/service.pid.
 //
 // Returns (process, status, err). Possible values are:
 // - (<process>, 0, nil) if the pidfile exists and can be read and the process is running

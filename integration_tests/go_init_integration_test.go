@@ -138,6 +138,8 @@ func TestInitStop_StopsRunning(t *testing.T) {
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
+	_, err = ioutil.ReadFile(lib.Pidfile)
+	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
 }
 
 func TestInitStop_FailsRunningDoesNotTerminate(t *testing.T) {

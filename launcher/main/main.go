@@ -24,12 +24,13 @@ import (
 
 func Exit1WithMessage(message string) {
 	fmt.Fprintln(os.Stderr, message)
-	os.Exit((1))
+	os.Exit(1)
 }
 
 func main() {
 	staticConfigFile := "launcher-static.yml"
 	customConfigFile := "launcher-custom.yml"
+	stdout := os.Stdout
 
 	switch numArgs := len(os.Args); {
 	case numArgs > 3:
@@ -44,23 +45,23 @@ func main() {
 	// Read configuration
 	staticConfig, err := launchlib.GetStaticConfigFromFile(staticConfigFile)
 	if err != nil {
-		fmt.Println("Failed to read static config file", err)
+		fmt.Fprintln(stdout, "Failed to read static config file", err)
 		panic(err)
 	}
-	customConfig, err := launchlib.GetCustomConfigFromFile(customConfigFile)
+	customConfig, err := launchlib.GetCustomConfigFromFile(customConfigFile, stdout)
 	if err != nil {
-		fmt.Println("Failed to read custom config file", err)
+		fmt.Fprintln(stdout, "Failed to read custom config file", err)
 		panic(err)
 	}
 
 	// Create configured directories
-	if err := launchlib.MkDirs(staticConfig.Dirs); err != nil {
+	if err := launchlib.MkDirs(staticConfig.Dirs, stdout); err != nil {
 		fmt.Println("Failed to create directories", err)
 		panic(err)
 	}
 
 	// Compile command
-	cmd, err := launchlib.CompileCmdFromConfig(&staticConfig, &customConfig)
+	cmd, err := launchlib.CompileCmdFromConfig(&staticConfig, &customConfig, stdout)
 	if err != nil {
 		fmt.Println("Failed to assemble executable metadata", cmd, err)
 		panic(err)

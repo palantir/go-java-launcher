@@ -1,4 +1,4 @@
-// Copyright 2016 Palantir Technologies, Inc.
+// Copyright 2018 Palantir Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,16 @@
 
 package cli
 
-const (
-	pidfileParameter            = "pidFile"
-	outFileParameter            = "outFile"
-	launcherStaticFileParameter = "launcherStaticFile"
-	launcherCustomFileParameter = "launcherCustomFile"
+import (
+	"testing"
+	"github.com/stretchr/testify/assert"
+	"github.com/palantir/pkg/cli/flag"
 )
 
-const (
-	defaultPidFile = "var/run/service.pid"
-)
+// To prevent accidental changes to parameter default values
+func TestInitStop_DefaultParameters(t *testing.T) {
+	cmd := stopCommand()
+	assert.Equal(t,
+		cmd.Flags,
+		[]flag.Flag(nil))
+}

@@ -17,7 +17,6 @@ package launchlib
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -25,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
+	"io"
 )
 
 type JavaConfig struct {
@@ -114,9 +114,9 @@ func ParseCustomConfig(yamlString []byte) (CustomLauncherConfig, error) {
 	return config, nil
 }
 
-func GetCustomConfigFromFile(customConfigFile string) (CustomLauncherConfig, error) {
+func GetCustomConfigFromFile(customConfigFile string, stdout io.Writer) (CustomLauncherConfig, error) {
 	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
-		fmt.Fprintln(os.Stderr, "Failed to read custom config file, assuming no custom config:", customConfigFile)
+		fmt.Fprintln(stdout, "Failed to read custom config file, assuming no custom config:", customConfigFile)
 		return CustomLauncherConfig{}, nil
 	} else if customConfig, err := ParseCustomConfig(customData); err != nil {
 		return CustomLauncherConfig{}, err

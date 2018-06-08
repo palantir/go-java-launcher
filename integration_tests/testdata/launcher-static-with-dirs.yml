@@ -2,7 +2,7 @@ configType: java
 configVersion: 1
 mainClass: Main
 classpath:
-  - ./test_resources/
+  - ./testdata/
 jvmOpts:
   - '-Xmx4M'
 args:

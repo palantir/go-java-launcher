@@ -12,5 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package integration contains the integration tests for go-java-launcher.
-package integration
+package lib
+
+const (
+	LauncherStaticFile = "service/bin/launcher-static.yml"
+	LauncherCustomFile = "var/conf/launcher-custom.yml"
+	OutputFile         = "var/log/startup.log"
+	Pidfile            = "var/run/service.pid"
+)

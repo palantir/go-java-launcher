@@ -15,4 +15,4 @@
 // Package integration_test contains the integration tests for go-java-launcher. This file only exists so that
 // `go install $(./godelw packages)` will succeed, since you can't install a package that contains only test code.
 // https://github.com/palantir/godel/issues/401
-package integration_test
+package integration

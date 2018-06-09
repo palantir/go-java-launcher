@@ -125,7 +125,6 @@ func TestInitStop_StopsRunning(t *testing.T) {
 	if err := exec.Command("/bin/sh", "-c", stoppableCommand).Run(); err != nil {
 		panic(err)
 	}
-	time.Sleep(5 * time.Second)
 	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
 	if err != nil {
 		panic(err)
@@ -151,7 +150,6 @@ func TestInitStop_FailsRunningDoesNotTerminate(t *testing.T) {
 	if err := exec.Command("/bin/sh", "-c", unstoppableCommand).Run(); err != nil {
 		panic(err)
 	}
-	time.Sleep(5 * time.Second)
 	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
 	if err != nil {
 		panic(err)
@@ -165,7 +163,7 @@ func TestInitStop_FailsRunningDoesNotTerminate(t *testing.T) {
 
 	assert.Equal(t, 1, exitCode)
 	msg := fmt.Sprintf("failed to stop process: failed to wait for process to stop: process with pid '%d' did not " +
-		"stop within 10 seconds", pid)
+		"stop within 240 seconds", pid)
 	assert.Contains(t, stderr, msg)
 
 	process, _ := os.FindProcess(lib.ReadPid())

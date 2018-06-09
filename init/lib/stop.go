@@ -38,7 +38,7 @@ func StopProcess(process *os.Process) error {
 }
 
 func waitForProcessToStop(process *os.Process) error {
-	numSecondsToWait := 10
+	numSecondsToWait := 240
 	counter := 0
 	for isRunning(process) && counter < numSecondsToWait {
 		time.Sleep(time.Second)

@@ -27,7 +27,7 @@ func stopCommand() cli.Command {
 		Name: "stop",
 		Usage: `
 Stops the process the PID of which is written to var/run/service.pid. Returns 0 if the process is successfully stopped
-or is not running and returns 1 if the process is not successfully stopped.`,
+or is not running and the pidfile is removed and returns 1 otherwise.`,
 		Action: stop,
 	}
 }
@@ -41,10 +41,14 @@ func stop(_ cli.Context) error {
 		if err := lib.StopProcess(process); err != nil {
 			return cli.WithExitCode(1, err)
 		}
-		os.Remove(lib.Pidfile)
+		if err := os.Remove(lib.Pidfile); err != nil {
+			return cli.WithExitCode(1, err)
+		}
 		return nil
 	case 1:
-		os.Remove(lib.Pidfile)
+		if err := os.Remove(lib.Pidfile); err != nil {
+			return cli.WithExitCode(1, err)
+		}
 		return nil
 	case 3:
 		return nil

@@ -1,4 +1,4 @@
 tags:
   integration:
     names:
-    - ^integration_tests$
+    - ^integration_test$

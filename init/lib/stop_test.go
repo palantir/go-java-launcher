@@ -33,7 +33,7 @@ func TestStopProcess_RunningTerminates(t *testing.T) {
 	if err := exec.Command("/bin/sh", "-c", stoppableCommand).Run(); err != nil {
 		panic(err)
 	}
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
 	if err != nil {
 		panic(err)
@@ -53,7 +53,7 @@ func TestStopProcess_RunningDoesNotTerminate(t *testing.T) {
 	if err := exec.Command("/bin/sh", "-c", unstoppableCommand).Run(); err != nil {
 		panic(err)
 	}
-	time.Sleep(time.Second)
+	time.Sleep(5 * time.Second)
 	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
 	if err != nil {
 		panic(err)

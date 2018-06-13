@@ -32,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/palantir/go-java-launcher/init/lib"
+	"fmt"
 )
 
 var files = []string{lib.LauncherStaticFile, lib.LauncherCustomFile, lib.OutputFile, lib.Pidfile}
@@ -173,8 +174,8 @@ func TestInitStop_FailsRunningDoesNotTerminate(t *testing.T) {
 	exitCode, stderr := runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "failed to stop process: failed to wait for process to stop: process with pid '%d' "+
-		"did not stop within 240 seconds", pid)
+	assert.Contains(t, stderr, fmt.Sprintf("failed to stop process: failed to wait for process to stop: process with " +
+		"pid '%d' did not stop within 240 seconds", pid))
 
 	process, _ := os.FindProcess(readPid(t))
 	require.NoError(t, process.Signal(syscall.SIGKILL))

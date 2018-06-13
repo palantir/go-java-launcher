@@ -38,8 +38,8 @@ func StopProcess(process *os.Process) error {
 }
 
 func waitForProcessToStop(process *os.Process) error {
-	waitDuration := 240 * time.Second
-	timer := time.NewTimer(waitDuration)
+	const numSecondsToWait = 240
+	timer := time.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -51,8 +51,8 @@ func waitForProcessToStop(process *os.Process) error {
 				return nil
 			}
 		case <-timer.C:
-			return errors.Errorf(
-				"failed to wait for process to stop: process with pid '%d' did not stop within %d seconds")
+			return errors.Errorf("failed to wait for process to stop: process with pid '%d' did not stop within %d " +
+				"seconds", process.Pid, numSecondsToWait)
 		}
 	}
 }

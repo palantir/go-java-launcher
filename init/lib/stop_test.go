@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"fmt"
 )
 
 func TestStopProcess_RunningTerminates(t *testing.T) {
@@ -50,8 +51,8 @@ func TestStopProcess_RunningDoesNotTerminate(t *testing.T) {
 	require.NoError(t, err)
 
 	process, _ := os.FindProcess(pid)
-	assert.EqualError(t, StopProcess(process), "failed to stop process: failed to wait for process to stop: process "+
-		"with pid '%d' did not stop within 240 seconds", pid)
+	assert.EqualError(t, StopProcess(process), fmt.Sprintf("failed to stop process: failed to wait for process to " +
+		"stop: process with pid '%d' did not stop within 240 seconds", pid))
 
 	// Clean up the process
 	require.NoError(t, process.Signal(syscall.SIGKILL))

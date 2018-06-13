@@ -26,8 +26,8 @@ import (
 )
 
 func TestStart(t *testing.T) {
-	setup()
-	defer teardown()
+	setup(t)
+	defer teardown(t)
 
 	outputFile, err := os.Create(OutputFile)
 	require.NoError(t, err)
@@ -40,5 +40,5 @@ func TestStart(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(output), "start.go")
 	// Pidfile was written
-	readPid()
+	readPid(t)
 }

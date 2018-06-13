@@ -28,7 +28,8 @@ func stopCommand() cli.Command {
 		Name: "stop",
 		Usage: `
 Stops the process the PID of which is written to var/run/service.pid. Returns 0 if the process is successfully stopped
-or is not running and the pidfile is removed and returns 1 otherwise.`,
+or is not running and the pidfile is removed and returns 1 otherwise. Waits 240 seconds for the process to stop before
+considering the execution a failure.`,
 		Action: func(_ cli.Context) error {
 			return stop()
 		},

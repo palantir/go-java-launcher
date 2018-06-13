@@ -15,10 +15,10 @@
 package lib
 
 import (
-	"testing"
-	"github.com/stretchr/testify/assert"
 	"os"
-	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIsRunning_Running(t *testing.T) {
@@ -33,9 +33,9 @@ func TestIsRunning_NotRunning(t *testing.T) {
 
 func TestGetProcessStatus_Running(t *testing.T) {
 	setup()
-	defer Teardown()
+	defer teardown()
 
-	WritePid(os.Getpid())
+	writePid(os.Getpid())
 	process, status, err := GetProcessStatus()
 
 	assert.Equal(t, process.Pid, os.Getpid())
@@ -45,10 +45,10 @@ func TestGetProcessStatus_Running(t *testing.T) {
 
 func TestGetProcessStatus_NotRunningPidfileExists(t *testing.T) {
 	setup()
-	defer Teardown()
+	defer teardown()
 
 	notRunningPid := 99999
-	WritePid(notRunningPid)
+	writePid(notRunningPid)
 	process, status, err := GetProcessStatus()
 
 	assert.Equal(t, process.Pid, notRunningPid)
@@ -58,12 +58,11 @@ func TestGetProcessStatus_NotRunningPidfileExists(t *testing.T) {
 
 func TestGetProcessStatus_NotRunningPidfileDoesNotExist(t *testing.T) {
 	setup()
-	defer Teardown()
+	defer teardown()
 
 	process, status, err := GetProcessStatus()
 
 	assert.Empty(t, process)
 	assert.Equal(t, status, 3)
-	msg := fmt.Sprintf("failed to read pidfile: open %s: no such file or directory", Pidfile)
-	assert.Contains(t, err.Error(), msg)
+	assert.Contains(t, err.Error(), "failed to read pidfile: open %s: no such file or directory", Pidfile)
 }

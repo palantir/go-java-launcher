@@ -15,12 +15,12 @@
 package lib
 
 import (
-	"time"
-	"fmt"
-	"github.com/pkg/errors"
 	"os"
-	"syscall"
 	"strings"
+	"syscall"
+	"time"
+
+	"github.com/pkg/errors"
 )
 
 func StopProcess(process *os.Process) error {
@@ -38,18 +38,21 @@ func StopProcess(process *os.Process) error {
 }
 
 func waitForProcessToStop(process *os.Process) error {
-	numSecondsToWait := 240
-	counter := 0
-	for isRunning(process) && counter < numSecondsToWait {
-		time.Sleep(time.Second)
-		counter++
-	}
+	waitDuration := 240 * time.Second
+	timer := time.NewTimer(waitDuration)
+	defer timer.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
-	if isRunning(process) {
-		msg := fmt.Sprintf("failed to wait for process to stop: process with pid '%d' did not stop within %d seconds",
-			process.Pid, numSecondsToWait)
-		return errors.New(msg)
+	for {
+		select {
+		case <-ticker.C:
+			if !isRunning(process) {
+				return nil
+			}
+		case <-timer.C:
+			return errors.Errorf(
+				"failed to wait for process to stop: process with pid '%d' did not stop within %d seconds")
+		}
 	}
-
-	return nil
 }

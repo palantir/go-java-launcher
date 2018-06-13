@@ -30,13 +30,14 @@ Exits:
 - 1 if the pidfile exists and can be read but the process is not running
 - 3 if the pidfile does not exist or cannot be read
 If exit code is nonzero, writes an error message to stderr.`,
-		Action: status,
+		Action: func(_ cli.Context) error {
+			return status()
+		},
 	}
 }
 
-func status(_ cli.Context) error {
-	_, status, err := lib.GetProcessStatus()
-	if err != nil {
+func status() error {
+	if _, status, err := lib.GetProcessStatus(); err != nil {
 		return cli.WithExitCode(status, err)
 	}
 	return nil

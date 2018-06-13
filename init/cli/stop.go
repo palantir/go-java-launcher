@@ -15,11 +15,12 @@
 package cli
 
 import (
-	"github.com/palantir/pkg/cli"
-	"github.com/palantir/go-java-launcher/init/lib"
 	"os"
+
+	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-	"fmt"
+
+	"github.com/palantir/go-java-launcher/init/lib"
 )
 
 func stopCommand() cli.Command {
@@ -28,15 +29,15 @@ func stopCommand() cli.Command {
 		Usage: `
 Stops the process the PID of which is written to var/run/service.pid. Returns 0 if the process is successfully stopped
 or is not running and the pidfile is removed and returns 1 otherwise.`,
-		Action: stop,
+		Action: func(_ cli.Context) error {
+			return stop()
+		},
 	}
 }
 
-func stop(_ cli.Context) error {
+func stop() error {
 	// The status tells us more than the error
-	process, status, _ := lib.GetProcessStatus()
-
-	switch status {
+	switch process, status, _ := lib.GetProcessStatus(); status {
 	case 0:
 		if err := lib.StopProcess(process); err != nil {
 			return cli.WithExitCode(1, err)
@@ -53,8 +54,6 @@ func stop(_ cli.Context) error {
 	case 3:
 		return nil
 	default:
-		msg := fmt.Sprintf("internal error, process status code not a known value: %d", status)
-		err := errors.New(msg)
-		return cli.WithExitCode(1, err)
+		return cli.WithExitCode(1, errors.Errorf("internal error, process status code not a known value: %d", status))
 	}
 }

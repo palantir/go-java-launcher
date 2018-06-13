@@ -16,12 +16,12 @@ package launchlib
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
 	"strings"
-	"io"
 )
 
 const (

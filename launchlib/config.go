@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"path"
 	"strconv"
@@ -24,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
-	"io"
 )
 
 type JavaConfig struct {

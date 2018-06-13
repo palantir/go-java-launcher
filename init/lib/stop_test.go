@@ -15,31 +15,26 @@
 package lib
 
 import (
-	"testing"
-	"github.com/stretchr/testify/assert"
+	"os"
 	"os/exec"
-	"fmt"
 	"strconv"
 	"strings"
-	"os"
 	"syscall"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStopProcess_RunningTerminates(t *testing.T) {
 	// Run sleep in sh so that it's not a child process of the one checking if it's running. The echo is to have a
 	// fairly surely unique text reference to grep for later (since we don't get the PID of a grandchild process).
 	stoppableCommand := "/bin/echo go-init-testing && /bin/sleep 10000 &"
-	if err := exec.Command("/bin/sh", "-c", stoppableCommand).Run(); err != nil {
-		panic(err)
-	}
+	require.NoError(t, exec.Command("/bin/sh", "-c", stoppableCommand).Run())
 	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	process, _ := os.FindProcess(pid)
 	assert.NoError(t, StopProcess(process))
@@ -48,27 +43,18 @@ func TestStopProcess_RunningTerminates(t *testing.T) {
 func TestStopProcess_RunningDoesNotTerminate(t *testing.T) {
 	// Signum 15 is SIGTERM - need a program that ignores SIGTERM and thus won't stop even after waiting.
 	unstoppableCommand := "trap '' 15; /bin/echo go-init-testing && /bin/sleep 10000 &"
-	if err := exec.Command("/bin/sh", "-c", unstoppableCommand).Run(); err != nil {
-		panic(err)
-	}
+	require.NoError(t, exec.Command("/bin/sh", "-c", unstoppableCommand).Run())
 	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	process, _ := os.FindProcess(pid)
-	msg := fmt.Sprintf("failed to stop process: failed to wait for process to stop: process with pid '%d' did not " +
-		"stop within 240 seconds", pid)
-	assert.EqualError(t, StopProcess(process), msg)
+	assert.EqualError(t, StopProcess(process), "failed to stop process: failed to wait for process to stop: process "+
+		"with pid '%d' did not stop within 240 seconds", pid)
 
 	// Clean up the process
-	if err := process.Signal(syscall.SIGKILL); err != nil {
-		panic(err)
-	}
+	require.NoError(t, process.Signal(syscall.SIGKILL))
 }
 
 func TestStopProcess_NotRunning(t *testing.T) {

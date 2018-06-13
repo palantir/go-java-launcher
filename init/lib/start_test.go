@@ -16,32 +16,29 @@ package lib
 
 import (
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"os"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStart(t *testing.T) {
 	setup()
-	defer Teardown()
+	defer teardown()
 
 	outputFile, err := os.Create(OutputFile)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	cmd := &exec.Cmd{Path: "/bin/ls"}
 	assert.NoError(t, StartCommand(cmd, outputFile))
 
 	// Output was written to OutputFile
 	time.Sleep(time.Second) // Wait for forked process to start and print output
 	output, err := ioutil.ReadFile(OutputFile)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	assert.Contains(t, string(output), "start.go")
 	// Pidfile was written
-	ReadPid()
+	readPid()
 }

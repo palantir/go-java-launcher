@@ -15,11 +15,12 @@
 package lib
 
 import (
-	"github.com/pkg/errors"
 	"io/ioutil"
-	"strconv"
 	"os"
+	"strconv"
 	"syscall"
+
+	"github.com/pkg/errors"
 )
 
 // GetProcessStatus determines the status of the process whose PID is written to var/run/service.pid.
@@ -49,9 +50,5 @@ func GetProcessStatus() (*os.Process, int, error) {
 }
 
 func isRunning(process *os.Process) bool {
-	if err := process.Signal(syscall.Signal(0)); err != nil {
-		return false
-	}
-
-	return true
+	return process.Signal(syscall.Signal(0)) == nil
 }

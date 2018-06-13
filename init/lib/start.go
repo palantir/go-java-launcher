@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+
 	"github.com/pkg/errors"
 )
 
@@ -31,8 +32,7 @@ func StartCommand(cmd *exec.Cmd, outputFile *os.File) error {
 		return errors.Wrap(err, "failed to start command")
 	}
 
-	pid := cmd.Process.Pid
-	if err := ioutil.WriteFile(Pidfile, []byte(strconv.Itoa(pid)), 0644); err != nil {
+	if err := ioutil.WriteFile(Pidfile, []byte(strconv.Itoa(cmd.Process.Pid)), 0644); err != nil {
 		return errors.Wrap(err, "failed to write pidfile")
 	}
 

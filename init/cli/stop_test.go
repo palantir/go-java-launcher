@@ -16,8 +16,9 @@ package cli
 
 import (
 	"testing"
-	"github.com/stretchr/testify/assert"
+
 	"github.com/palantir/pkg/cli/flag"
+	"github.com/stretchr/testify/assert"
 )
 
 // To prevent accidental changes to parameter default values

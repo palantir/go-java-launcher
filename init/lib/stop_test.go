@@ -37,7 +37,6 @@ func TestStopProcess_RunningStoppableTerminatesAndRunningUnstoppableDoesNotTermi
 	require.NoError(t, err)
 
 	process, _ := os.FindProcess(pid)
-	println(fmt.Sprintf("k now we're going to stop, pid is '%d'", pid))
 	assert.NoError(t, StopProcess(process))
 
 	// Signum 15 is SIGTERM - need a program that ignores SIGTERM and thus won't stop even after waiting.

@@ -15,11 +15,11 @@
 package lib
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"fmt"
 )
 
 func TestIsRunning_Running(t *testing.T) {

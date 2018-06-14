@@ -51,7 +51,7 @@ func waitForProcessToStop(process *os.Process) error {
 				return nil
 			}
 		case <-timer.C:
-			return errors.Errorf("failed to wait for process to stop: process with pid '%d' did not stop within %d " +
+			return errors.Errorf("failed to wait for process to stop: process with pid '%d' did not stop within %d "+
 				"seconds", process.Pid, numSecondsToWait)
 		}
 	}

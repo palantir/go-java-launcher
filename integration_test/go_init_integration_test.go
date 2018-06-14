@@ -16,6 +16,7 @@ package integration_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -32,7 +33,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/palantir/go-java-launcher/init/lib"
-	"fmt"
 )
 
 var files = []string{lib.LauncherStaticFile, lib.LauncherCustomFile, lib.OutputFile, lib.Pidfile}
@@ -141,13 +141,13 @@ func TestInitStatus_NotRunningPidfileDoesNotExist(t *testing.T) {
 	assert.Contains(t, stderr, "failed to read pidfile: open var/run/service.pid: no such file or directory")
 }
 
-func TestInitStop_StopsRunning(t *testing.T) {
+func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	stoppableCommand := "/bin/echo go-init-testing && /bin/sleep 10000 &"
-	require.NoError(t, exec.Command("/bin/sh", "-c", stoppableCommand).Run())
-	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
+	// Stoppable process gets stopped.
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	pidBytes, err := exec.Command("pgrep", "-f", "sleep").Output()
 	require.NoError(t, err)
 	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
 	require.NoError(t, err)
@@ -158,23 +158,22 @@ func TestInitStop_StopsRunning(t *testing.T) {
 	assert.Empty(t, stderr)
 	_, err = ioutil.ReadFile(lib.Pidfile)
 	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
-}
 
-func TestInitStop_FailsRunningDoesNotTerminate(t *testing.T) {
+	// Reset since this is really two tests we have to run sequentially.
+	teardown(t)
 	setup(t)
-	defer teardown(t)
 
-	unstoppableCommand := "trap '' 15; /bin/echo go-init-testing && /bin/sleep 10000 &"
-	require.NoError(t, exec.Command("/bin/sh", "-c", unstoppableCommand).Run())
-	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
+	// Unstoppable process does not get stopped.
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	pidBytes, err = exec.Command("pgrep", "-f", "sleep").Output()
 	require.NoError(t, err)
-	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
+	pid, err = strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
 	require.NoError(t, err)
 	writePid(t, pid)
-	exitCode, stderr := runInit(t, "stop")
+	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("failed to stop process: failed to wait for process to stop: process with " +
+	assert.Contains(t, stderr, fmt.Sprintf("failed to stop process: failed to wait for process to stop: process with "+
 		"pid '%d' did not stop within 240 seconds", pid))
 
 	process, _ := os.FindProcess(readPid(t))

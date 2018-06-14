@@ -15,6 +15,7 @@
 package lib
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -24,34 +25,30 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"fmt"
 )
 
-func TestStopProcess_RunningTerminates(t *testing.T) {
+func TestStopProcess_RunningStoppableTerminatesAndRunningUnstoppableDoesNotTerminate(t *testing.T) {
 	// Run sleep in sh so that it's not a child process of the one checking if it's running. The echo is to have a
 	// fairly surely unique text reference to grep for later (since we don't get the PID of a grandchild process).
-	stoppableCommand := "/bin/echo go-init-testing && /bin/sleep 10000 &"
-	require.NoError(t, exec.Command("/bin/sh", "-c", stoppableCommand).Run())
-	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	pidBytes, err := exec.Command("pgrep", "-f", "sleep").Output()
 	require.NoError(t, err)
 	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
 	require.NoError(t, err)
 
 	process, _ := os.FindProcess(pid)
+	println(fmt.Sprintf("k now we're going to stop, pid is '%d'", pid))
 	assert.NoError(t, StopProcess(process))
-}
 
-func TestStopProcess_RunningDoesNotTerminate(t *testing.T) {
 	// Signum 15 is SIGTERM - need a program that ignores SIGTERM and thus won't stop even after waiting.
-	unstoppableCommand := "trap '' 15; /bin/echo go-init-testing && /bin/sleep 10000 &"
-	require.NoError(t, exec.Command("/bin/sh", "-c", unstoppableCommand).Run())
-	pidBytes, err := exec.Command("pgrep", "-f", "go-init-testing").Output()
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	pidBytes, err = exec.Command("pgrep", "-f", "sleep").Output()
 	require.NoError(t, err)
-	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
+	pid, err = strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
 	require.NoError(t, err)
 
-	process, _ := os.FindProcess(pid)
-	assert.EqualError(t, StopProcess(process), fmt.Sprintf("failed to stop process: failed to wait for process to " +
+	process, _ = os.FindProcess(pid)
+	assert.EqualError(t, StopProcess(process), fmt.Sprintf("failed to stop process: failed to wait for process to "+
 		"stop: process with pid '%d' did not stop within 240 seconds", pid))
 
 	// Clean up the process

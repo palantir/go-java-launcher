@@ -25,33 +25,33 @@ import (
 )
 
 func TestMainMethod(t *testing.T) {
-	output, err := runMainWithArgs(t, "test_resources/launcher-static.yml", "test_resources/launcher-custom.yml")
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", "testdata/launcher-custom.yml")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
-	_, err := runMainWithArgs(t, "test_resources/launcher-static-bad-java-home.yml", "foo")
+	_, err := runMainWithArgs(t, "testdata/launcher-static-bad-java-home.yml", "foo")
 	require.Error(t, err, "error: Failed to determine is path is safe to execute: /foo/bar/bin/java")
 }
 
 func TestMainMethodWithoutCustomConfig(t *testing.T) {
-	output, err := runMainWithArgs(t, "test_resources/launcher-static.yml", "foo")
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", "foo")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/test_resources Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, string(output))
 }
 
 func TestCreatesDirs(t *testing.T) {
-	output, err := runMainWithArgs(t, "test_resources/launcher-static-with-dirs.yml", "foo")
+	output, err := runMainWithArgs(t, "testdata/launcher-static-with-dirs.yml", "foo")
 	require.NoError(t, err, "failed: %s", output)
 
 	dir, err := os.Stat("foo")

@@ -15,32 +15,26 @@
 package lib
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
-func StartCommandWithOutputRedirectionAndPidFile(cmd *exec.Cmd, stdoutFile *os.File, pidFileName string) (int, error) {
-	isRunning, _ := IsRunningByPidFile(pidFileName)
-	if isRunning == 0 {
-		pid, _ := GetPid(pidFileName)
-		return pid, nil
+// StartCommand starts the given command, outputting to var/log/startup.log and writing the resulting process's PID to
+// var/run/service.pid.
+func StartCommand(cmd *exec.Cmd, outputFile *os.File) error {
+	cmd.Stdout = outputFile
+	cmd.Stderr = outputFile
+	if err := cmd.Start(); err != nil {
+		return errors.Wrap(err, "failed to start command")
 	}
 
-	cmd.Stdout = stdoutFile
-	cmd.Stderr = stdoutFile
-	err := cmd.Start()
-	if err != nil {
-		return -1, err
+	if err := ioutil.WriteFile(Pidfile, []byte(strconv.Itoa(cmd.Process.Pid)), 0644); err != nil {
+		return errors.Wrap(err, "failed to write pidfile")
 	}
 
-	pid := cmd.Process.Pid
-	err = ioutil.WriteFile(pidFileName, []byte(strconv.Itoa(pid)), 0644)
-	if err != nil {
-		return pid, fmt.Errorf("Failed to write pid file: %s", pidFileName)
-	}
-
-	return pid, nil
+	return nil
 }

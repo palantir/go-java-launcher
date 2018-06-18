@@ -12,15 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cli
+package lib
 
 const (
-	pidfileParameter            = "pidFile"
-	outFileParameter            = "outFile"
-	launcherStaticFileParameter = "launcherStaticFile"
-	launcherCustomFileParameter = "launcherCustomFile"
-)
-
-const (
-	defaultPidFile = "var/run/service.pid"
+	LauncherStaticFile = "service/bin/launcher-static.yml"
+	LauncherCustomFile = "var/conf/launcher-custom.yml"
+	OutputFile         = "var/log/startup.log"
+	Pidfile            = "var/run/service.pid"
 )

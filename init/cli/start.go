@@ -15,11 +15,10 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/palantir/pkg/cli"
-	"github.com/palantir/pkg/cli/flag"
+	"github.com/pkg/errors"
 
 	"github.com/palantir/go-java-launcher/init/lib"
 	"github.com/palantir/go-java-launcher/launchlib"
@@ -29,59 +28,35 @@ func startCommand() cli.Command {
 	return cli.Command{
 		Name: "start",
 		Usage: `
-Runs the command defined by the given static and custom configurations and stores the PID of the resulting process in
-the given pid file.
-`,
-		Flags: []flag.Flag{
-			flag.StringFlag{
-				Name:  launcherStaticFileParameter,
-				Value: "service/bin/launcher-static.yml",
-				Usage: "The location of the LauncherStatic file configuration of the started command"},
-			flag.StringFlag{
-				Name:  launcherCustomFileParameter,
-				Value: "var/conf/launcher-custom.yml",
-				Usage: "The location of the LauncherCustom file configuration of the started command"},
-			flag.StringFlag{
-				Name:  pidfileParameter,
-				Value: "var/run/service.pid",
-				Usage: "The location of the file storing the process ID of the started command"},
-			flag.StringFlag{
-				Name:  outFileParameter,
-				Value: "var/log/startup.log",
-				Usage: "The location of the file to which STDOUT and STDERR of the started command are redirected"},
+Launches the process defined by the static and custom configurations at service/bin/launcher-static.yml and
+var/conf/launcher-custom.yml. Writes its PID to var/run/service.pid and redirects its output to var/log/startup.log. If
+successful, exits 0, otherwise exits 1 and writes an error message to stderr.`,
+		Action: func(_ cli.Context) error {
+			return start()
 		},
-		Action: doStart,
 	}
 }
 
-func doStart(ctx cli.Context) error {
-	launcherStaticFile := ctx.String(launcherStaticFileParameter)
-	launcherCustomFile := ctx.String(launcherCustomFileParameter)
-	pidfile := ctx.String(pidfileParameter)
-	stdoutFileName := ctx.String(outFileParameter)
-
-	stdoutFile, err := os.Create(stdoutFileName)
-	if err != nil {
-		msg := fmt.Sprintln("Failed to create startup log file", err)
-		return respondError(msg, err, 1)
+func start() error {
+	if _, _, err := lib.GetProcessStatus(); err == nil {
+		// Process already running, don't restart it.
+		return nil
 	}
 
-	originalStdout := os.Stdout
-	os.Stdout = stdoutFile // log command assembly output to file instead of stdout
-	defer func() {
-		os.Stdout = originalStdout
-	}()
-	cmd, err := launchlib.CompileCmdFromConfigFiles(launcherStaticFile, launcherCustomFile)
+	outputFile, err := os.Create(lib.OutputFile)
 	if err != nil {
-		msg := fmt.Sprintln("Failed to assemble Command object from static and custom configuration files", err)
-		return respondError(msg, err, 1)
+		return cli.WithExitCode(1, errors.Wrap(err, "failed to create startup log file"))
 	}
 
-	pid, err := lib.StartCommandWithOutputRedirectionAndPidFile(cmd, stdoutFile, pidfile)
+	cmd, err := launchlib.CompileCmdFromConfigFiles(lib.LauncherStaticFile, lib.LauncherCustomFile, outputFile)
 	if err != nil {
-		msg := fmt.Sprintln("Failed to start process", err)
-		return respondError(msg, err, 1)
+		return cli.WithExitCode(1,
+			errors.Wrap(err, "failed to assemble command from static and custom configuration files"))
 	}
 
-	return respondSuccess(0, fmt.Sprintf("Started (%d)\n", pid))
+	if err := lib.StartCommand(cmd, outputFile); err != nil {
+		return cli.WithExitCode(1, errors.Wrap(err, "failed to start process"))
+	}
+
+	return nil
 }

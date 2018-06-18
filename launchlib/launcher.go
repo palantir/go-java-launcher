@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -30,25 +31,27 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {
+func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (*exec.Cmd, error) {
 	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
 	if staticConfigErr != nil {
 		return nil, staticConfigErr
 	}
 
-	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile)
+	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile, stdout)
 	if customConfigErr != nil {
 		return nil, customConfigErr
 	}
 
-	return CompileCmdFromConfig(&staticConfig, &customConfig)
+	return CompileCmdFromConfig(&staticConfig, &customConfig, stdout)
 }
 
-func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) (*exec.Cmd, error) {
-	fmt.Printf("Launching with static configuration %v and custom configuration %v\n", *staticConfig, *customConfig)
+func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,
+	stdout io.Writer) (*exec.Cmd, error) {
+	fmt.Fprintf(stdout, "Launching with static configuration %v and custom configuration %v\n", *staticConfig,
+		*customConfig)
 
 	workingDir := getWorkingDir()
-	fmt.Println("Working directory:", workingDir)
+	fmt.Fprintln(stdout, "Working directory:", workingDir)
 
 	var args []string
 	var executable string
@@ -59,10 +62,10 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
 		}
-		fmt.Println("Using JAVA_HOME:", javaHome)
+		fmt.Fprintln(stdout, "Using JAVA_HOME:", javaHome)
 
 		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
-		fmt.Println("Classpath:", classpath)
+		fmt.Fprintln(stdout, "Classpath:", classpath)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
@@ -84,21 +87,21 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 	}
 
 	args = append(args, staticConfig.Args...)
-	fmt.Printf("Argument list to executable binary: %v\n\n", args)
+	fmt.Fprintf(stdout, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
 	return createCmd(executable, args, env)
 }
 
-func MkDirs(dirs []string) error {
+func MkDirs(dirs []string, stdout io.Writer) error {
 	isDirMatcher := regexp.MustCompile(`^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$`).MatchString
 	for _, dir := range dirs {
 		if !isDirMatcher(dir) {
 			return fmt.Errorf("Cannot create directory with non [A-Za-z0-9] characters: %s", dir)
 		}
 
-		fmt.Printf("Creating directory: %s\n", dir)
+		fmt.Fprintf(stdout, "Creating directory: %s\n", dir)
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}

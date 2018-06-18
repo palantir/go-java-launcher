@@ -21,27 +21,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// To prevent accidental changes to parameter default values
 func TestInitStart_DefaultParameters(t *testing.T) {
-	// Test to prevent accidental changes to parameter default values
 	cmd := startCommand()
 	assert.Equal(t,
 		cmd.Flags,
-		[]flag.Flag{
-			flag.StringFlag{
-				Name:  launcherStaticFileParameter,
-				Value: "service/bin/launcher-static.yml",
-				Usage: "The location of the LauncherStatic file configuration of the started command"},
-			flag.StringFlag{
-				Name:  launcherCustomFileParameter,
-				Value: "var/conf/launcher-custom.yml",
-				Usage: "The location of the LauncherCustom file configuration of the started command"},
-			flag.StringFlag{
-				Name:  pidfileParameter,
-				Value: "var/run/service.pid",
-				Usage: "The location of the file storing the process ID of the started command"},
-			flag.StringFlag{
-				Name:  outFileParameter,
-				Value: "var/log/startup.log",
-				Usage: "The location of the file to which STDOUT and STDERR of the started command are redirected"},
-		})
+		[]flag.Flag(nil))
 }

@@ -15,11 +15,7 @@
 package cli
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/palantir/pkg/cli"
-	"github.com/palantir/pkg/cli/flag"
 
 	"github.com/palantir/go-java-launcher/init/lib"
 )
@@ -28,34 +24,21 @@ func statusCommand() cli.Command {
 	return cli.Command{
 		Name: "status",
 		Usage: `
-Determines the status of the process whose PID is contained in the given pid-file. Returns 0 if the
-process is running, 1 if the pid-file exists but the process is not running, and 3 if the pid-file
-does not exist`,
-		Flags: []flag.Flag{
-			flag.StringFlag{
-				Name:  pidfileParameter,
-				Usage: "The path to a file containing the PID for which the status is to be determined",
-				Value: defaultPidFile},
+Determines the status of the process the PID of which is written to var/run/service.pid.
+Exits:
+- 0 if the pidfile exists and can be read and the process is running
+- 1 if the pidfile exists and can be read but the process is not running
+- 3 if the pidfile does not exist or cannot be read
+If exit code is nonzero, writes an error message to stderr.`,
+		Action: func(_ cli.Context) error {
+			return status()
 		},
-		Action: doStatus,
 	}
 }
 
-func doStatus(ctx cli.Context) error {
-	pidFile := ctx.String(pidfileParameter)
-	isRunning, err := lib.IsRunningByPidFile(pidFile)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to determine whether process is running for pid-file: %s", pidFile)
-		return respondError(msg, err, isRunning)
+func status() error {
+	if _, status, err := lib.GetProcessStatus(); err != nil {
+		return cli.WithExitCode(status, err)
 	}
-
-	switch isRunning {
-	case 0:
-		pid, _ := lib.GetPid(pidFile)
-		return respondSuccess(isRunning, fmt.Sprintf("Running (%d)\n", pid))
-	case 1:
-		return respondSuccess(isRunning, "Process dead but pidfile exists\n")
-	}
-
-	return errors.New("Internal error, failed to determine status")
+	return nil
 }

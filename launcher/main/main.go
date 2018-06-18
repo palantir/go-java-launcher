@@ -81,14 +81,9 @@ func main() {
 	}
 
 	// Read configuration
-	staticConfig, err := launchlib.GetStaticConfigFromFile(staticConfigFile)
+	staticConfig, customConfig, err := launchlib.GetConfigsFromFiles(staticConfigFile, customConfigFile, stdout)
 	if err != nil {
-		fmt.Fprintln(stdout, "Failed to read static config file", err)
-		panic(err)
-	}
-	customConfig, err := launchlib.GetCustomConfigFromFile(customConfigFile, staticConfig, stdout)
-	if err != nil {
-		fmt.Fprintln(stdout, "Failed to read custom config file", err)
+		fmt.Println("Failed to read config files", err)
 		panic(err)
 	}
 
@@ -144,7 +139,7 @@ func main() {
 				}
 				panic(err)
 			} else {
-				fmt.Printf("Started secondary %s under process pid %s", name, secondary.Process.Pid)
+				fmt.Printf("Started secondary %s under process pid %d", name, secondary.Process.Pid)
 			}
 		}
 	}

@@ -47,21 +47,23 @@ args:
   - arg2
 `,
 			want: PrimaryStaticLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
-				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
-				},
-				Executable: "java",
-				Args:       []string{"arg1", "arg2"},
-				JavaConfig: JavaConfig{
-					MainClass: "mainClass",
-					JavaHome:  "javaHome",
-					Classpath: []string{"classpath1", "classpath2"},
-					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+				StaticLauncherConfig: StaticLauncherConfig{
+					LauncherConfig: LauncherConfig{
+						ConfigType:    "java",
+						ConfigVersion: 1,
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "java",
+					Args:       []string{"arg1", "arg2"},
+					JavaConfig: JavaConfig{
+						MainClass: "mainClass",
+						JavaHome:  "javaHome",
+						Classpath: []string{"classpath1", "classpath2"},
+						JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+					},
 				},
 			},
 		},
@@ -79,20 +81,22 @@ args:
   - arg2
 `,
 			want: PrimaryStaticLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "executable",
-					ConfigVersion: 1,
+				StaticLauncherConfig: StaticLauncherConfig{
+					LauncherConfig: LauncherConfig{
+						ConfigType:    "executable",
+						ConfigVersion: 1,
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "/usr/bin/postgres",
+					Args:       []string{"arg1", "arg2"},
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
-				},
-				Executable: "/usr/bin/postgres",
-				Args:       []string{"arg1", "arg2"},
 			},
 		},
 	} {
-		got, _ := ParseStaticConfig([]byte(currCase.data))
+		got, _ := parseStaticConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
 }
@@ -116,15 +120,17 @@ jvmOpts:
   - jvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+				CustomLauncherConfig: CustomLauncherConfig{
+					LauncherConfig: LauncherConfig{
+						ConfigType:    "java",
+						ConfigVersion: 1,
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
-				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 			},
 		},
 		{
@@ -137,11 +143,13 @@ jvmOpts:
   - jvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+				CustomLauncherConfig: CustomLauncherConfig{
+					LauncherConfig: LauncherConfig{
+						ConfigType:    "java",
+						ConfigVersion: 1,
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 			},
 		},
 		{
@@ -156,14 +164,16 @@ jvmOpts:
   - jvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+				CustomLauncherConfig: CustomLauncherConfig{
+					LauncherConfig: LauncherConfig{
+						ConfigType:    "java",
+						ConfigVersion: 1,
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR": "{{CWD}}/etc/profile",
-				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 			},
 		},
 		{
@@ -176,18 +186,20 @@ env:
   OTHER_ENV_VAR: /etc/redhat-release
 `,
 			want: PrimaryCustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "executable",
-					ConfigVersion: 1,
-				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
+				CustomLauncherConfig: CustomLauncherConfig{
+					LauncherConfig: LauncherConfig{
+						ConfigType:    "executable",
+						ConfigVersion: 1,
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
 				},
 			},
 		},
 	} {
-		got, _ := ParseCustomConfig([]byte(currCase.data))
+		got, _ := parseCustomConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
 }
@@ -272,7 +284,7 @@ mainClass: hello.world
 `,
 		},
 	} {
-		_, err := ParseStaticConfig([]byte(currCase.data))
+		_, err := parseStaticConfig([]byte(currCase.data))
 		assert.NotEqual(t, err, nil, "Case %d: %s had no errors", i, currCase.name)
 		assert.Regexp(t, currCase.msg, err.Error(), "Case %d: %s had the wrong error message", i, currCase.name)
 	}

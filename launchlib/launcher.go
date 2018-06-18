@@ -38,17 +38,11 @@ type ServiceCommands struct {
 	Secondaries map[string]*exec.Cmd
 }
 
-func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (*exec.Cmd, error) {
-	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
-	if staticConfigErr != nil {
-		return ServiceCommands{}, staticConfigErr
+func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (ServiceCommands, error) {
+	staticConfig, customConfig, err := GetConfigsFromFiles(staticConfigFile, customConfigFile, stdout io.Writer)
+	if err != nil {
+		return ServiceCommands{}, err
 	}
-
-	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile, staticConfig, stdout)
-	if customConfigErr != nil {
-		return ServiceCommands{}, customConfigErr
-	}
-
 	return CompileCmdsFromConfig(&staticConfig, &customConfig)
 }
 

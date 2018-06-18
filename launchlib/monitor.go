@@ -28,7 +28,7 @@ const (
 
 type ProcessMonitor struct {
 	ServicePid     int
-	ServiceGroupId int
+	ServiceGroupID int
 }
 
 func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
@@ -50,20 +50,20 @@ func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
 	}
 
 	// Service process has died, terminating process group
-	if err := syscall.Kill(-m.ServiceGroupId, syscall.SIGTERM); err != nil {
+	if err := syscall.Kill(-m.ServiceGroupID, syscall.SIGTERM); err != nil {
 		return errors.Wrapf(err, "unable to set term signal to process group, beware of orphaned secondary services")
 	}
 	return nil
 }
 
 func (m *ProcessMonitor) verify() error {
-	if syscall.Getpgrp() != m.ServiceGroupId {
+	if syscall.Getpgrp() != m.ServiceGroupID {
 		return errors.Errorf("ProcessMonitor is part of process group '%s' not service process group '%s'. "+
 			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same process as the"+
-			" service", syscall.Getpgrp(), m.ServiceGroupId)
+			" service", syscall.Getpgrp(), m.ServiceGroupID)
 	}
 
-	if m.ServiceGroupId == 1 {
+	if m.ServiceGroupID == 1 {
 		return errors.New("ProcessMonitor service group given is '1', refusing to monitor services under " +
 			"init process group")
 	}

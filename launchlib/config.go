@@ -123,10 +123,7 @@ func validateStaticConfig(config *StaticLauncherConfig) error {
 		}
 	}
 
-	if err := validateExecutableConfig(config.Executable); err != nil {
-		return err
-	}
-	return nil
+	return validateExecutableConfig(config.Executable)
 }
 
 func getStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConfig, error) {

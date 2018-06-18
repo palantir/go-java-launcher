@@ -42,7 +42,7 @@ func ParseMonitorArgs(args []string) (*launchlib.ProcessMonitor, error) {
 	if monitor.ServicePid, err = strconv.Atoi(args[0]); err != nil {
 		return nil, errors.Wrapf(err, "error parsing service pid")
 	}
-	if monitor.ServiceGroupId, err = strconv.Atoi(args[1]); err != nil {
+	if monitor.ServiceGroupID, err = strconv.Atoi(args[1]); err != nil {
 		return nil, errors.Wrapf(err, "error parsing service group id")
 	}
 	return monitor, nil
@@ -52,7 +52,7 @@ func GenerateMonitorArgs(monitor *launchlib.ProcessMonitor) []string {
 	return []string{
 		monitorFlag,
 		strconv.Itoa(monitor.ServicePid),
-		strconv.Itoa(monitor.ServiceGroupId),
+		strconv.Itoa(monitor.ServiceGroupID),
 	}
 }
 
@@ -109,11 +109,14 @@ func main() {
 
 	if len(cmds.Secondaries) != 0 {
 		// Ensure we are in our own process group, since the monitor kills the group
-		syscall.Setpgid(0, 0)
+		if err := syscall.Setpgid(0, 0); err != nil {
+			fmt.Printf("Unable to create process group for process including secondaries")
+			panic(err)
+		}
 
 		monitor := &launchlib.ProcessMonitor{
 			ServicePid:     os.Getpid(),
-			ServiceGroupId: syscall.Getpgrp(),
+			ServiceGroupID: syscall.Getpgrp(),
 		}
 		monitorCmd := exec.Command(os.Args[0], GenerateMonitorArgs(monitor)...)
 		monitorCmd.Stdout = os.Stdout

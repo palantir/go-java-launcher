@@ -54,7 +54,7 @@ func start() error {
 			errors.Wrap(err, "failed to assemble command from static and custom configuration files"))
 	}
 
-	if err = lib.StartCommand(cmd, outputFile); err != nil {
+	if err := lib.StartCommand(cmd, outputFile); err != nil {
 		return cli.WithExitCode(1, errors.Wrap(err, "failed to start process"))
 	}
 

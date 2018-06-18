@@ -61,8 +61,12 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 		return ServiceCommands{}, err
 	}
 
-	for name, static := range staticConfig.Secondaries {
-		if cmds.Secondaries[name], err = CompileCmdFromConfig(&static, &customConfig[name]); err != nil {
+	for name, staticSecondary := range staticConfig.Secondaries {
+		customSecondary, ok := customConfig.Secondaries[name]
+		if !ok {
+			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for secondary config '%s'", name)
+		}
+		if cmds.Secondaries[name], err = CompileCmdFromConfig(&staticSecondary, &customSecondary); err != nil {
 			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for secondary config '%s'", name)
 		}
 	}

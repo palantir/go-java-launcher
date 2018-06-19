@@ -39,10 +39,10 @@ func ParseMonitorArgs(args []string) (*launchlib.ProcessMonitor, error) {
 	monitor := &launchlib.ProcessMonitor{}
 
 	var err error
-	if monitor.ServicePid, err = strconv.Atoi(args[0]); err != nil {
+	if monitor.PrimaryPID, err = strconv.Atoi(args[0]); err != nil {
 		return nil, errors.Wrapf(err, "error parsing service pid")
 	}
-	if monitor.ServiceGroupID, err = strconv.Atoi(args[1]); err != nil {
+	if monitor.ProcessGroupPID, err = strconv.Atoi(args[1]); err != nil {
 		return nil, errors.Wrapf(err, "error parsing service group id")
 	}
 	return monitor, nil
@@ -51,8 +51,8 @@ func ParseMonitorArgs(args []string) (*launchlib.ProcessMonitor, error) {
 func GenerateMonitorArgs(monitor *launchlib.ProcessMonitor) []string {
 	return []string{
 		monitorFlag,
-		strconv.Itoa(monitor.ServicePid),
-		strconv.Itoa(monitor.ServiceGroupID),
+		strconv.Itoa(monitor.PrimaryPID),
+		strconv.Itoa(monitor.ProcessGroupPID),
 	}
 }
 
@@ -65,7 +65,7 @@ func main() {
 	case numArgs == 4 && os.Args[1] == monitorFlag:
 		if monitor, err := ParseMonitorArgs(os.Args[2:]); err != nil {
 			fmt.Println("error parsing monitor args", err)
-			Exit1WithMessage(fmt.Sprintf("Usage: go-java-launcher %s <service pid> <service pgid>", monitorFlag))
+			Exit1WithMessage(fmt.Sprintf("Usage: go-java-launcher %s <primary pid> <pgid>", monitorFlag))
 		} else if err = monitor.TermProcessGroupOnDeath(); err != nil {
 			fmt.Println("error running process monitor", err)
 			Exit1WithMessage("process monitor failed")
@@ -115,8 +115,8 @@ func main() {
 		}
 
 		monitor := &launchlib.ProcessMonitor{
-			ServicePid:     os.Getpid(),
-			ServiceGroupID: syscall.Getpgrp(),
+			PrimaryPID:      os.Getpid(),
+			ProcessGroupPID: syscall.Getpgrp(),
 		}
 		monitorCmd := exec.Command(os.Args[0], GenerateMonitorArgs(monitor)...)
 		monitorCmd.Stdout = os.Stdout

@@ -27,8 +27,8 @@ const (
 )
 
 type ProcessMonitor struct {
-	ServicePid     int
-	ServiceGroupID int
+	PrimaryPID      int
+	ProcessGroupPID int
 }
 
 func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
@@ -50,20 +50,20 @@ func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
 	}
 
 	// Service process has died, terminating process group
-	if err := syscall.Kill(-m.ServiceGroupID, syscall.SIGTERM); err != nil {
+	if err := syscall.Kill(-m.ProcessGroupPID, syscall.SIGTERM); err != nil {
 		return errors.Wrapf(err, "unable to set term signal to process group, beware of orphaned secondary services")
 	}
 	return nil
 }
 
 func (m *ProcessMonitor) verify() error {
-	if syscall.Getpgrp() != m.ServiceGroupID {
+	if syscall.Getpgrp() != m.ProcessGroupPID {
 		return errors.Errorf("ProcessMonitor is part of process group '%s' not service process group '%s'. "+
 			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same process as the"+
-			" service", syscall.Getpgrp(), m.ServiceGroupID)
+			" service", syscall.Getpgrp(), m.ProcessGroupPID)
 	}
 
-	if m.ServiceGroupID == 1 {
+	if m.ProcessGroupPID == 1 {
 		return errors.New("ProcessMonitor service group given is '1', refusing to monitor services under " +
 			"init process group")
 	}
@@ -71,11 +71,14 @@ func (m *ProcessMonitor) verify() error {
 }
 
 func (m *ProcessMonitor) isAlive() bool {
-	process, err := os.FindProcess(m.ServicePid)
+	// This always succeeds on unix systems as it merely creates a process object
+	process, err := os.FindProcess(m.PrimaryPID)
 	if err != nil {
 		return false
 	}
 
+	// Sending a signal of 0 checks the process exists, without actually sending a signal,
+	// see https://linux.die.net/man/2/kill
 	err = process.Signal(syscall.Signal(0))
 	if err != nil {
 		return false

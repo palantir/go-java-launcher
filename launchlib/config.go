@@ -77,13 +77,13 @@ var allowedLauncherConfigs = AllowedLauncherConfigValues{
 	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}, "envoy": {}},
 }
 
-func GetConfigsFromFiles(staticConfigFile string, customConfigFile string) (PrimaryStaticLauncherConfig, PrimaryCustomLauncherConfig, error) {
+func GetConfigsFromFiles(staticConfigFile string, customConfigFile string, stdout io.Writer) (PrimaryStaticLauncherConfig, PrimaryCustomLauncherConfig, error) {
 	staticConfig, err := getStaticConfigFromFile(staticConfigFile)
 	if err != nil {
 		return PrimaryStaticLauncherConfig{}, PrimaryCustomLauncherConfig{}, err
 	}
 
-	customConfig, err := getCustomConfigFromFile(customConfigFile)
+	customConfig, err := getCustomConfigFromFile(customConfigFile, stdout)
 	if err != nil {
 		return PrimaryStaticLauncherConfig{}, PrimaryCustomLauncherConfig{}, err
 	}

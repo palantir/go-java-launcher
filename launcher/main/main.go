@@ -94,7 +94,7 @@ func main() {
 	}
 
 	for name, secondaryStatic := range staticConfig.Secondaries {
-		if err := launchlib.MkDirs(secondaryStatic.Dirs); err != nil {
+		if err := launchlib.MkDirs(secondaryStatic.Dirs, stdout); err != nil {
 			fmt.Println("Failed to create directories for secondary process ", name, err)
 			panic(err)
 		}

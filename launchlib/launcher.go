@@ -39,14 +39,14 @@ type ServiceCommands struct {
 }
 
 func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (ServiceCommands, error) {
-	staticConfig, customConfig, err := GetConfigsFromFiles(staticConfigFile, customConfigFile, stdout io.Writer)
+	staticConfig, customConfig, err := GetConfigsFromFiles(staticConfigFile, customConfigFile, stdout)
 	if err != nil {
 		return ServiceCommands{}, err
 	}
-	return CompileCmdsFromConfig(&staticConfig, &customConfig)
+	return CompileCmdsFromConfig(&staticConfig, &customConfig, stdout)
 }
 
-func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig) (ServiceCommands, error) {
+func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (ServiceCommands, error) {
 	cmds := ServiceCommands{
 		Secondaries: make(map[string]*exec.Cmd),
 	}
@@ -60,7 +60,7 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 		if !ok {
 			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for secondary config '%s'", name)
 		}
-		if cmds.Secondaries[name], err = CompileCmdFromConfig(&staticSecondary, &customSecondary); err != nil {
+		if cmds.Secondaries[name], err = CompileCmdFromConfig(&staticSecondary, &customSecondary, stdout); err != nil {
 			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for secondary config '%s'", name)
 		}
 	}

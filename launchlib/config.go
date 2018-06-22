@@ -45,8 +45,8 @@ type StaticLauncherConfig struct {
 }
 
 type PrimaryStaticLauncherConfig struct {
-	StaticLauncherConfig `yaml:",inline"`
-	Secondaries          map[string]StaticLauncherConfig `yaml:"secondaries"`
+	StaticLauncherConfig                         `yaml:",inline"`
+	SubProcesses map[string]StaticLauncherConfig `yaml:"sub-processes"`
 }
 
 type CustomLauncherConfig struct {
@@ -57,7 +57,7 @@ type CustomLauncherConfig struct {
 
 type PrimaryCustomLauncherConfig struct {
 	CustomLauncherConfig `yaml:",inline"`
-	Secondaries          map[string]CustomLauncherConfig `yaml:"secondaries"`
+	SubProcesses         map[string]CustomLauncherConfig `yaml:"sub-processes"`
 }
 
 type LauncherConfig struct {
@@ -91,6 +91,13 @@ func GetConfigsFromFiles(staticConfigFile string, customConfigFile string, stdou
 	return staticConfig, customConfig, verifyStaticWithCustomConfig(staticConfig, customConfig)
 }
 
+func validateSubProcessLimit(numberSubProcesses int) error {
+	if numberSubProcesses > 1 {
+		return errors.New("only one named sub-processes is currently allowed")
+	}
+	return nil
+}
+
 func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 	var config PrimaryStaticLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
@@ -102,10 +109,14 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 		return PrimaryStaticLauncherConfig{}, err
 	}
 
-	for name, secondary := range config.Secondaries {
-		if err := validateStaticConfig(&secondary); err != nil {
+	if err := validateSubProcessLimit(len(config.SubProcesses)); err != nil {
+		return PrimaryStaticLauncherConfig{}, err
+	}
+
+	for name, subProcess := range config.SubProcesses {
+		if err := validateStaticConfig(&subProcess); err != nil {
 			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
-				"failed to validate secondary launcher configuration '%s'", name)
+				"failed to validate sub-process launcher configuration '%s'", name)
 		}
 	}
 	return config, nil
@@ -137,17 +148,17 @@ func getStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConf
 }
 
 func verifyStaticWithCustomConfig(staticConfig PrimaryStaticLauncherConfig, customConfig PrimaryCustomLauncherConfig) error {
-	for name := range customConfig.Secondaries {
-		if _, ok := staticConfig.Secondaries[name]; !ok {
+	for name := range customConfig.SubProcesses {
+		if _, ok := staticConfig.SubProcesses[name]; !ok {
 			return errors.Errorf(
-				"custom secondary config '%s' does not exist in the static config file", name)
+				"custom sub-process config '%s' does not exist in the static config file", name)
 		}
 	}
 
-	for name := range staticConfig.Secondaries {
-		if _, ok := customConfig.Secondaries[name]; !ok {
+	for name := range staticConfig.SubProcesses {
+		if _, ok := customConfig.SubProcesses[name]; !ok {
 			return errors.Errorf(
-				"no custom config exists for secondary '%s' defined in the static config file", name)
+				"no custom config exists for sub-process '%s' defined in the static config file", name)
 		}
 	}
 	return nil
@@ -159,14 +170,19 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 		return PrimaryCustomLauncherConfig{},
 			errors.Wrap(err, "Failed to deserialize Custom Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
 	}
+
 	if err := config.LauncherConfig.validateLauncherConfig(); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
 	}
 
-	for name, secondary := range config.Secondaries {
-		if err := secondary.LauncherConfig.validateLauncherConfig(); err != nil {
+	if err := validateSubProcessLimit(len(config.SubProcesses)); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
+	}
+
+	for name, subProcess := range config.SubProcesses {
+		if err := subProcess.LauncherConfig.validateLauncherConfig(); err != nil {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid launch config in custom "+
-				"secondary config %s", name)
+				"subProcess config %s", name)
 		}
 	}
 	return config, nil

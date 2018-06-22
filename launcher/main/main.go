@@ -93,9 +93,9 @@ func main() {
 		panic(err)
 	}
 
-	for name, secondaryStatic := range staticConfig.Secondaries {
-		if err := launchlib.MkDirs(secondaryStatic.Dirs, stdout); err != nil {
-			fmt.Println("Failed to create directories for secondary process ", name, err)
+	for name, subProcStatic := range staticConfig.SubProcesses {
+		if err := launchlib.MkDirs(subProcStatic.Dirs, stdout); err != nil {
+			fmt.Println("Failed to create directories for subprocess ", name, err)
 			panic(err)
 		}
 	}
@@ -107,10 +107,10 @@ func main() {
 		panic(err)
 	}
 
-	if len(cmds.Secondaries) != 0 {
+	if len(cmds.SubProcesses) != 0 {
 		// Ensure we are in our own process group, since the monitor kills the group
 		if err := syscall.Setpgid(0, 0); err != nil {
-			fmt.Printf("Unable to create process group for process including secondaries")
+			fmt.Printf("Unable to create process group for primary with subprocesses")
 			panic(err)
 		}
 
@@ -129,20 +129,20 @@ func main() {
 			panic(err)
 		}
 
-		for name, secondary := range cmds.Secondaries {
+		for name, subProcess := range cmds.SubProcesses {
 			// Ensure child processes are in the same parent group
-			if secondary.SysProcAttr == nil {
-				secondary.SysProcAttr = &syscall.SysProcAttr{}
+			if subProcess.SysProcAttr == nil {
+				subProcess.SysProcAttr = &syscall.SysProcAttr{}
 			}
-			secondary.SysProcAttr.Setpgid = false
+			subProcess.SysProcAttr.Setpgid = false
 
-			if execErr := secondary.Start(); execErr != nil {
+			if execErr := subProcess.Start(); execErr != nil {
 				if os.IsNotExist(execErr) {
-					fmt.Printf("Executable not found for secondary %s at: %s\n", name, secondary.Path)
+					fmt.Printf("Executable not found for subProcess %s at: %s\n", name, subProcess.Path)
 				}
 				panic(err)
 			} else {
-				fmt.Printf("Started secondary %s under process pid %d", name, secondary.Process.Pid)
+				fmt.Printf("Started subProcess %s under process pid %d", name, subProcess.Process.Pid)
 			}
 		}
 	}

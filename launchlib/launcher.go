@@ -34,8 +34,8 @@ const (
 )
 
 type ServiceCommands struct {
-	Primary     *exec.Cmd
-	Secondaries map[string]*exec.Cmd
+	Primary      *exec.Cmd
+	SubProcesses map[string]*exec.Cmd
 }
 
 func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (ServiceCommands, error) {
@@ -48,20 +48,20 @@ func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdou
 
 func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (ServiceCommands, error) {
 	cmds := ServiceCommands{
-		Secondaries: make(map[string]*exec.Cmd),
+		SubProcesses: make(map[string]*exec.Cmd),
 	}
 	var err error
 	if cmds.Primary, err = CompileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, stdout); err != nil {
 		return ServiceCommands{}, err
 	}
 
-	for name, staticSecondary := range staticConfig.Secondaries {
-		customSecondary, ok := customConfig.Secondaries[name]
+	for name, subProcStatic := range staticConfig.SubProcesses {
+		subProcCustom, ok := customConfig.SubProcesses[name]
 		if !ok {
-			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for secondary config '%s'", name)
+			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for sub-process config '%s'", name)
 		}
-		if cmds.Secondaries[name], err = CompileCmdFromConfig(&staticSecondary, &customSecondary, stdout); err != nil {
-			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for secondary config '%s'", name)
+		if cmds.SubProcesses[name], err = CompileCmdFromConfig(&subProcStatic, &subProcCustom, stdout); err != nil {
+			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for sub-process config '%s'", name)
 		}
 	}
 	return cmds, nil

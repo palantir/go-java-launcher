@@ -45,8 +45,8 @@ type StaticLauncherConfig struct {
 }
 
 type PrimaryStaticLauncherConfig struct {
-	StaticLauncherConfig                         `yaml:",inline"`
-	SubProcesses map[string]StaticLauncherConfig `yaml:"sub-processes"`
+	StaticLauncherConfig `yaml:",inline"`
+	SubProcesses         map[string]StaticLauncherConfig `yaml:"sub-processes"`
 }
 
 type CustomLauncherConfig struct {

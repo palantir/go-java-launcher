@@ -79,7 +79,7 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 	var executable string
 	var executableErr error
 
-	if staticConfig.ConfigType == "java" {
+	if staticConfig.Type == "java" {
 		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
@@ -98,14 +98,14 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		args = append(args, customConfig.JvmOpts...)
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
-	} else if staticConfig.ConfigType == "executable" {
+	} else if staticConfig.Type == "executable" {
 		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
 		if executableErr != nil {
 			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
 	} else {
-		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
+		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.Type)
 	}
 
 	args = append(args, staticConfig.Args...)

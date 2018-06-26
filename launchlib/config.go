@@ -27,6 +27,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type VersionedConfig struct {
+	Version int `yaml:"configVersion"`
+}
+
+type TypedConfig struct {
+	Type string `yaml:"configType"`
+}
+
 type JavaConfig struct {
 	JavaHome  string   `yaml:"javaHome"`
 	MainClass string   `yaml:"mainClass" validate:"nonzero"`
@@ -35,34 +43,31 @@ type JavaConfig struct {
 }
 
 type StaticLauncherConfig struct {
-	LauncherConfig `yaml:",inline"`
-	JavaConfig     `yaml:",inline"`
-	ServiceName    string            `yaml:"serviceName"`
-	Env            map[string]string `yaml:"env"`
-	Executable     string            `yaml:"executable,omitempty"`
-	Args           []string          `yaml:"args"`
-	Dirs           []string          `yaml:"dirs"`
+	TypedConfig `yaml:",inline"`
+	JavaConfig  `yaml:",inline"`
+	ServiceName string            `yaml:"serviceName"`
+	Env         map[string]string `yaml:"env"`
+	Executable  string            `yaml:"executable,omitempty"`
+	Args        []string          `yaml:"args"`
+	Dirs        []string          `yaml:"dirs"`
 }
 
 type PrimaryStaticLauncherConfig struct {
+	VersionedConfig      `yaml:",inline"`
 	StaticLauncherConfig `yaml:",inline"`
 	SubProcesses         map[string]StaticLauncherConfig `yaml:"sub-processes"`
 }
 
 type CustomLauncherConfig struct {
-	LauncherConfig `yaml:",inline"`
-	JvmOpts        []string          `yaml:"jvmOpts"`
-	Env            map[string]string `yaml:"env"`
+	TypedConfig `yaml:",inline"`
+	JvmOpts     []string          `yaml:"jvmOpts"`
+	Env         map[string]string `yaml:"env"`
 }
 
 type PrimaryCustomLauncherConfig struct {
+	VersionedConfig      `yaml:",inline"`
 	CustomLauncherConfig `yaml:",inline"`
 	SubProcesses         map[string]CustomLauncherConfig `yaml:"sub-processes"`
-}
-
-type LauncherConfig struct {
-	ConfigType    string `yaml:"configType"`
-	ConfigVersion int    `yaml:"configVersion"`
 }
 
 type AllowedLauncherConfigValues struct {
@@ -105,6 +110,10 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 			errors.Wrap(err, "Failed to deserialize Static Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
 	}
 
+	if err := config.VersionedConfig.validateVersion(allowedLauncherConfigs.ConfigVersions); err != nil {
+		return PrimaryStaticLauncherConfig{}, err
+	}
+
 	if err := validateStaticConfig(&config.StaticLauncherConfig); err != nil {
 		return PrimaryStaticLauncherConfig{}, err
 	}
@@ -123,11 +132,11 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 }
 
 func validateStaticConfig(config *StaticLauncherConfig) error {
-	if err := config.LauncherConfig.validateLauncherConfig(); err != nil {
+	if err := config.TypedConfig.validateType(allowedLauncherConfigs.ConfigTypes); err != nil {
 		return err
 	}
 
-	if config.ConfigType == "java" {
+	if config.Type == "java" {
 		config.Executable = "java"
 		if err := validator.Validate(config.JavaConfig); err != nil {
 			return err
@@ -171,7 +180,11 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 			errors.Wrap(err, "Failed to deserialize Custom Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
 	}
 
-	if err := config.LauncherConfig.validateLauncherConfig(); err != nil {
+	if err := config.VersionedConfig.validateVersion(allowedLauncherConfigs.ConfigVersions); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
+	}
+
+	if err := config.TypedConfig.validateType(allowedLauncherConfigs.ConfigTypes); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
 	}
 
@@ -180,7 +193,7 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 	}
 
 	for name, subProcess := range config.SubProcesses {
-		if err := subProcess.LauncherConfig.validateLauncherConfig(); err != nil {
+		if err := subProcess.TypedConfig.validateType(allowedLauncherConfigs.ConfigTypes); err != nil {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid launch config in custom "+
 				"subProcess config %s", name)
 		}
@@ -199,14 +212,18 @@ func getCustomConfigFromFile(customConfigFile string, stdout io.Writer) (Primary
 	}
 }
 
-func (config *LauncherConfig) validateLauncherConfig() error {
-	if _, ok := allowedLauncherConfigs.ConfigTypes[config.ConfigType]; !ok {
-		return fmt.Errorf("Can handle configType=%v only, found %s",
-			toString(allowedLauncherConfigs.ConfigTypes), config.ConfigType)
-	}
-	if _, ok := allowedLauncherConfigs.ConfigVersions[config.ConfigVersion]; !ok {
+func (config *VersionedConfig) validateVersion(allowedVersions map[int]struct{}) error {
+	if _, ok := allowedVersions[config.Version]; !ok {
 		return fmt.Errorf("Can handle configVersion=%v only, found %d",
-			toString(convertMap(allowedLauncherConfigs.ConfigVersions)), config.ConfigVersion)
+			toString(convertMap(allowedVersions)), config.Version)
+	}
+	return nil
+}
+
+func (config *TypedConfig) validateType(allowedTypes map[string]struct{}) error {
+	if _, ok := allowedTypes[config.Type]; !ok {
+		return fmt.Errorf("Can handle configType=%v only, found %s",
+			toString(allowedTypes), config.Type)
 	}
 	return nil
 }

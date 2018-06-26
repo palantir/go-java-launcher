@@ -47,10 +47,12 @@ args:
   - arg2
 `,
 			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
 				StaticLauncherConfig: StaticLauncherConfig{
-					LauncherConfig: LauncherConfig{
-						ConfigType:    "java",
-						ConfigVersion: 1,
+					TypedConfig: TypedConfig{
+						Type: "java",
 					},
 					Env: map[string]string{
 						"SOME_ENV_VAR":  "/etc/profile",
@@ -81,10 +83,12 @@ args:
   - arg2
 `,
 			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
 				StaticLauncherConfig: StaticLauncherConfig{
-					LauncherConfig: LauncherConfig{
-						ConfigType:    "executable",
-						ConfigVersion: 1,
+					TypedConfig: TypedConfig{
+						Type: "executable",
 					},
 					Env: map[string]string{
 						"SOME_ENV_VAR":  "/etc/profile",
@@ -92,6 +96,51 @@ args:
 					},
 					Executable: "/usr/bin/postgres",
 					Args:       []string{"arg1", "arg2"},
+				},
+			},
+		},
+		{
+			name: "with sub-process config",
+			data: `
+configType: executable
+configVersion: 1
+executable: /usr/bin/postgres
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+args:
+  - arg1
+  - arg2
+subProcesses:
+  envoy:
+    configType: executable
+    executable: /etc/envoy/envoy
+    args:
+      - arg3
+`,
+			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				StaticLauncherConfig: StaticLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "executable",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "/usr/bin/postgres",
+					Args:       []string{"arg1", "arg2"},
+				},
+				SubProcesses: map[string]StaticLauncherConfig{
+					"envoy": {
+						TypedConfig: TypedConfig{
+							Type: "executable",
+						},
+						Executable: "/etc/bin/envoy",
+						Args:       []string{"arg3"},
+					},
 				},
 			},
 		},
@@ -120,10 +169,12 @@ jvmOpts:
   - jvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
 				CustomLauncherConfig: CustomLauncherConfig{
-					LauncherConfig: LauncherConfig{
-						ConfigType:    "java",
-						ConfigVersion: 1,
+					TypedConfig: TypedConfig{
+						Type: "java",
 					},
 					Env: map[string]string{
 						"SOME_ENV_VAR":  "/etc/profile",
@@ -143,10 +194,12 @@ jvmOpts:
   - jvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
 				CustomLauncherConfig: CustomLauncherConfig{
-					LauncherConfig: LauncherConfig{
-						ConfigType:    "java",
-						ConfigVersion: 1,
+					TypedConfig: TypedConfig{
+						Type: "java",
 					},
 					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
@@ -164,15 +217,58 @@ jvmOpts:
   - jvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
 				CustomLauncherConfig: CustomLauncherConfig{
-					LauncherConfig: LauncherConfig{
-						ConfigType:    "java",
-						ConfigVersion: 1,
+					TypedConfig: TypedConfig{
+						Type: "java",
 					},
 					Env: map[string]string{
 						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 					},
 					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
+			},
+		},
+		{
+			name: "java custom config with sub-process",
+			data: `
+configType: java
+configVersion: 1
+env:
+  SOME_ENV_VAR: '{{CWD}}/etc/profile'
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+subProcesses:
+  envoy:
+    configType: executable
+    env:
+      LOG_LEVEL: info
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
+				SubProcesses: map[string]CustomLauncherConfig{
+					"envoy": {
+						TypedConfig: TypedConfig{
+							Type: "executable",
+						},
+						Env: map[string]string{
+							"LOG_LEVEL": "info",
+						},
+					},
 				},
 			},
 		},
@@ -186,10 +282,12 @@ env:
   OTHER_ENV_VAR: /etc/redhat-release
 `,
 			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
 				CustomLauncherConfig: CustomLauncherConfig{
-					LauncherConfig: LauncherConfig{
-						ConfigType:    "executable",
-						ConfigVersion: 1,
+					TypedConfig: TypedConfig{
+						Type: "executable",
 					},
 					Env: map[string]string{
 						"SOME_ENV_VAR":  "/etc/profile",
@@ -233,6 +331,18 @@ executable: postgres
 configType: executable
 configVersion: 2
 executable: postgres
+`,
+		},
+		{
+			name: "invalid subprocess",
+			msg:  `Can handle configType\=\{1\} only, found config`,
+			data: `
+configType: executable
+configVersion: 1
+executable: postgres
+subProcesses:
+  sub-process:
+    configType: config
 `,
 		},
 		{

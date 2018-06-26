@@ -108,15 +108,17 @@ func main() {
 	}
 
 	if len(cmds.SubProcesses) != 0 {
-		// Ensure we are in our own process group, since the monitor kills the group
+		// For this process (referenced as 0), set the process group id to our pid (also referenced as 0), to ensure
+		// we are in our own group.
 		if err := syscall.Setpgid(0, 0); err != nil {
 			fmt.Printf("Unable to create process group for primary with subprocesses")
 			panic(err)
 		}
 
+		pgid := syscall.Getpgrp()
 		monitor := &launchlib.ProcessMonitor{
 			PrimaryPID:      os.Getpid(),
-			ProcessGroupPID: syscall.Getpgrp(),
+			ProcessGroupPID: pgid,
 		}
 		monitorCmd := exec.Command(os.Args[0], GenerateMonitorArgs(monitor)...)
 		monitorCmd.Stdout = os.Stdout
@@ -124,25 +126,30 @@ func main() {
 
 		// From this point, if the launcher, or subsequent primary process dies, the process group will be terminated
 		// by the process monitor
+		fmt.Println("Starting process monitor for service process group ", pgid)
 		if err := monitorCmd.Start(); err != nil {
 			fmt.Println("Failed to start process monitor for service process group")
 			panic(err)
 		}
 
 		for name, subProcess := range cmds.SubProcesses {
-			// Ensure child processes are in the same parent group
+			// Create struct if not present, as to not override previously set SysProcAttr properties
 			if subProcess.SysProcAttr == nil {
 				subProcess.SysProcAttr = &syscall.SysProcAttr{}
 			}
+			// Do not set the pgid of the subprocesses, leaving them in the same process group as this process
 			subProcess.SysProcAttr.Setpgid = false
+			subProcess.Stdout = os.Stdout
+			subProcess.Stderr = os.Stderr
 
+			fmt.Println("Starting sub-processes ", name, subProcess.Path)
 			if execErr := subProcess.Start(); execErr != nil {
 				if os.IsNotExist(execErr) {
 					fmt.Printf("Executable not found for subProcess %s at: %s\n", name, subProcess.Path)
 				}
 				panic(err)
 			} else {
-				fmt.Printf("Started subProcess %s under process pid %d", name, subProcess.Process.Pid)
+				fmt.Printf("Started subProcess %s under process pid %d\n", name, subProcess.Process.Pid)
 			}
 		}
 	}

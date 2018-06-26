@@ -95,7 +95,7 @@ func main() {
 
 	for name, subProcStatic := range staticConfig.SubProcesses {
 		if err := launchlib.MkDirs(subProcStatic.Dirs, stdout); err != nil {
-			fmt.Println("Failed to create directories for subprocess ", name, err)
+			fmt.Println("Failed to create directories for subProcess ", name, err)
 			panic(err)
 		}
 	}
@@ -111,7 +111,7 @@ func main() {
 		// For this process (referenced as 0), set the process group id to our pid (also referenced as 0), to ensure
 		// we are in our own group.
 		if err := syscall.Setpgid(0, 0); err != nil {
-			fmt.Printf("Unable to create process group for primary with subprocesses")
+			fmt.Printf("Unable to create process group for primary with subProcesses")
 			panic(err)
 		}
 
@@ -137,12 +137,12 @@ func main() {
 			if subProcess.SysProcAttr == nil {
 				subProcess.SysProcAttr = &syscall.SysProcAttr{}
 			}
-			// Do not set the pgid of the subprocesses, leaving them in the same process group as this process
+			// Do not set the pgid of the subProcesses, leaving them in the same process group as this process
 			subProcess.SysProcAttr.Setpgid = false
 			subProcess.Stdout = os.Stdout
 			subProcess.Stderr = os.Stderr
 
-			fmt.Println("Starting sub-processes ", name, subProcess.Path)
+			fmt.Println("Starting subProcesses ", name, subProcess.Path)
 			if execErr := subProcess.Start(); execErr != nil {
 				if os.IsNotExist(execErr) {
 					fmt.Printf("Executable not found for subProcess %s at: %s\n", name, subProcess.Path)

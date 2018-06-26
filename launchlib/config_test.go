@@ -100,7 +100,7 @@ args:
 			},
 		},
 		{
-			name: "with sub-process config",
+			name: "with subProcess config",
 			data: `
 configType: executable
 configVersion: 1
@@ -232,7 +232,7 @@ jvmOpts:
 			},
 		},
 		{
-			name: "java custom config with sub-process",
+			name: "java custom config with subProcess",
 			data: `
 configType: java
 configVersion: 1
@@ -334,14 +334,14 @@ executable: postgres
 `,
 		},
 		{
-			name: "invalid subprocess",
+			name: "invalid subProcess",
 			msg:  `Can handle configType\=\{1\} only, found config`,
 			data: `
 configType: executable
 configVersion: 1
 executable: postgres
 subProcesses:
-  sub-process:
+  subProcess:
     configType: config
 `,
 		},

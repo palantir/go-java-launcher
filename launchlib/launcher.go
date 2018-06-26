@@ -58,10 +58,10 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 	for name, subProcStatic := range staticConfig.SubProcesses {
 		subProcCustom, ok := customConfig.SubProcesses[name]
 		if !ok {
-			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for sub-process config '%s'", name)
+			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
 		}
 		if cmds.SubProcesses[name], err = CompileCmdFromConfig(&subProcStatic, &subProcCustom, stdout); err != nil {
-			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for sub-process config '%s'", name)
+			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for subProcess config '%s'", name)
 		}
 	}
 	return cmds, nil

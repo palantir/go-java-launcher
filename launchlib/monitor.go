@@ -51,7 +51,7 @@ func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
 
 	// Service process has died, terminating process group
 	if err := syscall.Kill(-m.ProcessGroupPID, syscall.SIGTERM); err != nil {
-		return errors.Wrapf(err, "unable to send term signal to process group, beware of orphaned sub-processes")
+		return errors.Wrapf(err, "unable to send term signal to process group, beware of orphaned subProcesses")
 	}
 	return nil
 }

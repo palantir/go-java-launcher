@@ -55,7 +55,7 @@ type StaticLauncherConfig struct {
 type PrimaryStaticLauncherConfig struct {
 	VersionedConfig      `yaml:",inline"`
 	StaticLauncherConfig `yaml:",inline"`
-	SubProcesses         map[string]StaticLauncherConfig `yaml:"sub-processes"`
+	SubProcesses         map[string]StaticLauncherConfig `yaml:"subProcesses"`
 }
 
 type CustomLauncherConfig struct {
@@ -67,7 +67,7 @@ type CustomLauncherConfig struct {
 type PrimaryCustomLauncherConfig struct {
 	VersionedConfig      `yaml:",inline"`
 	CustomLauncherConfig `yaml:",inline"`
-	SubProcesses         map[string]CustomLauncherConfig `yaml:"sub-processes"`
+	SubProcesses         map[string]CustomLauncherConfig `yaml:"subProcesses"`
 }
 
 type AllowedLauncherConfigValues struct {
@@ -98,7 +98,7 @@ func GetConfigsFromFiles(staticConfigFile string, customConfigFile string, stdou
 
 func validateSubProcessLimit(numberSubProcesses int) error {
 	if numberSubProcesses > 1 {
-		return errors.New("only one named sub-processes is currently allowed")
+		return errors.New("only one named subProcesses is currently allowed")
 	}
 	return nil
 }
@@ -125,7 +125,7 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 	for name, subProcess := range config.SubProcesses {
 		if err := validateStaticConfig(&subProcess); err != nil {
 			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
-				"failed to validate sub-process launcher configuration '%s'", name)
+				"failed to validate subProcess launcher configuration '%s'", name)
 		}
 	}
 	return config, nil
@@ -160,14 +160,14 @@ func verifyStaticWithCustomConfig(staticConfig PrimaryStaticLauncherConfig, cust
 	for name := range customConfig.SubProcesses {
 		if _, ok := staticConfig.SubProcesses[name]; !ok {
 			return errors.Errorf(
-				"custom sub-process config '%s' does not exist in the static config file", name)
+				"custom subProcess config '%s' does not exist in the static config file", name)
 		}
 	}
 
 	for name := range staticConfig.SubProcesses {
 		if _, ok := customConfig.SubProcesses[name]; !ok {
 			return errors.Errorf(
-				"no custom config exists for sub-process '%s' defined in the static config file", name)
+				"no custom config exists for subProcess '%s' defined in the static config file", name)
 		}
 	}
 	return nil

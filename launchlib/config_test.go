@@ -138,7 +138,7 @@ subProcesses:
 						TypedConfig: TypedConfig{
 							Type: "executable",
 						},
-						Executable: "/etc/bin/envoy",
+						Executable: "/etc/envoy/envoy",
 						Args:       []string{"arg3"},
 					},
 				},
@@ -334,14 +334,14 @@ executable: postgres
 `,
 		},
 		{
-			name: "invalid subProcess",
-			msg:  `Can handle configType\=\{1\} only, found config`,
+			name: "invalid subProcess config type",
+			msg:  `failed to validate subProcess launcher configuration 'incorrect': Can handle configType\=\{.+\} only, found config`,
 			data: `
 configType: executable
 configVersion: 1
 executable: postgres
 subProcesses:
-  subProcess:
+  incorrect:
     configType: config
 `,
 		},

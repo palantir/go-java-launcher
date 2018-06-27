@@ -38,9 +38,8 @@ dirs:
 # OPTIONAL - A map of configurations of subProcesses to launch
 subProcesses:
   SUB_PROCESS_NAME:
-    # another StaticLauncherConfig, cannot have it's own subProcesses
+    # another StaticLauncherConfig though it cannot have its own subProcesses, and uses its parent's configVersion
     configType: executable
-    configVersion: 1
     env:
       CUSTOM_VAR: CUSTOM_VALUE
     executable: "{{CWD}}/service/lib/envoy/envoy"
@@ -70,9 +69,8 @@ dirs:
 # OPTIONAL - A map of configurations of secondary processes to launch
 subProcesses:
   SUB_PROCESS_NAME:
-    # another StaticLauncherConfig, cannot have it's own subProcesses
+    # another StaticLauncherConfig though it cannot have its own subProcesses, and uses its parent's configVersion
     configType: executable
-    configVersion: 1
     env:
       CUSTOM_VAR: CUSTOM_VALUE
     executable: "{{CWD}}/service/lib/envoy/envoy"
@@ -97,9 +95,8 @@ jvmOpts:
 # OPTIONAL - A map of configurations of secondary processes to launch
 subProcess:
   SUB_PROCESS_NAME:
-    # another CustomLauncherConfig, cannot have it's own subProcesses
+    # another CustomLauncherConfig though it cannot have its own subProcesses, and uses its parent's configVersion
     configType: executable
-    configVersion: 1
     env:
       CUSTOM_VAR: CUSTOM_VALUE
 ```

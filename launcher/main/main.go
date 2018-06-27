@@ -147,7 +147,7 @@ func main() {
 				if os.IsNotExist(execErr) {
 					fmt.Printf("Executable not found for subProcess %s at: %s\n", name, subProcess.Path)
 				}
-				panic(err)
+				panic(execErr)
 			} else {
 				fmt.Printf("Started subProcess %s under process pid %d\n", name, subProcess.Process.Pid)
 			}

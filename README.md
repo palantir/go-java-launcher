@@ -35,10 +35,10 @@ args:
 dirs:
   - var/data/tmp
   - var/log
-# OPTIONAL - A map of configurations of sub-processes to launch
-sub-processes:
+# OPTIONAL - A map of configurations of subProcesses to launch
+subProcesses:
   SUB_PROCESS_NAME:
-    # another StaticLauncherConfig, cannot have it's own sub-processes
+    # another StaticLauncherConfig, cannot have it's own subProcesses
     configType: executable
     configVersion: 1
     env:
@@ -68,9 +68,9 @@ dirs:
   - var/data/tmp
   - var/log
 # OPTIONAL - A map of configurations of secondary processes to launch
-sub-processes:
+subProcesses:
   SUB_PROCESS_NAME:
-    # another StaticLauncherConfig, cannot have it's own sub-processes
+    # another StaticLauncherConfig, cannot have it's own subProcesses
     configType: executable
     configVersion: 1
     env:
@@ -95,9 +95,9 @@ env:
 jvmOpts:
   - '-Xmx2g'
 # OPTIONAL - A map of configurations of secondary processes to launch
-sub-process:
+subProcess:
   SUB_PROCESS_NAME:
-    # another CustomLauncherConfig, cannot have it's own sub-processes
+    # another CustomLauncherConfig, cannot have it's own subProcesses
     configType: executable
     configVersion: 1
     env:
@@ -126,8 +126,8 @@ and `<custom.xyz>` refer to the options from the two configuration files, respec
 Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typically take precendence; the exact
 behaviour may depend on the Java distribution.
 
-If any sub-processes are defined, they will be launched as child processes of the main process, with all of these
-processes occupying their own process group.  Additionally, a monitor sub-process will be launched, which terminates
+If any subProcesses are defined, they will be launched as child processes of the main process, with all of these
+processes occupying their own process group.  Additionally, a monitor subProcess will be launched, which terminates
 the group, should the main process die.
 
 `env` block, both in static and custom configuration, supports restricted set of automatic expansions for values

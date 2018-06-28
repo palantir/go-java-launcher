@@ -346,6 +346,18 @@ subProcesses:
 `,
 		},
 		{
+			name: "invalid subProcess name",
+			msg:  "invalid subProcess name '../breakout' in static config: subProcess name '../breakout' does not match required pattern '.+'",
+			data: `
+configType: executable
+configVersion: 1
+executable: postgres
+subProcesses:
+  ../breakout:
+    configType: java
+`,
+		},
+		{
 			name: "invalid executable",
 			msg:  `Can handle executable\=\{.+\} only, found /bin/rm`,
 			data: `

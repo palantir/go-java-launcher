@@ -19,12 +19,17 @@ import (
 	"io"
 	"io/ioutil"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
 	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
+)
+
+var (
+	subProcessNamePattern = regexp.MustCompile("^[a-z-]+$")
 )
 
 type VersionedConfig struct {
@@ -118,6 +123,13 @@ func validateSubProcessLimit(numberSubProcesses int) error {
 	return nil
 }
 
+func validateSubProcessName(name string) error {
+	if !subProcessNamePattern.MatchString(name) {
+		return errors.Errorf("subProcess name '%s' does not match required pattern '%s'", name, subProcessNamePattern)
+	}
+	return nil
+}
+
 func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 	var config PrimaryStaticLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
@@ -138,6 +150,11 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 	}
 
 	for name, subProcess := range config.SubProcesses {
+		if err := validateSubProcessName(name); err != nil {
+			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err, "invalid subProcess name '%s' in static config",
+				name)
+		}
+
 		if err := validateStaticConfig(&subProcess); err != nil {
 			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
 				"failed to validate subProcess launcher configuration '%s'", name)
@@ -212,6 +229,11 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 	}
 
 	for name, subProcess := range config.SubProcesses {
+		if err := validateSubProcessName(name); err != nil {
+			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid subProcess name '%s' in static config",
+				name)
+		}
+
 		if err := subProcess.TypedConfig.validateType(allowedLauncherConfigs.ConfigTypes); err != nil {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid launch config in custom "+
 				"subProcess config %s", name)

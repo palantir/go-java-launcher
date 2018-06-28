@@ -93,6 +93,21 @@ func GetConfigsFromFiles(staticConfigFile string, customConfigFile string, stdou
 		return PrimaryStaticLauncherConfig{}, PrimaryCustomLauncherConfig{}, err
 	}
 
+	// create empty CustomLauncherConfigs for subProcesses not explicitly defined already
+	for name, static := range staticConfig.SubProcesses {
+		if _, ok := customConfig.SubProcesses[name]; !ok {
+			if customConfig.SubProcesses == nil {
+				customConfig.SubProcesses = map[string]CustomLauncherConfig{}
+			}
+
+			customConfig.SubProcesses[name] = CustomLauncherConfig{
+				TypedConfig: TypedConfig{
+					Type: static.Type,
+				},
+			}
+		}
+	}
+
 	return staticConfig, customConfig, verifyStaticWithCustomConfig(staticConfig, customConfig)
 }
 
@@ -164,10 +179,14 @@ func verifyStaticWithCustomConfig(staticConfig PrimaryStaticLauncherConfig, cust
 		}
 	}
 
-	for name := range staticConfig.SubProcesses {
-		if _, ok := customConfig.SubProcesses[name]; !ok {
+	for name, subStatic := range staticConfig.SubProcesses {
+		if subCustom, ok := customConfig.SubProcesses[name]; !ok {
 			return errors.Errorf(
 				"no custom config exists for subProcess '%s' defined in the static config file", name)
+		} else if subStatic.Type != subCustom.Type {
+			return errors.Errorf(
+				"custom config for subProcess '%s' has different type '%s' from static type '%s'",
+				name, subCustom.Type, subStatic.Type)
 		}
 	}
 	return nil

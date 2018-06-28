@@ -48,13 +48,13 @@ func start() error {
 		return cli.WithExitCode(1, errors.Wrap(err, "failed to create startup log file"))
 	}
 
-	cmd, err := launchlib.CompileCmdFromConfigFiles(lib.LauncherStaticFile, lib.LauncherCustomFile, outputFile)
+	cmd, err := launchlib.CompileCmdsFromConfigFiles(lib.LauncherStaticFile, lib.LauncherCustomFile, outputFile)
 	if err != nil {
 		return cli.WithExitCode(1,
 			errors.Wrap(err, "failed to assemble command from static and custom configuration files"))
 	}
 
-	if err := lib.StartCommand(cmd, outputFile); err != nil {
+	if err := lib.StartCommand(cmd.Primary, outputFile); err != nil {
 		return cli.WithExitCode(1, errors.Wrap(err, "failed to start process"))
 	}
 

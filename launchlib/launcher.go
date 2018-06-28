@@ -22,6 +22,8 @@ import (
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -31,18 +33,38 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (*exec.Cmd, error) {
-	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
-	if staticConfigErr != nil {
-		return nil, staticConfigErr
+type ServiceCommands struct {
+	Primary      *exec.Cmd
+	SubProcesses map[string]*exec.Cmd
+}
+
+func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (ServiceCommands, error) {
+	staticConfig, customConfig, err := GetConfigsFromFiles(staticConfigFile, customConfigFile, stdout)
+	if err != nil {
+		return ServiceCommands{}, err
+	}
+	return CompileCmdsFromConfig(&staticConfig, &customConfig, stdout)
+}
+
+func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (ServiceCommands, error) {
+	cmds := ServiceCommands{
+		SubProcesses: make(map[string]*exec.Cmd),
+	}
+	var err error
+	if cmds.Primary, err = CompileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, stdout); err != nil {
+		return ServiceCommands{}, err
 	}
 
-	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile, stdout)
-	if customConfigErr != nil {
-		return nil, customConfigErr
+	for name, subProcStatic := range staticConfig.SubProcesses {
+		subProcCustom, ok := customConfig.SubProcesses[name]
+		if !ok {
+			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
+		}
+		if cmds.SubProcesses[name], err = CompileCmdFromConfig(&subProcStatic, &subProcCustom, stdout); err != nil {
+			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for subProcess config '%s'", name)
+		}
 	}
-
-	return CompileCmdFromConfig(&staticConfig, &customConfig, stdout)
+	return cmds, nil
 }
 
 func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,
@@ -57,7 +79,7 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 	var executable string
 	var executableErr error
 
-	if staticConfig.ConfigType == "java" {
+	if staticConfig.Type == "java" {
 		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
@@ -76,14 +98,14 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		args = append(args, customConfig.JvmOpts...)
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
-	} else if staticConfig.ConfigType == "executable" {
+	} else if staticConfig.Type == "executable" {
 		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
 		if executableErr != nil {
 			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
 	} else {
-		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
+		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.Type)
 	}
 
 	args = append(args, staticConfig.Args...)

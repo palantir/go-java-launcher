@@ -17,38 +17,89 @@ package lib
 import (
 	"io/ioutil"
 	"os"
-	"strconv"
 	"syscall"
 
 	"github.com/pkg/errors"
+	"gopkg.in/validator.v2"
+	"gopkg.in/yaml.v2"
+
+	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-// GetProcessStatus determines the status of the process whose PID is written to var/run/service.pid.
-//
-// Returns (process, status, err). Possible values are:
-// - (<process>, 0, nil) if the pidfile exists and can be read and the process is running
-// - (<process>, 1, <err>) if the pidfile exists and can be read but the process is not running
-// - (nil, 3, <err>) if the pidfile does not exist or cannot be read
-func GetProcessStatus() (*os.Process, int, error) {
-	pidBytes, err := ioutil.ReadFile(Pidfile)
-	if err != nil {
-		return nil, 3, errors.Wrap(err, "failed to read pidfile")
-	}
-
-	pid, err := strconv.Atoi(string(pidBytes[:]))
-	if err != nil {
-		return nil, 3, errors.Wrap(err, "failed to parse a valid PID from pidfile")
-	}
-
-	// Docs say FindProcess always succeeds on Unix.
-	process, _ := os.FindProcess(pid)
-	if !isRunning(process) {
-		return process, 1, errors.New("pidfile exists but process is not running")
-	}
-
-	return process, 0, nil
+type ServicePids struct {
+	PidsByName map[string]int `yaml:"pidsByName" validate:"nonzero"`
 }
 
-func isRunning(process *os.Process) bool {
-	return process.Signal(syscall.Signal(0)) == nil
+type ServiceStatusInfo struct {
+	RunningProcs   []*os.Process
+	NotRunningCmds []launchlib.ProcCmd
+}
+
+// GetServiceStatus determines the status of the service based on the configuration and the pidfile.
+// Returns (ServiceStatusInfo, status, err). Possible values are:
+// - (info, 0, nil) if the pidfile exists and can be read and all processes are running
+// - (info, 1, <err>) if the pidfile exists and can be read but at least one process is not running
+// - (info, 3, <err>) if the pidfile does not exist or cannot be read
+// - (nil, 3, <err>) if the config cannot be read
+// info contains any running processes recorded in the pidfile (since these are the ones that will need to be stopped to
+// stop the service) and the commands that are not running that are defined in the configuration files (since these are
+// the ones that will need to be started to start the service).
+func GetServiceStatus() (*ServiceStatusInfo, int, error) {
+	procCmds, err := launchlib.CompileCmdsFromConfigFiles()
+	if err != nil {
+		return nil, 3, errors.Wrap(err, "failed to read static and custom configuration files")
+	}
+
+	pidfileBytes, err := ioutil.ReadFile(pidfile)
+	if err != nil {
+		return &ServiceStatusInfo{[]*os.Process{}, procCmds}, 3, errors.Wrap(err, "failed to read pidfile")
+	}
+	var servicePids ServicePids
+	if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {
+		return &ServiceStatusInfo{[]*os.Process{}, procCmds}, 3, errors.Wrap(err, "failed to deserialize pidfile")
+	}
+	if err := validator.Validate(servicePids); err != nil {
+		return &ServiceStatusInfo{[]*os.Process{}, procCmds}, 3, errors.Wrap(err, "failed to deserialize pidfile")
+	}
+	if err != nil {
+		return &ServiceStatusInfo{[]*os.Process{}, procCmds}, 3,
+			errors.Wrap(err, "failed to assemble commands from static and custom configuration files")
+	}
+
+	// What processes are running (regardless of if they are configured), and which of the configured processes are not
+	// listed in the pidfile or are not running?
+	// Look at the pidfile and record what's running.
+	runningProcs := make([]*os.Process, 0, len(servicePids.PidsByName))
+	for _, procPid := range servicePids.PidsByName {
+		// Docs say FindProcess always succeeds on Unix.
+		proc, _ := os.FindProcess(procPid)
+		if isRunning(proc) {
+			runningProcs = append(runningProcs, proc)
+		}
+	}
+	// Then look at the config and record what's not running.
+	notRunningCmds := make([]launchlib.ProcCmd, 0, len(procCmds))
+	for _, procCmd := range procCmds {
+		procPid, ok := servicePids.PidsByName[procCmd.Name]
+		if !ok {
+			notRunningCmds = append(notRunningCmds, procCmd)
+		} else {
+			subProc, _ := os.FindProcess(procPid)
+			if !isRunning(subProc) {
+				notRunningCmds = append(notRunningCmds, procCmd)
+			}
+		}
+	}
+
+	serviceStatusInfo := &ServiceStatusInfo{runningProcs, notRunningCmds}
+	if len(notRunningCmds) > 0 {
+		return serviceStatusInfo, 1,
+			errors.New("pidfile exists and can be read but at least one process is not running")
+	}
+	return serviceStatusInfo, 0, nil
+}
+
+// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
+func isRunning(proc *os.Process) bool {
+	return proc.Signal(syscall.Signal(0)) == nil
 }

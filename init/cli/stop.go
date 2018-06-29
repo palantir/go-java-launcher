@@ -15,8 +15,6 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
@@ -27,9 +25,9 @@ func stopCommand() cli.Command {
 	return cli.Command{
 		Name: "stop",
 		Usage: `
-Stops the process the PID of which is written to var/run/service.pid. Returns 0 if the process is successfully stopped
-or is not running and the pidfile is removed and returns 1 otherwise. Waits 240 seconds for the process to stop before
-considering the execution a failure.`,
+Ensures the service defined by the static and custom configurations are service/bin/launcher-static.yml and
+var/conf/launcher-custom.yml is not running. If successful, exits 0, otherwise exits 1 and writes an error message to
+stderr. Waits for at least 240 seconds for any processes to stop.`,
 		Action: func(_ cli.Context) error {
 			return stop()
 		},
@@ -37,18 +35,12 @@ considering the execution a failure.`,
 }
 
 func stop() error {
-	// The status tells us more than the error
-	switch process, status, _ := lib.GetProcessStatus(); status {
+	// We take action here based on the status, not the error
+	switch info, status, _ := lib.GetServiceStatus(); status {
 	case 0:
-		if err := lib.StopProcess(process); err != nil {
-			return cli.WithExitCode(1, err)
-		}
-		if err := os.Remove(lib.Pidfile); err != nil {
-			return cli.WithExitCode(1, err)
-		}
-		return nil
+		fallthrough
 	case 1:
-		if err := os.Remove(lib.Pidfile); err != nil {
+		if err := lib.StopService(info.RunningProcs); err != nil {
 			return cli.WithExitCode(1, err)
 		}
 		return nil

@@ -1,0 +1,9 @@
+configType: java
+configVersion: 1
+jvmOpts:
+  - '-Xmx1g'
+subProcesses:
+  sidecar:
+    configType: java
+    jvmOpts:
+      - '-Xmx1g'

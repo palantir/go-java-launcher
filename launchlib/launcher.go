@@ -33,38 +33,49 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-type ServiceCommands struct {
-	Primary      *exec.Cmd
-	SubProcesses map[string]*exec.Cmd
+type ProcCmd struct {
+	Name   string
+	Cmd    *exec.Cmd
+	Stdout io.Writer
 }
 
-func CompileCmdsFromConfigFiles(staticConfigFile, customConfigFile string, stdout io.Writer) (ServiceCommands, error) {
-	staticConfig, customConfig, err := GetConfigsFromFiles(staticConfigFile, customConfigFile, stdout)
+func CompileCmdsFromConfigFiles() ([]ProcCmd, error) {
+	primaryStdout, err := os.Create(PrimaryOutputFile)
 	if err != nil {
-		return ServiceCommands{}, err
+		return nil, errors.Wrap(err, "failed to create primary startup log file")
 	}
-	return CompileCmdsFromConfig(&staticConfig, &customConfig, stdout)
+	staticConfig, customConfig, err :=
+		GetConfigsFromFiles(LauncherStaticFile, LauncherCustomFile, primaryStdout)
+	if err != nil {
+		return nil, err
+	}
+	return CompileCmdsFromConfig(&staticConfig, &customConfig, primaryStdout)
 }
 
-func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (ServiceCommands, error) {
-	cmds := ServiceCommands{
-		SubProcesses: make(map[string]*exec.Cmd),
-	}
-	var err error
-	if cmds.Primary, err = CompileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, stdout); err != nil {
-		return ServiceCommands{}, err
-	}
+func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, primaryStdout io.Writer) ([]ProcCmd, error) {
+	procCmds := make([]ProcCmd, 0, 1+len(staticConfig.SubProcesses))
 
+	primaryCmd, err := CompileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, primaryStdout)
+	if err != nil {
+		return nil, err
+	}
+	procCmds = append(procCmds, ProcCmd{"primary", primaryCmd, primaryStdout})
 	for name, subProcStatic := range staticConfig.SubProcesses {
 		subProcCustom, ok := customConfig.SubProcesses[name]
 		if !ok {
-			return ServiceCommands{}, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
+			return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
 		}
-		if cmds.SubProcesses[name], err = CompileCmdFromConfig(&subProcStatic, &subProcCustom, stdout); err != nil {
-			return ServiceCommands{}, errors.Wrapf(err, "unable to compile command for subProcess config '%s'", name)
+		stdout, err := os.Create(fmt.Sprintf(OutputFileFormat, name+"-"))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create startup log file for subprocess %s", name)
 		}
+		subProcCmd, err := CompileCmdFromConfig(&subProcStatic, &subProcCustom, stdout)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to compile command for subProcess config '%s'", name)
+		}
+		procCmds = append(procCmds, ProcCmd{name, subProcCmd, stdout})
 	}
-	return cmds, nil
+	return procCmds, nil
 }
 
 func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,

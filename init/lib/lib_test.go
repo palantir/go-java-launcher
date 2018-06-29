@@ -18,22 +18,33 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
+
+	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-var files = []string{LauncherStaticFile, LauncherCustomFile, OutputFile, Pidfile}
+var files = []string{launchlib.LauncherStaticFile, launchlib.LauncherCustomFile, launchlib.OutputFileFormat, pidfile}
+
+func setupSingleProcess(t *testing.T) {
+	setup(t)
+	require.NoError(t, os.Link("testdata/launcher-static.yml", launchlib.LauncherStaticFile))
+	require.NoError(t, os.Link("testdata/launcher-custom.yml", launchlib.LauncherCustomFile))
+}
+
+func setupMultiProcess(t *testing.T) {
+	setup(t)
+	require.NoError(t, os.Link("testdata/launcher-static-multiprocess.yml", launchlib.LauncherStaticFile))
+	require.NoError(t, os.Link("testdata/launcher-custom-multiprocess.yml", launchlib.LauncherCustomFile))
+}
 
 func setup(t *testing.T) {
 	for _, file := range files {
 		require.NoError(t, os.MkdirAll(filepath.Dir(file), 0777))
 	}
-
-	require.NoError(t, os.Link("testdata/launcher-static-null.yml", LauncherStaticFile))
-	require.NoError(t, os.Link("testdata/launcher-custom-null.yml", LauncherCustomFile))
 }
 
 func teardown(t *testing.T) {
@@ -42,14 +53,25 @@ func teardown(t *testing.T) {
 	}
 }
 
-func writePid(t *testing.T, pid int) {
-	require.NoError(t, ioutil.WriteFile(Pidfile, []byte(strconv.Itoa(pid)), 0644))
+func writePidOrFail(t *testing.T, name string, pid int) {
+	var servicePids ServicePids
+	if pidfileExists() {
+		pidfileBytes, err := ioutil.ReadFile(pidfile)
+		require.NoError(t, err)
+		require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
+	} else {
+		servicePids.PidsByName = make(map[string]int)
+	}
+	servicePids.PidsByName[name] = pid
+	servicePidsBytes, err := yaml.Marshal(servicePids)
+	require.NoError(t, err)
+	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))
 }
 
-func readPid(t *testing.T) int {
-	pidBytes, err := ioutil.ReadFile(Pidfile)
+func readPids(t *testing.T) *ServicePids {
+	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	require.NoError(t, err)
-	pid, err := strconv.Atoi(string(pidBytes))
-	require.NoError(t, err)
-	return pid
+	var servicePids ServicePids
+	require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
+	return &servicePids
 }

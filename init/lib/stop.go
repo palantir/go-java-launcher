@@ -23,36 +23,59 @@ import (
 	"github.com/pkg/errors"
 )
 
-func StopProcess(process *os.Process) error {
-	if err := process.Signal(syscall.SIGTERM); err != nil {
-		if !strings.Contains(err.Error(), "os: process already finished") {
-			return errors.Wrap(err, "failed to stop process")
+func StopService(procs []*os.Process) error {
+	for _, proc := range procs {
+		if err := proc.Signal(syscall.SIGTERM); err != nil {
+			if !strings.Contains(err.Error(), "os: process already finished") {
+				return errors.Wrap(err, "failed to stop at least one process")
+			}
 		}
 	}
 
-	if err := waitForProcessToStop(process); err != nil {
-		return errors.Wrap(err, "failed to stop process")
+	if err := waitForServiceToStop(procs); err != nil {
+		return errors.Wrap(err, "failed to stop at least one process")
+	}
+
+	if pidfileExists() {
+		if err := os.Remove(pidfile); err != nil {
+			return errors.Wrap(err, "failed to remove pidfile")
+		}
 	}
 
 	return nil
 }
 
-func waitForProcessToStop(process *os.Process) error {
+func waitForServiceToStop(procs []*os.Process) error {
 	const numSecondsToWait = 240
 	timer := time.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
+	remainingProcs := make(map[*os.Process]struct{})
+	for _, proc := range procs {
+		remainingProcs[proc] = struct{}{}
+	}
 	for {
 		select {
 		case <-ticker.C:
-			if !isRunning(process) {
+			for remainingProc := range remainingProcs {
+				if !isRunning(remainingProc) {
+					delete(remainingProcs, remainingProc)
+				}
+			}
+			if len(remainingProcs) == 0 {
 				return nil
 			}
 		case <-timer.C:
-			return errors.Errorf("failed to wait for process to stop: process with pid '%d' did not stop within %d "+
-				"seconds", process.Pid, numSecondsToWait)
+			remainingPids := make([]int, len(remainingProcs))
+			i := 0
+			for proc := range remainingProcs {
+				remainingPids[i] = proc.Pid
+				i++
+			}
+			return errors.Errorf("failed to wait for all processes to stop: processes with pids '%v' did not stop "+
+				"within %d seconds", remainingPids, numSecondsToWait)
 		}
 	}
 }

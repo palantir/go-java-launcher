@@ -12,8 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package lib
+package launchlib
+
+import (
+	"fmt"
+)
 
 const (
-	pidfile = "var/run/service.pid"
+	LauncherStaticFile = "service/bin/launcher-static.yml"
+	LauncherCustomFile = "var/conf/launcher-custom.yml"
+	OutputFileFormat   = "var/log/%sstartup.log"
 )
+
+var PrimaryOutputFile = fmt.Sprintf(OutputFileFormat, "")

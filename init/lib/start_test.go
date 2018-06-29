@@ -15,6 +15,7 @@
 package lib
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -23,22 +24,55 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-func TestStart(t *testing.T) {
+func TestStartService_SingleProcess(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	outputFile, err := os.Create(OutputFile)
+	outputFile, err := os.Create(launchlib.PrimaryOutputFile)
 	require.NoError(t, err)
-	cmd := &exec.Cmd{Path: "/bin/ls"}
-	assert.NoError(t, StartCommand(cmd, outputFile))
+	cmds := []launchlib.ProcCmd{{Name: "primary", Cmd: exec.Command("/bin/ls"), Stdout: outputFile}}
+	assert.NoError(t, StartService(cmds))
+	// Wait for process to start up and write output
+	time.Sleep(time.Second)
 
-	// Output was written to OutputFile
-	time.Sleep(time.Second) // Wait for forked process to start and print output
-	output, err := ioutil.ReadFile(OutputFile)
+	output, err := ioutil.ReadFile(launchlib.PrimaryOutputFile)
 	require.NoError(t, err)
 	assert.Contains(t, string(output), "start.go")
-	// Pidfile was written
-	readPid(t)
+	pids := readPids(t).PidsByName
+	assert.Equal(t, 1, len(pids))
+	assert.Equal(t, cmds[0].Cmd.Process.Pid, pids["primary"])
+}
+
+func TestStartService_MultiProcess(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	primaryOutputFile, err := os.Create(launchlib.PrimaryOutputFile)
+	require.NoError(t, err)
+	sidecarOutputFileName := fmt.Sprintf(launchlib.OutputFileFormat, "sidecar-")
+	sidecarOutputFile, err := os.Create(sidecarOutputFileName)
+	require.NoError(t, err)
+	cmds := []launchlib.ProcCmd{
+		{Name: "primary", Cmd: exec.Command("/bin/ls"), Stdout: primaryOutputFile},
+		{Name: "sidecar", Cmd: exec.Command("/bin/echo", "foo"), Stdout: sidecarOutputFile},
+	}
+	assert.NoError(t, StartService(cmds))
+
+	// Wait for processes to start up and write output
+	time.Sleep(time.Second)
+
+	primaryOutput, err := ioutil.ReadFile(launchlib.PrimaryOutputFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(primaryOutput), "start.go")
+	sidecarOutput, err := ioutil.ReadFile(sidecarOutputFileName)
+	require.NoError(t, err)
+	assert.Contains(t, string(sidecarOutput), "foo")
+	pids := readPids(t).PidsByName
+	assert.Equal(t, 2, len(pids))
+	assert.Equal(t, cmds[0].Cmd.Process.Pid, pids["primary"])
+	assert.Equal(t, cmds[1].Cmd.Process.Pid, pids["sidecar"])
 }

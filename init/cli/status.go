@@ -24,11 +24,12 @@ func statusCommand() cli.Command {
 	return cli.Command{
 		Name: "status",
 		Usage: `
-Determines the status of the process the PID of which is written to var/run/service.pid.
+Determines the status of the service defined by the static and custom configurations at service/bin/launcher-static.yml
+and var/conf/launcher-custom.yml.
 Exits:
-- 0 if the pidfile exists and can be read and the process is running
-- 1 if the pidfile exists and can be read but the process is not running
-- 3 if the pidfile does not exist or cannot be read
+- 0 if all of its processes are running
+- 1 if at least one process is not running
+- 3 if the status cannot be determined
 If exit code is nonzero, writes an error message to stderr.`,
 		Action: func(_ cli.Context) error {
 			return status()
@@ -37,7 +38,7 @@ If exit code is nonzero, writes an error message to stderr.`,
 }
 
 func status() error {
-	if _, status, err := lib.GetProcessStatus(); err != nil {
+	if _, status, err := lib.GetServiceStatus(); err != nil {
 		return cli.WithExitCode(status, err)
 	}
 	return nil

@@ -27,34 +27,95 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStopProcess_RunningStoppableTerminatesAndRunningUnstoppableDoesNotTerminate(t *testing.T) {
-	// Run sleep in sh so that it's not a child process of the one checking if it's running. The echo is to have a
-	// fairly surely unique text reference to grep for later (since we don't get the PID of a grandchild process).
+// All these tests must run sequentially since they all utilize global state (the process table).
+func TestStopService_Running(t *testing.T) {
+
+	/* 1) Stoppable single-process service stops. */
+
+	// Run sleep in sh so that it's not a child process of the one checking if it's running.
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	pidBytes, err := exec.Command("pgrep", "-f", "sleep").Output()
+	// -P specifies the PPID to filter on. In this case sleep will be orphaned and adopted by init.
+	pidBytes, err := exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
 	require.NoError(t, err)
 	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
 	require.NoError(t, err)
 
-	process, _ := os.FindProcess(pid)
-	assert.NoError(t, StopProcess(process))
+	proc, _ := os.FindProcess(pid)
+	require.NoError(t, StopService([]*os.Process{proc}))
+
+	/* 2) Unstoppable single-process service does not stop. */
 
 	// Signum 15 is SIGTERM - need a program that ignores SIGTERM and thus won't stop even after waiting.
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pidBytes, err = exec.Command("pgrep", "-f", "sleep").Output()
+	pidBytes, err = exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
 	require.NoError(t, err)
 	pid, err = strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
 	require.NoError(t, err)
 
-	process, _ = os.FindProcess(pid)
-	assert.EqualError(t, StopProcess(process), fmt.Sprintf("failed to stop process: failed to wait for process to "+
-		"stop: process with pid '%d' did not stop within 240 seconds", pid))
+	proc, _ = os.FindProcess(pid)
+	require.EqualError(t, StopService([]*os.Process{proc}), fmt.Sprintf("failed to stop at least one process: "+
+		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 240 seconds",
+		[]int{pid}))
 
 	// Clean up the process
-	require.NoError(t, process.Signal(syscall.SIGKILL))
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+
+	/* 3) Stoppable multi-process service stops. */
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	pidsBytes, err := exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
+	require.NoError(t, err)
+	pidsStrings := strings.Split(string(pidsBytes), "\n")
+	pids := make([]int, len(pidsStrings)-1)
+	for i, pidString := range pidsStrings[0 : len(pidsStrings)-1] {
+		pids[i], err = strconv.Atoi(pidString)
+		require.NoError(t, err)
+	}
+	procs := make([]*os.Process, len(pids))
+	for i, pid := range pids {
+		procs[i], _ = os.FindProcess(pid)
+	}
+
+	require.NoError(t, StopService(procs))
+
+	/* 4) Unstoppable multi-process service does not stop. */
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	unstoppablePidBytes, err := exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
+	require.NoError(t, err)
+	unstoppablePid, err := strconv.Atoi(strings.Split(string(unstoppablePidBytes), "\n")[0])
+	require.NoError(t, err)
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	pidsBytes, err = exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
+	require.NoError(t, err)
+	pidsStrings = strings.Split(string(pidsBytes), "\n")
+	pids = make([]int, len(pidsStrings)-1)
+	for i, pidString := range pidsStrings[0 : len(pidsStrings)-1] {
+		pids[i], err = strconv.Atoi(pidString)
+		require.NoError(t, err)
+	}
+	procs = make([]*os.Process, len(pids))
+	for i, pid := range pids {
+		procs[i], _ = os.FindProcess(pid)
+	}
+
+	require.EqualError(t, StopService(procs), fmt.Sprintf("failed to stop at least one process: "+
+		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 240 seconds",
+		[]int{unstoppablePid}))
+
+	unstoppableProc, _ := os.FindProcess(unstoppablePid)
+	require.NoError(t, unstoppableProc.Signal(syscall.SIGKILL))
 }
 
-func TestStopProcess_NotRunning(t *testing.T) {
-	process, _ := os.FindProcess(99999)
-	assert.NoError(t, StopProcess(process))
+func TestStopProcess_NotRunningSingleProcess(t *testing.T) {
+	proc, _ := os.FindProcess(99999)
+	assert.NoError(t, StopService([]*os.Process{proc}))
+}
+
+func TestStopProcess_NotRunningMultiProcess(t *testing.T) {
+	procs := make([]*os.Process, 2)
+	procs[0], _ = os.FindProcess(99998)
+	procs[1], _ = os.FindProcess(99999)
+	assert.NoError(t, StopService(procs))
 }

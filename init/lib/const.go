@@ -15,5 +15,5 @@
 package lib
 
 const (
-	pidfile = "var/run/service.pid"
+	pidfile = "var/run/pids.yaml"
 )

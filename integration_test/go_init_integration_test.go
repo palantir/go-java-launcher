@@ -39,7 +39,7 @@ import (
 
 var launcherStaticFile = "service/bin/launcher-static.yml"
 var launcherCustomFile = "var/conf/launcher-custom.yml"
-var pidfile = "var/run/service.pid"
+var pidfile = "var/run/pids.yaml"
 
 var files = []string{launcherStaticFile, launcherCustomFile, "var/log/startup.log", pidfile}
 
@@ -305,7 +305,7 @@ func TestInitStatus_NotRunningPidfileDoesNotExistSingleProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 3, exitCode)
-	assert.Contains(t, stderr, "failed to read pidfile: open var/run/service.pid: no such file or directory")
+	assert.Contains(t, stderr, "failed to read pidfile: open var/run/pids.yaml: no such file or directory")
 }
 
 func TestInitStatus_NotRunningPidfileDoesNotExistMultiProcess(t *testing.T) {
@@ -315,7 +315,7 @@ func TestInitStatus_NotRunningPidfileDoesNotExistMultiProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 3, exitCode)
-	assert.Contains(t, stderr, "failed to read pidfile: open var/run/service.pid: no such file or directory")
+	assert.Contains(t, stderr, "failed to read pidfile: open var/run/pids.yaml: no such file or directory")
 }
 
 func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
@@ -335,7 +335,7 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
 	_, err = ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
+	assert.EqualError(t, err, "open var/run/pids.yaml: no such file or directory")
 
 	// Reset since this is really two tests we have to run sequentially.
 	teardown(t)
@@ -381,7 +381,7 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
 	_, err = ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
+	assert.EqualError(t, err, "open var/run/pids.yaml: no such file or directory")
 
 	teardown(t)
 
@@ -399,7 +399,7 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
 	_, err = ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
+	assert.EqualError(t, err, "open var/run/pids.yaml: no such file or directory")
 
 	teardown(t)
 
@@ -442,7 +442,7 @@ func TestInitStop_RemovesPidfileNotRunningPidfileExistsSingleProcess(t *testing.
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
 	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
+	assert.EqualError(t, err, "open var/run/pids.yaml: no such file or directory")
 }
 
 func TestInitStop_RemovesPidfileNotRunningPidfileExistsMultiProcess(t *testing.T) {
@@ -456,7 +456,7 @@ func TestInitStop_RemovesPidfileNotRunningPidfileExistsMultiProcess(t *testing.T
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
 	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, "open var/run/service.pid: no such file or directory")
+	assert.EqualError(t, err, "open var/run/pids.yaml: no such file or directory")
 }
 
 func TestInitStop_DoesNothingNotRunningPidfileDoesNotExist(t *testing.T) {

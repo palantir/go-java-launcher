@@ -27,7 +27,8 @@ func startCommand() cli.Command {
 		Usage: `
 Ensures the service defined by the static and custom configurations at service/bin/launcher-static.yml and
 var/conf/launcher-custom.yml is running and its outputs are redirecting to var/log/startup.log and other
-var/log/$PROCESS-startup.log files. If successful, exits 0, otherwise exits 1 and writes an error message to stderr.`,
+var/log/${SUB_PROCESS}-startup.log files. If successful, exits 0, otherwise exits 1 and writes an error message to
+stderr.`,
 		Action: func(_ cli.Context) error {
 			return start()
 		},

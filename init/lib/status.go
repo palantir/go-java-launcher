@@ -70,10 +70,9 @@ func GetServiceStatus() (*ServiceStatusInfo, int, error) {
 	// listed in the pidfile or are not running?
 	// Look at the pidfile and record what's running.
 	runningProcs := make([]*os.Process, 0, len(servicePids.PidsByName))
-	for _, procPid := range servicePids.PidsByName {
-		// Docs say FindProcess always succeeds on Unix.
-		proc, _ := os.FindProcess(procPid)
-		if isRunning(proc) {
+	for _, pid := range servicePids.PidsByName {
+		running, proc := isPidRunning(pid)
+		if running {
 			runningProcs = append(runningProcs, proc)
 		}
 	}
@@ -84,8 +83,8 @@ func GetServiceStatus() (*ServiceStatusInfo, int, error) {
 		if !ok {
 			notRunningCmds = append(notRunningCmds, procCmd)
 		} else {
-			subProc, _ := os.FindProcess(procPid)
-			if !isRunning(subProc) {
+			running, _ := isPidRunning(procPid)
+			if !running {
 				notRunningCmds = append(notRunningCmds, procCmd)
 			}
 		}
@@ -99,7 +98,17 @@ func GetServiceStatus() (*ServiceStatusInfo, int, error) {
 	return serviceStatusInfo, 0, nil
 }
 
-// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
-func isRunning(proc *os.Process) bool {
+func isPidRunning(pid int) (bool, *os.Process) {
+	// Docs say FindProcess always succeeds on Unix.
+	proc, _ := os.FindProcess(pid)
+	if isProcRunning(proc) {
+		return true, proc
+	} else {
+		return false, nil
+	}
+}
+
+func isProcRunning(proc *os.Process) bool {
+	// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
 	return proc.Signal(syscall.Signal(0)) == nil
 }

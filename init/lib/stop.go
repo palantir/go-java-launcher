@@ -58,7 +58,7 @@ func waitForServiceToStop(procs []*os.Process) error {
 		select {
 		case <-ticker.C:
 			for remainingProc := range remainingProcs {
-				if !isRunning(remainingProc) {
+				if !isProcRunning(remainingProc) {
 					delete(remainingProcs, remainingProc)
 				}
 			}

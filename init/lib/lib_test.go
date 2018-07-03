@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/palantir/go-java-launcher/launchlib"
@@ -55,12 +56,14 @@ func teardown(t *testing.T) {
 
 func writePidOrFail(t *testing.T, name string, pid int) {
 	var servicePids ServicePids
-	if pidfileExists() {
-		pidfileBytes, err := ioutil.ReadFile(pidfile)
-		require.NoError(t, err)
-		require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
-	} else {
+	pidfileBytes, err := ioutil.ReadFile(pidfile)
+	if err != nil && !os.IsNotExist(err) {
+		require.Fail(t, "failed to read previous pidfile")
+	} else if err != nil && os.IsNotExist(err) {
 		servicePids.PidsByName = make(map[string]int)
+	} else {
+		require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
+		require.NoError(t, validator.Validate(servicePids))
 	}
 	servicePids.PidsByName[name] = pid
 	servicePidsBytes, err := yaml.Marshal(servicePids)

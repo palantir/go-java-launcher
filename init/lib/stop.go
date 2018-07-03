@@ -36,10 +36,8 @@ func StopService(procs []*os.Process) error {
 		return errors.Wrap(err, "failed to stop at least one process")
 	}
 
-	if pidfileExists() {
-		if err := os.Remove(pidfile); err != nil {
-			return errors.Wrap(err, "failed to remove pidfile")
-		}
+	if err := os.Remove(pidfile); err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to remove pidfile")
 	}
 
 	return nil

@@ -48,19 +48,18 @@ func startCommand(procCmd launchlib.ProcCmd) (rErr error) {
 
 func writePid(name string, pid int) error {
 	var servicePids ServicePids
-	if pidfileExists() {
-		pidfileBytes, err := ioutil.ReadFile(pidfile)
-		if err != nil {
-			return errors.Wrap(err, "failed to read previous pidfile")
-		}
+	pidfileBytes, err := ioutil.ReadFile(pidfile)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to read previous pidfile")
+	} else if err != nil && os.IsNotExist(err) {
+		servicePids.PidsByName = make(map[string]int)
+	} else {
 		if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {
 			return errors.Wrap(err, "failed to deserialize pidfile")
 		}
 		if err := validator.Validate(servicePids); err != nil {
 			return errors.Wrap(err, "failed to deserialize pidfile")
 		}
-	} else {
-		servicePids.PidsByName = make(map[string]int)
 	}
 
 	servicePids.PidsByName[name] = pid
@@ -73,12 +72,4 @@ func writePid(name string, pid int) error {
 	}
 
 	return nil
-}
-
-func pidfileExists() bool {
-	if _, err := os.Stat(pidfile); err != nil {
-		// The only piece of information from the error we care about is if the file exists.
-		return !os.IsNotExist(err)
-	}
-	return true
 }

@@ -42,10 +42,10 @@ func start() error {
 		return nil
 	}
 	if info == nil {
-		return cli.WithExitCode(1, errors.Wrap(err, "failed to start service"))
+		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to start service"), 1)
 	}
 	if err := lib.StartService(info.NotRunningCmds); err != nil {
-		return cli.WithExitCode(1, errors.Wrap(err, "failed to start service"))
+		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to start service"), 1)
 	}
 	return nil
 }

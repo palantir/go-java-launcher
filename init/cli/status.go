@@ -39,7 +39,7 @@ If exit code is nonzero, writes an error message to stderr.`,
 
 func status() error {
 	if _, status, err := lib.GetServiceStatus(); err != nil {
-		return cli.WithExitCode(status, err)
+		return logErrorAndReturnWithExitCode(err, status)
 	}
 	return nil
 }

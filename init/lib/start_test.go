@@ -17,7 +17,6 @@ package lib
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -32,9 +31,8 @@ func TestStartService_SingleProcess(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	outputFile, err := os.Create(launchlib.PrimaryOutputFile)
-	require.NoError(t, err)
-	cmds := []launchlib.ProcCmd{{Name: "primary", Cmd: exec.Command("/bin/ls"), Stdout: outputFile}}
+	cmds := []launchlib.ProcCmd{{Name: "primary", Cmd: exec.Command("/bin/ls"),
+		OutFileName: launchlib.PrimaryOutputFile}}
 	assert.NoError(t, StartService(cmds))
 	// Wait for process to start up and write output
 	time.Sleep(time.Second)
@@ -51,14 +49,10 @@ func TestStartService_MultiProcess(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	primaryOutputFile, err := os.Create(launchlib.PrimaryOutputFile)
-	require.NoError(t, err)
 	sidecarOutputFileName := fmt.Sprintf(launchlib.OutputFileFormat, "sidecar-")
-	sidecarOutputFile, err := os.Create(sidecarOutputFileName)
-	require.NoError(t, err)
 	cmds := []launchlib.ProcCmd{
-		{Name: "primary", Cmd: exec.Command("/bin/ls"), Stdout: primaryOutputFile},
-		{Name: "sidecar", Cmd: exec.Command("/bin/echo", "foo"), Stdout: sidecarOutputFile},
+		{Name: "primary", Cmd: exec.Command("/bin/ls"), OutFileName: launchlib.PrimaryOutputFile},
+		{Name: "sidecar", Cmd: exec.Command("/bin/echo", "foo"), OutFileName: sidecarOutputFileName},
 	}
 	assert.NoError(t, StartService(cmds))
 

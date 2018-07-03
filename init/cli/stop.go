@@ -41,12 +41,13 @@ func stop() error {
 		fallthrough
 	case 1:
 		if err := lib.StopService(info.RunningProcs); err != nil {
-			return cli.WithExitCode(1, err)
+			return logErrorAndReturnWithExitCode(err, 1)
 		}
 		return nil
 	case 3:
 		return nil
 	default:
-		return cli.WithExitCode(1, errors.Errorf("internal error, process status code not a known value: %d", status))
+		return logErrorAndReturnWithExitCode(
+			errors.Errorf("internal error, process status code not a known value: %d", status), 1)
 	}
 }

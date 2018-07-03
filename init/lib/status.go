@@ -103,9 +103,8 @@ func isPidRunning(pid int) (bool, *os.Process) {
 	proc, _ := os.FindProcess(pid)
 	if isProcRunning(proc) {
 		return true, proc
-	} else {
-		return false, nil
 	}
+	return false, nil
 }
 
 func isProcRunning(proc *os.Process) bool {

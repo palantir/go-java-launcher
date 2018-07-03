@@ -44,7 +44,8 @@ func StopService(procs []*os.Process) error {
 }
 
 func waitForServiceToStop(procs []*os.Process) error {
-	const numSecondsToWait = 240
+	// TODO
+	const numSecondsToWait = 5
 	timer := time.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)
@@ -72,8 +73,8 @@ func waitForServiceToStop(procs []*os.Process) error {
 				remainingPids[i] = proc.Pid
 				i++
 			}
-			return errors.Errorf("failed to wait for all processes to stop: processes with pids '%v' did not stop "+
-				"within %d seconds", remainingPids, numSecondsToWait)
+			return errors.Errorf("failed to wait for all processes to stop: processes with pids '%v' did "+
+				"not stop within %d seconds", remainingPids, numSecondsToWait)
 		}
 	}
 }

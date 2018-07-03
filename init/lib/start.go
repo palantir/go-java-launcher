@@ -37,9 +37,13 @@ func StartService(procCmds []launchlib.ProcCmd) error {
 	return nil
 }
 
-func startCommand(procCmd launchlib.ProcCmd) (rErr error) {
-	procCmd.Cmd.Stdout = procCmd.Stdout
-	procCmd.Cmd.Stderr = procCmd.Stdout
+func startCommand(procCmd launchlib.ProcCmd) error {
+	stdout, err := os.OpenFile(procCmd.OutFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 266)
+	if err != nil {
+		return errors.Wrap(err, "failed to open output file: "+procCmd.OutFileName)
+	}
+	procCmd.Cmd.Stdout = stdout
+	procCmd.Cmd.Stderr = stdout
 	if err := procCmd.Cmd.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}

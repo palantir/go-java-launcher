@@ -53,8 +53,9 @@ func TestStopService_Running(t *testing.T) {
 	require.NoError(t, err)
 
 	proc, _ = os.FindProcess(pid)
+	// TODO
 	require.EqualError(t, StopService([]*os.Process{proc}), fmt.Sprintf("failed to stop at least one process: "+
-		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 240 seconds",
+		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 5 seconds",
 		[]int{pid}))
 
 	// Clean up the process
@@ -100,8 +101,9 @@ func TestStopService_Running(t *testing.T) {
 		procs[i], _ = os.FindProcess(pid)
 	}
 
+	// TODO
 	require.EqualError(t, StopService(procs), fmt.Sprintf("failed to stop at least one process: "+
-		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 240 seconds",
+		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 5 seconds",
 		[]int{unstoppablePid}))
 
 	unstoppableProc, _ := os.FindProcess(unstoppablePid)

@@ -190,5 +190,5 @@ func TestGetServiceStatus_NotRunningPidfileDoesNotExistConfigIsBad(t *testing.T)
 	assert.Nil(t, info)
 	assert.Equal(t, 3, status)
 	require.Error(t, err, "expected error")
-	assert.Contains(t, err.Error(), "failed to read static and custom configuration files")
+	assert.Contains(t, err.Error(), "failed to get commands from static and custom configuration files")
 }

@@ -15,5 +15,7 @@
 package lib
 
 const (
-	pidfile = "var/run/pids.yaml"
+	launcherStaticFile = "service/bin/launcher-static.yml"
+	launcherCustomFile = "var/conf/launcher-custom.yml"
+	pidfile            = "var/run/pids.yaml"
 )

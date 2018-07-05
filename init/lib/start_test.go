@@ -31,8 +31,8 @@ func TestStartService_SingleProcess(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	cmds := []launchlib.ProcCmd{{Name: "primary", Cmd: exec.Command("/bin/ls"),
-		OutFileName: launchlib.PrimaryOutputFile}}
+	cmds := []NamedCmd{{Name: "primary", Cmd: exec.Command("/bin/ls"),
+		OutputFilename: launchlib.PrimaryOutputFile}}
 	assert.NoError(t, StartService(cmds))
 	// Wait for process to start up and write output
 	time.Sleep(time.Second)
@@ -50,9 +50,9 @@ func TestStartService_MultiProcess(t *testing.T) {
 	defer teardown(t)
 
 	sidecarOutputFileName := fmt.Sprintf(launchlib.OutputFileFormat, "sidecar-")
-	cmds := []launchlib.ProcCmd{
-		{Name: "primary", Cmd: exec.Command("/bin/ls"), OutFileName: launchlib.PrimaryOutputFile},
-		{Name: "sidecar", Cmd: exec.Command("/bin/echo", "foo"), OutFileName: sidecarOutputFileName},
+	cmds := []NamedCmd{
+		{Name: "primary", Cmd: exec.Command("/bin/ls"), OutputFilename: launchlib.PrimaryOutputFile},
+		{Name: "sidecar", Cmd: exec.Command("/bin/echo", "foo"), OutputFilename: sidecarOutputFileName},
 	}
 	assert.NoError(t, StartService(cmds))
 

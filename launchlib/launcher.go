@@ -33,40 +33,27 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-type ProcCmd struct {
-	Name        string
-	Cmd         *exec.Cmd
-	OutFileName string
-}
-
-func CompileCmdsFromConfigFiles() (procCmds []ProcCmd, rErr error) {
-	primaryStdout, err := os.Create(PrimaryOutputFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create primary output file: "+PrimaryOutputFile)
-	}
-	defer func() {
-		if cErr := primaryStdout.Close(); rErr == nil && cErr != nil {
-			rErr = errors.Wrap(err, "failed to close primary output file: "+PrimaryOutputFile)
-		}
-	}()
-	staticConfig, customConfig, err := GetConfigsFromFiles(LauncherStaticFile, LauncherCustomFile, primaryStdout)
-
-	if err != nil {
-		return nil, err
-	}
-	return CompileCmdsFromConfig(&staticConfig, &customConfig, primaryStdout)
+type ServiceCmds struct {
+	Primary             *exec.Cmd
+	PrimaryOutputFile   string
+	SubProcs            map[string]*exec.Cmd
+	SubProcsOutputFiles map[string]string
 }
 
 func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig,
-	primaryStdout io.Writer) (procCmds []ProcCmd, rErr error) {
-	procCmds = make([]ProcCmd, 0, 1+len(staticConfig.SubProcesses))
+	primaryStdout io.Writer) (serviceCmds *ServiceCmds, rErr error) {
+	serviceCmds = &ServiceCmds{
+		SubProcs:            make(map[string]*exec.Cmd),
+		SubProcsOutputFiles: make(map[string]string),
+	}
 
-	primaryCmd, err := CompileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig,
-		primaryStdout)
+	var err error
+	serviceCmds.Primary, err = compileCmdFromConfig(&staticConfig.StaticLauncherConfig,
+		&customConfig.CustomLauncherConfig, primaryStdout)
 	if err != nil {
 		return nil, err
 	}
-	procCmds = append(procCmds, ProcCmd{"primary", primaryCmd, PrimaryOutputFile})
+	serviceCmds.PrimaryOutputFile = PrimaryOutputFile
 	for name, subProcStatic := range staticConfig.SubProcesses {
 		subProcCustom, ok := customConfig.SubProcesses[name]
 		if !ok {
@@ -75,23 +62,24 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 		subProcOutFileName := fmt.Sprintf(OutputFileFormat, name+"-")
 		subProcStdout, err := os.Create(subProcOutFileName)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to create subprocess output file: "+subProcOutFileName)
+			return nil, errors.Wrapf(err, "failed to create subprocess output file: %s", subProcOutFileName)
 		}
 		defer func() {
 			if cErr := subProcStdout.Close(); rErr == nil && cErr != nil {
-				rErr = errors.Wrap(err, "failed to close subprocess output file: "+subProcOutFileName)
+				rErr = errors.Wrapf(err, "failed to close subprocess output file: %s",
+					subProcOutFileName)
 			}
 		}()
-		subProcCmd, err := CompileCmdFromConfig(&subProcStatic, &subProcCustom, subProcStdout)
+		serviceCmds.SubProcs[name], err = compileCmdFromConfig(&subProcStatic, &subProcCustom, subProcStdout)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to compile command for subProcess config '%s'", name)
 		}
-		procCmds = append(procCmds, ProcCmd{name, subProcCmd, subProcOutFileName})
+		serviceCmds.SubProcsOutputFiles[name] = subProcOutFileName
 	}
-	return procCmds, nil
+	return serviceCmds, nil
 }
 
-func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,
+func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,
 	stdout io.Writer) (*exec.Cmd, error) {
 	fmt.Fprintf(stdout, "Launching with static configuration %v and custom configuration %v\n", *staticConfig,
 		*customConfig)

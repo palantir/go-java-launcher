@@ -19,10 +19,8 @@ import (
 )
 
 const (
-	LauncherStaticFile = "service/bin/launcher-static.yml"
-	LauncherCustomFile = "var/conf/launcher-custom.yml"
-	OutputFileName     = "startup.log"
-	OutputFileFormat   = "var/log/%s" + OutputFileName
+	OutputFileName   = "startup.log"
+	OutputFileFormat = "var/log/%s" + OutputFileName
 )
 
 var PrimaryOutputFile = fmt.Sprintf(OutputFileFormat, "")

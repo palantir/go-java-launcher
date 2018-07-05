@@ -21,12 +21,10 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
-
-	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-func StartService(procCmds []launchlib.ProcCmd) error {
-	for _, procCmd := range procCmds {
+func StartService(cmds []NamedCmd) error {
+	for _, procCmd := range cmds {
 		if err := startCommand(procCmd); err != nil {
 			return errors.Wrap(err, "failed to start at least one process")
 		}
@@ -37,14 +35,14 @@ func StartService(procCmds []launchlib.ProcCmd) error {
 	return nil
 }
 
-func startCommand(procCmd launchlib.ProcCmd) error {
-	stdout, err := os.OpenFile(procCmd.OutFileName, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 266)
+func startCommand(cmd NamedCmd) error {
+	stdout, err := os.OpenFile(cmd.OutputFilename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 266)
 	if err != nil {
-		return errors.Wrap(err, "failed to open output file: "+procCmd.OutFileName)
+		return errors.Wrap(err, "failed to open output file: "+cmd.OutputFilename)
 	}
-	procCmd.Cmd.Stdout = stdout
-	procCmd.Cmd.Stderr = stdout
-	if err := procCmd.Cmd.Start(); err != nil {
+	cmd.Cmd.Stdout = stdout
+	cmd.Cmd.Stderr = stdout
+	if err := cmd.Cmd.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 	return nil

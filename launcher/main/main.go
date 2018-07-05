@@ -106,17 +106,8 @@ func main() {
 		fmt.Println("Failed to assemble executable metadata", cmds, err)
 		panic(err)
 	}
-	var primaryCmd *exec.Cmd
-	subProcesses := make(map[string]*exec.Cmd)
-	for _, cmd := range cmds {
-		if cmd.Name == "primary" {
-			primaryCmd = cmd.Cmd
-		} else {
-			subProcesses[cmd.Name] = cmd.Cmd
-		}
-	}
 
-	if len(subProcesses) != 0 {
+	if len(cmds.SubProcs) != 0 {
 		// For this process (referenced as 0), set the process group id to our pid (also referenced as 0), to ensure
 		// we are in our own group.
 		if err := syscall.Setpgid(0, 0); err != nil {
@@ -141,7 +132,7 @@ func main() {
 			panic(err)
 		}
 
-		for name, subProcess := range subProcesses {
+		for name, subProcess := range cmds.SubProcs {
 			// Create struct if not present, as to not override previously set SysProcAttr properties
 			if subProcess.SysProcAttr == nil {
 				subProcess.SysProcAttr = &syscall.SysProcAttr{}
@@ -163,10 +154,10 @@ func main() {
 		}
 	}
 
-	execErr := syscall.Exec(primaryCmd.Path, primaryCmd.Args, primaryCmd.Env)
+	execErr := syscall.Exec(cmds.Primary.Path, cmds.Primary.Args, cmds.Primary.Env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
-			fmt.Println("Executable not found at:", primaryCmd.Path)
+			fmt.Println("Executable not found at:", cmds.Primary.Path)
 		}
 		panic(execErr)
 	}

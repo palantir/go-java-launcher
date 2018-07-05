@@ -211,7 +211,7 @@ func TestInitStart_DoesNotStartNotRunningPidfileDoesNotExistConfigIsBad(t *testi
 	exitCode, stderr := runInit(t, "start")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "failed to read static and custom configuration files")
+	assert.Contains(t, stderr, "failed to get commands from static and custom configuration files")
 }
 
 func TestInitStart_StartsNotRunningPidfileDoesNotExistMultiProcess(t *testing.T) {

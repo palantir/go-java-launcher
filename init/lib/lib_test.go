@@ -28,18 +28,18 @@ import (
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-var files = []string{launchlib.LauncherStaticFile, launchlib.LauncherCustomFile, launchlib.OutputFileFormat, pidfile}
+var files = []string{launcherStaticFile, launcherCustomFile, launchlib.OutputFileFormat, pidfile}
 
 func setupSingleProcess(t *testing.T) {
 	setup(t)
-	require.NoError(t, os.Link("testdata/launcher-static.yml", launchlib.LauncherStaticFile))
-	require.NoError(t, os.Link("testdata/launcher-custom.yml", launchlib.LauncherCustomFile))
+	require.NoError(t, os.Link("testdata/launcher-static.yml", launcherStaticFile))
+	require.NoError(t, os.Link("testdata/launcher-custom.yml", launcherCustomFile))
 }
 
 func setupMultiProcess(t *testing.T) {
 	setup(t)
-	require.NoError(t, os.Link("testdata/launcher-static-multiprocess.yml", launchlib.LauncherStaticFile))
-	require.NoError(t, os.Link("testdata/launcher-custom-multiprocess.yml", launchlib.LauncherCustomFile))
+	require.NoError(t, os.Link("testdata/launcher-static-multiprocess.yml", launcherStaticFile))
+	require.NoError(t, os.Link("testdata/launcher-custom-multiprocess.yml", launcherCustomFile))
 }
 
 func setup(t *testing.T) {

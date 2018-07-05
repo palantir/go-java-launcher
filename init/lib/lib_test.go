@@ -17,8 +17,10 @@ package lib
 import (
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,8 +28,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/palantir/go-java-launcher/launchlib"
-	"os/signal"
-	"syscall"
 )
 
 var files = []string{launcherStaticFile, launcherCustomFile, launchlib.OutputFileFormat, pidfile}

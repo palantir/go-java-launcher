@@ -21,6 +21,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -35,7 +36,6 @@ import (
 
 	"github.com/palantir/go-java-launcher/init/lib"
 	"github.com/palantir/go-java-launcher/launchlib"
-	"os/signal"
 )
 
 var launcherStaticFile = "service/bin/launcher-static.yml"

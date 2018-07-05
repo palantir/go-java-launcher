@@ -35,11 +35,16 @@ func StartService(cmds []NamedCmd) error {
 	return nil
 }
 
-func startCommand(cmd NamedCmd) error {
+func startCommand(cmd NamedCmd) (rErr error) {
 	stdout, err := os.OpenFile(cmd.OutputFilename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 266)
 	if err != nil {
 		return errors.Wrap(err, "failed to open output file: "+cmd.OutputFilename)
 	}
+	defer func() {
+		if cErr := stdout.Close(); rErr == nil && cErr != nil {
+			rErr = errors.Wrap(err, "failed to close output file: "+cmd.OutputFilename)
+		}
+	}()
 	cmd.Cmd.Stdout = stdout
 	cmd.Cmd.Stderr = stdout
 	if err := cmd.Cmd.Start(); err != nil {

@@ -26,6 +26,8 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/palantir/go-java-launcher/launchlib"
+	"os/signal"
+	"syscall"
 )
 
 var files = []string{launcherStaticFile, launcherCustomFile, launchlib.OutputFileFormat, pidfile}
@@ -43,6 +45,12 @@ func setupMultiProcess(t *testing.T) {
 }
 
 func setup(t *testing.T) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+	go func() {
+		_ = <-c
+		teardown(t)
+	}()
 	for _, file := range files {
 		require.NoError(t, os.MkdirAll(filepath.Dir(file), 0777))
 	}

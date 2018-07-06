@@ -23,14 +23,18 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func StartService(notRunningCmdsByName map[string]CmdWithOutputFile) error {
-	for name, notRunningCmd := range notRunningCmdsByName {
-		if err := startCommand(notRunningCmd); err != nil {
+func StartService(notRunningCmdsByName map[string]CmdWithOutputFile) (rErr error) {
+	pids := make(map[string]int)
+	defer func() {
+		if err := writePids(pids); err != nil {
+			rErr = errors.Wrap(err, "failed to record at least one pid")
+		}
+	}()
+	for name, cmd := range notRunningCmdsByName {
+		if err := startCommand(cmd); err != nil {
 			return errors.Wrap(err, "failed to start at least one process")
 		}
-		if err := writePid(name, notRunningCmd.Cmd.Process.Pid); err != nil {
-			return errors.Wrap(err, "failed to record at least one pid")
-		}
+		pids[name] = cmd.Cmd.Process.Pid
 	}
 	return nil
 }
@@ -53,7 +57,7 @@ func startCommand(cmd CmdWithOutputFile) (rErr error) {
 	return nil
 }
 
-func writePid(name string, pid int) error {
+func writePids(pidsByName map[string]int) error {
 	var servicePids ServicePids
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	if err != nil && !os.IsNotExist(err) {
@@ -69,7 +73,9 @@ func writePid(name string, pid int) error {
 		}
 	}
 
-	servicePids.PidsByName[name] = pid
+	for name, pid := range pidsByName {
+		servicePids.PidsByName[name] = pid
+	}
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	if err != nil {
 		return errors.Wrap(err, "failed to serialize pidfile")

@@ -31,84 +31,53 @@ type ServicePids struct {
 	PidsByName map[string]int `yaml:"pidsByName" validate:"nonzero"`
 }
 
-type ServiceStatusInfo struct {
-	RunningProcs   []*os.Process
-	NotRunningCmds []NamedCmd
-}
-
-type NamedCmd struct {
-	Name           string
+type CmdWithOutputFile struct {
 	Cmd            *exec.Cmd
 	OutputFilename string
 }
 
-// GetServiceStatus determines the status of the service based on the configuration and the pidfile.
-// Returns (ServiceStatusInfo, status, err). Possible values are:
-// - (info, 0, nil) if the pidfile exists and can be read and all processes are running
-// - (info, 1, <err>) if the pidfile exists and can be read but at least one process is not running
-// - (info, 3, <err>) if the pidfile does not exist or cannot be read
-// - (nil, 3, <err>) if the config cannot be read
-// info contains any running processes recorded in the pidfile (since these are the ones that will need to be stopped to
-// stop the service) and the commands that are not running that are defined in the configuration files (since these are
-// the ones that will need to be started to start the service).
-func GetServiceStatus() (*ServiceStatusInfo, int, error) {
-	cmds, err := getConfiguredCommands()
+func GetNotRunningCmdsByName() (map[string]CmdWithOutputFile, error) {
+	cmdsByName, err := GetConfiguredCommandsByName()
 	if err != nil {
-		return nil, 3, errors.Wrap(err, "failed to get commands from static and custom configuration files")
+		return nil, errors.Wrap(err, "failed to get commands from static and custom configuration files")
 	}
+	runningProcsByName, err := GetRunningProcsByName()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine running processes")
+	}
+	notRunningCmdsByName := make(map[string]CmdWithOutputFile)
+	for name, cmd := range cmdsByName {
+		if _, ok := runningProcsByName[name]; !ok {
+			notRunningCmdsByName[name] = cmd
+		}
+	}
+	return notRunningCmdsByName, nil
+}
 
+func GetRunningProcsByName() (map[string]*os.Process, error) {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	if err != nil {
-		return &ServiceStatusInfo{[]*os.Process{}, cmds}, 3,
-			errors.Wrap(err, "failed to read pidfile")
+		return nil, errors.Wrap(err, "failed to read pidfile")
 	}
 	var servicePids ServicePids
 	if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {
-		return &ServiceStatusInfo{[]*os.Process{}, cmds}, 3,
-			errors.Wrap(err, "failed to deserialize pidfile")
+		return nil, errors.Wrap(err, "failed to deserialize pidfile")
 	}
 	if err := validator.Validate(servicePids); err != nil {
-		return &ServiceStatusInfo{[]*os.Process{}, cmds}, 3,
-			errors.Wrap(err, "failed to deserialize pidfile")
-	}
-	if err != nil {
-		return &ServiceStatusInfo{[]*os.Process{}, cmds}, 3,
-			errors.Wrap(err, "failed to assemble commands from static and custom configuration files")
+		return nil, errors.Wrap(err, "failed to deserialize pidfile")
 	}
 
-	// What processes are running (regardless of if they are configured), and which of the configured processes are not
-	// listed in the pidfile or are not running?
-	// Look at the pidfile and record what's running.
-	runningProcs := make([]*os.Process, 0, len(servicePids.PidsByName))
-	for _, pid := range servicePids.PidsByName {
+	runningProcs := make(map[string]*os.Process)
+	for name, pid := range servicePids.PidsByName {
 		running, proc := isPidRunning(pid)
 		if running {
-			runningProcs = append(runningProcs, proc)
+			runningProcs[name] = proc
 		}
 	}
-	// Then look at the config and record what's not running.
-	notRunningCmds := make([]NamedCmd, 0, len(cmds))
-	for _, procCmd := range cmds {
-		procPid, ok := servicePids.PidsByName[procCmd.Name]
-		if !ok {
-			notRunningCmds = append(notRunningCmds, procCmd)
-		} else {
-			running, _ := isPidRunning(procPid)
-			if !running {
-				notRunningCmds = append(notRunningCmds, procCmd)
-			}
-		}
-	}
-
-	serviceStatusInfo := &ServiceStatusInfo{runningProcs, notRunningCmds}
-	if len(notRunningCmds) > 0 {
-		return serviceStatusInfo, 1,
-			errors.New("pidfile exists and can be read but at least one process is not running")
-	}
-	return serviceStatusInfo, 0, nil
+	return runningProcs, nil
 }
 
-func getConfiguredCommands() (cmds []NamedCmd, rErr error) {
+func GetConfiguredCommandsByName() (cmdsByName map[string]CmdWithOutputFile, rErr error) {
 	primaryStdout, err := os.Create(launchlib.PrimaryOutputFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create primary output file: "+launchlib.PrimaryOutputFile)
@@ -127,18 +96,20 @@ func getConfiguredCommands() (cmds []NamedCmd, rErr error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
-	cmds = make([]NamedCmd, 0, 1+len(serviceCmds.SubProcs))
-	cmds = append(cmds, NamedCmd{Name: "primary", Cmd: serviceCmds.Primary,
-		OutputFilename: serviceCmds.PrimaryOutputFile})
+	cmdsByName = make(map[string]CmdWithOutputFile)
+	cmdsByName["primary"] = CmdWithOutputFile{
+		Cmd:            serviceCmds.Primary,
+		OutputFilename: serviceCmds.PrimaryOutputFile,
+	}
 	for name, subProc := range serviceCmds.SubProcs {
 		subProcOutputFile, ok := serviceCmds.SubProcsOutputFiles[name]
 		if !ok {
 			return nil, errors.Wrapf(err,
 				"subProcess %s does not have a corresponding output file listed - this is a bug", name)
 		}
-		cmds = append(cmds, NamedCmd{Name: name, Cmd: subProc, OutputFilename: subProcOutputFile})
+		cmdsByName[name] = CmdWithOutputFile{Cmd: subProc, OutputFilename: subProcOutputFile}
 	}
-	return cmds, nil
+	return cmdsByName, nil
 }
 
 func isPidRunning(pid int) (bool, *os.Process) {

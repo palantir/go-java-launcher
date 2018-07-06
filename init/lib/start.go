@@ -23,19 +23,19 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func StartService(cmds []NamedCmd) error {
-	for _, procCmd := range cmds {
-		if err := startCommand(procCmd); err != nil {
+func StartService(notRunningCmdsByName map[string]CmdWithOutputFile) error {
+	for name, notRunningCmd := range notRunningCmdsByName {
+		if err := startCommand(notRunningCmd); err != nil {
 			return errors.Wrap(err, "failed to start at least one process")
 		}
-		if err := writePid(procCmd.Name, procCmd.Cmd.Process.Pid); err != nil {
+		if err := writePid(name, notRunningCmd.Cmd.Process.Pid); err != nil {
 			return errors.Wrap(err, "failed to record at least one pid")
 		}
 	}
 	return nil
 }
 
-func startCommand(cmd NamedCmd) (rErr error) {
+func startCommand(cmd CmdWithOutputFile) (rErr error) {
 	stdout, err := os.OpenFile(cmd.OutputFilename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 266)
 	if err != nil {
 		return errors.Wrap(err, "failed to open output file: "+cmd.OutputFilename)

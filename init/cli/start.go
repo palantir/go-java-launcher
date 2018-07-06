@@ -36,15 +36,15 @@ stderr.`,
 }
 
 func start() error {
-	info, _, err := lib.GetServiceStatus()
-	if err == nil {
-		// Service already running - nop.
-		return nil
+	notRunningCmdsByName, err := lib.GetNotRunningCmdsByName()
+	if err != nil {
+		// If it can't be determined which are running versus not, fall back to just starting all of them
+		notRunningCmdsByName, err = lib.GetConfiguredCommandsByName()
+		if err != nil {
+			return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to determine commands to run"), 1)
+		}
 	}
-	if info == nil {
-		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to start service"), 1)
-	}
-	if err := lib.StartService(info.NotRunningCmds); err != nil {
+	if err := lib.StartService(notRunningCmdsByName); err != nil {
 		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to start service"), 1)
 	}
 	return nil

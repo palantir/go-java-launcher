@@ -31,8 +31,12 @@ func TestStartService_SingleProcess(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	cmds := []NamedCmd{{Name: "primary", Cmd: exec.Command("/bin/ls"),
-		OutputFilename: launchlib.PrimaryOutputFile}}
+	cmds := map[string]CmdWithOutputFile{
+		"primary": {
+			Cmd:            exec.Command("/bin/ls"),
+			OutputFilename: launchlib.PrimaryOutputFile,
+		},
+	}
 	assert.NoError(t, StartService(cmds))
 	// Wait for process to start up and write output
 	time.Sleep(time.Second)
@@ -42,7 +46,7 @@ func TestStartService_SingleProcess(t *testing.T) {
 	assert.Contains(t, string(output), "start.go")
 	pids := readPids(t).PidsByName
 	assert.Equal(t, 1, len(pids))
-	assert.Equal(t, cmds[0].Cmd.Process.Pid, pids["primary"])
+	assert.Equal(t, cmds["primary"].Cmd.Process.Pid, pids["primary"])
 }
 
 func TestStartService_MultiProcess(t *testing.T) {
@@ -50,9 +54,14 @@ func TestStartService_MultiProcess(t *testing.T) {
 	defer teardown(t)
 
 	sidecarOutputFileName := fmt.Sprintf(launchlib.OutputFileFormat, "sidecar-")
-	cmds := []NamedCmd{
-		{Name: "primary", Cmd: exec.Command("/bin/ls"), OutputFilename: launchlib.PrimaryOutputFile},
-		{Name: "sidecar", Cmd: exec.Command("/bin/echo", "foo"), OutputFilename: sidecarOutputFileName},
+	cmds := map[string]CmdWithOutputFile{
+		"primary": {
+			Cmd:            exec.Command("/bin/ls"),
+			OutputFilename: launchlib.PrimaryOutputFile,
+		}, "sidecar": {
+			Cmd:            exec.Command("/bin/echo", "foo"),
+			OutputFilename: sidecarOutputFileName,
+		},
 	}
 	assert.NoError(t, StartService(cmds))
 
@@ -67,6 +76,6 @@ func TestStartService_MultiProcess(t *testing.T) {
 	assert.Contains(t, string(sidecarOutput), "foo")
 	pids := readPids(t).PidsByName
 	assert.Equal(t, 2, len(pids))
-	assert.Equal(t, cmds[0].Cmd.Process.Pid, pids["primary"])
-	assert.Equal(t, cmds[1].Cmd.Process.Pid, pids["sidecar"])
+	assert.Equal(t, cmds["primary"].Cmd.Process.Pid, pids["primary"])
+	assert.Equal(t, cmds["sidecar"].Cmd.Process.Pid, pids["sidecar"])
 }

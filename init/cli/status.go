@@ -16,6 +16,7 @@ package cli
 
 import (
 	"github.com/palantir/pkg/cli"
+	"github.com/pkg/errors"
 
 	"github.com/palantir/go-java-launcher/init/lib"
 )
@@ -38,8 +39,17 @@ If exit code is nonzero, writes an error message to stderr.`,
 }
 
 func status() error {
-	if _, status, err := lib.GetServiceStatus(); err != nil {
-		return logErrorAndReturnWithExitCode(err, status)
+	notRunningCmdsByName, err := lib.GetNotRunningCmdsByName()
+	if err != nil {
+		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to determine service status"), 3)
+	}
+	if len(notRunningCmdsByName) > 0 {
+		notRunningCmdNames := make([]string, 0, len(notRunningCmdsByName))
+		for name := range notRunningCmdsByName {
+			notRunningCmdNames = append(notRunningCmdNames, name)
+		}
+		return logErrorAndReturnWithExitCode(errors.Errorf("commands '%v' are not running",
+			notRunningCmdNames), 1)
 	}
 	return nil
 }

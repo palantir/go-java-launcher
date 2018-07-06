@@ -25,28 +25,112 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetServiceStatus_RunningSingleProcess(t *testing.T) {
+func TestGetNotRunningCmdsByName_NoConfiguration(t *testing.T) {
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Nil(t, notRunningCmdsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get commands from static and custom configuration files")
+}
+
+func TestGetNotRunningCmdsByName_OneConfiguredNoPidfile(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	// Note that this is in fact a different command than is configured to run. The old bash init.sh relied on the
-	// command line from ps containing the classpath and thus the name of the Java main class to verify that the running
-	// process was indeed the same as the one configured to run. There is no good way to ensure this in the
-	// multi-process case.
-	writePidOrFail(t, "primary", os.Getpid())
-	info, status, err := GetServiceStatus()
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Nil(t, notRunningCmdsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to determine running processes")
+}
 
-	assert.Equal(t, 1, len(info.RunningProcs))
-	assert.Equal(t, info.RunningProcs[0].Pid, os.Getpid())
-	assert.Equal(t, 0, len(info.NotRunningCmds))
-	assert.Equal(t, 0, status)
+func TestGetNotRunningCmdsByName_OneConfiguredOnePidWrittenZeroRunning(t *testing.T) {
+	setupSingleProcess(t)
+	defer teardown(t)
+	writePidOrFail(t, "primary", 99999)
+
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Equal(t, 1, len(notRunningCmdsByName))
+	_, ok := notRunningCmdsByName["primary"]
+	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetServiceStatus_RunningMultiProcess(t *testing.T) {
+func TestGetNotRunningCmdsByName_OneConfiguredOnePidWrittenOneRunning(t *testing.T) {
+	setupSingleProcess(t)
+	defer teardown(t)
+	writePidOrFail(t, "primary", os.Getpid())
+
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Empty(t, notRunningCmdsByName)
+	assert.NoError(t, err)
+}
+
+func TestGetNotRunningCmdsByName_TwoConfiguredNoPidfile(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Nil(t, notRunningCmdsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to determine running processes")
+}
+
+func TestGetNotRunningCmdsByName_TwoConfiguredOnePidWrittenZeroRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+	writePidOrFail(t, "primary", 99999)
+
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Equal(t, 2, len(notRunningCmdsByName))
+	_, ok := notRunningCmdsByName["primary"]
+	assert.True(t, ok)
+	_, ok = notRunningCmdsByName["sidecar"]
+	assert.True(t, ok)
+	assert.NoError(t, err)
+}
+
+func TestGetNotRunningCmdsByName_TwoConfiguredOnePidWrittenOneRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+	writePidOrFail(t, "primary", os.Getpid())
+
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Equal(t, 1, len(notRunningCmdsByName))
+	_, ok := notRunningCmdsByName["sidecar"]
+	assert.True(t, ok)
+	assert.NoError(t, err)
+}
+
+func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenZeroRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+	writePidOrFail(t, "primary", 99998)
+	writePidOrFail(t, "sidecar", 99999)
+
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Equal(t, 2, len(notRunningCmdsByName))
+	_, ok := notRunningCmdsByName["primary"]
+	assert.True(t, ok)
+	_, ok = notRunningCmdsByName["sidecar"]
+	assert.True(t, ok)
+	assert.NoError(t, err)
+}
+
+func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenOneRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+	writePidOrFail(t, "primary", os.Getpid())
+	writePidOrFail(t, "sidecar", 99999)
+
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Equal(t, 1, len(notRunningCmdsByName))
+	_, ok := notRunningCmdsByName["sidecar"]
+	assert.True(t, ok)
+	assert.NoError(t, err)
+}
+
+func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenTwoRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
 	cmd := exec.Command("/bin/sleep", "10")
 	require.NoError(t, cmd.Start())
 	defer func() {
@@ -54,141 +138,136 @@ func TestGetServiceStatus_RunningMultiProcess(t *testing.T) {
 	}()
 	writePidOrFail(t, "primary", os.Getpid())
 	writePidOrFail(t, "sidecar", cmd.Process.Pid)
-	info, status, err := GetServiceStatus()
-	runningPids := make([]int, len(info.RunningProcs))
-	for i, proc := range info.RunningProcs {
-		runningPids[i] = proc.Pid
-	}
 
-	assert.Equal(t, 2, len(info.RunningProcs))
-	assert.Contains(t, runningPids, os.Getpid())
-	assert.Contains(t, runningPids, cmd.Process.Pid)
-	assert.Equal(t, 0, len(info.NotRunningCmds))
-	assert.Equal(t, 0, status)
+	notRunningCmdsByName, err := GetNotRunningCmdsByName()
+	assert.Empty(t, notRunningCmdsByName)
 	assert.NoError(t, err)
 }
 
-func TestGetServiceStatus_PartiallyRunningPidfileExistsMultiProcess(t *testing.T) {
-	setupMultiProcess(t)
-	defer teardown(t)
-
-	notRunningPid := 99999
-	writePidOrFail(t, "primary", os.Getpid())
-	writePidOrFail(t, "sidecar", notRunningPid)
-	info, status, err := GetServiceStatus()
-
-	assert.Equal(t, 1, len(info.RunningProcs))
-	assert.Equal(t, info.RunningProcs[0].Pid, os.Getpid())
-	assert.Equal(t, 1, len(info.NotRunningCmds))
-	assert.Equal(t, 1, status)
-	assert.EqualError(t, err, "pidfile exists and can be read but at least one process is not running")
+func TestGetRunningProcsByName_NoPidfile(t *testing.T) {
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Nil(t, runningProcsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read pidfile")
 }
 
-func TestGetServiceStatus_PartiallyRunningPidfileExistsIncompleteMultiProcess(t *testing.T) {
-	setupMultiProcess(t)
+func TestGetRunningProcsByName_EmptyPidfile(t *testing.T) {
+	setup(t)
 	defer teardown(t)
+	_, err := os.Create(pidfile)
+	require.NoError(t, err)
 
-	writePidOrFail(t, "primary", os.Getpid())
-	info, status, err := GetServiceStatus()
-
-	assert.Equal(t, 1, len(info.RunningProcs))
-	assert.Equal(t, info.RunningProcs[0].Pid, os.Getpid())
-	assert.Equal(t, 1, len(info.NotRunningCmds))
-	assert.Equal(t, 1, status)
-	assert.EqualError(t, err, "pidfile exists and can be read but at least one process is not running")
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Nil(t, runningProcsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to deserialize pidfile")
 }
 
-func TestGetServiceStatus_NotRunningPidfileExistsSingleProcess(t *testing.T) {
-	setupSingleProcess(t)
+func TestGetRunningProcsByName_InvalidPidfile(t *testing.T) {
+	setup(t)
 	defer teardown(t)
+	require.NoError(t, ioutil.WriteFile(pidfile, []byte("bogus\ndata"), 0666))
 
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Nil(t, runningProcsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to deserialize pidfile")
+}
+
+func TestGetRunningProcsByName_OnePidWrittenZeroRunning(t *testing.T) {
+	setup(t)
+	defer teardown(t)
 	notRunningPid := 99999
 	writePidOrFail(t, "primary", notRunningPid)
-	info, status, err := GetServiceStatus()
 
-	assert.Equal(t, 0, len(info.RunningProcs))
-	assert.Equal(t, 1, len(info.NotRunningCmds))
-	assert.Equal(t, 1, status)
-	assert.EqualError(t, err, "pidfile exists and can be read but at least one process is not running")
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Empty(t, runningProcsByName)
+	assert.NoError(t, err)
 }
 
-func TestGetServiceStatus_NotRunningPidfileExistsMultiProcess(t *testing.T) {
-	setupMultiProcess(t)
+func TestGetRunningProcsByName_OnePidWrittenOneRunning(t *testing.T) {
+	setup(t)
 	defer teardown(t)
+	writePidOrFail(t, "primary", os.Getpid())
 
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Equal(t, 1, len(runningProcsByName))
+	assert.Equal(t, os.Getpid(), runningProcsByName["primary"].Pid)
+	assert.NoError(t, err)
+}
+
+func TestGetRunningProcsByName_TwoPidsWrittenZeroRunning(t *testing.T) {
+	setup(t)
+	defer teardown(t)
 	notRunningPid := 99998
 	otherNotRunningPid := 99999
 	writePidOrFail(t, "primary", notRunningPid)
 	writePidOrFail(t, "sidecar", otherNotRunningPid)
-	info, status, err := GetServiceStatus()
 
-	assert.Equal(t, 0, len(info.RunningProcs))
-	assert.Equal(t, 2, len(info.NotRunningCmds))
-	assert.Equal(t, 1, status)
-	assert.EqualError(t, err, "pidfile exists and can be read but at least one process is not running")
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Empty(t, runningProcsByName)
+	assert.NoError(t, err)
 }
 
-func TestGetServiceStatus_NotRunningPidfileExistsIncompleteMultiProcess(t *testing.T) {
+func TestGetRunningProcsByName_TwoPidsWrittenOneRunning(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+	notRunningPid := 99999
+	writePidOrFail(t, "primary", os.Getpid())
+	writePidOrFail(t, "sidecar", notRunningPid)
+
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Equal(t, 1, len(runningProcsByName))
+	assert.Equal(t, os.Getpid(), runningProcsByName["primary"].Pid)
+	assert.NoError(t, err)
+}
+
+func TestGetRunningProcsByName_TwoPidsWrittenTwoRunning(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+	cmd := exec.Command("/bin/sleep", "10")
+	require.NoError(t, cmd.Start())
+	defer func() {
+		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
+	}()
+	writePidOrFail(t, "primary", os.Getpid())
+	writePidOrFail(t, "sidecar", cmd.Process.Pid)
+
+	runningProcsByName, err := GetRunningProcsByName()
+	assert.Equal(t, 2, len(runningProcsByName))
+	assert.Equal(t, os.Getpid(), runningProcsByName["primary"].Pid)
+	assert.Equal(t, cmd.Process.Pid, runningProcsByName["sidecar"].Pid)
+	assert.NoError(t, err)
+}
+
+func TestGetConfiguredCommandsByName_NoConfiguration(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	cmdsByName, err := GetConfiguredCommandsByName()
+	assert.Nil(t, cmdsByName)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read static and custom configuration files")
+}
+
+func TestGetConfiguredCommandsByName_OneConfigured(t *testing.T) {
+	setupSingleProcess(t)
+	defer teardown(t)
+	cmdsByName, err := GetConfiguredCommandsByName()
+	assert.Equal(t, 1, len(cmdsByName))
+	_, ok := cmdsByName["primary"]
+	assert.True(t, ok)
+	assert.NoError(t, err)
+}
+
+func TestGetConfiguredCommandsByName_TwoConfigured(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
-
-	notRunningPid := 99998
-	writePidOrFail(t, "primary", notRunningPid)
-	info, status, err := GetServiceStatus()
-
-	assert.Equal(t, 0, len(info.RunningProcs))
-	assert.Equal(t, 2, len(info.NotRunningCmds))
-	assert.Equal(t, 1, status)
-	assert.EqualError(t, err, "pidfile exists and can be read but at least one process is not running")
-}
-
-func TestGetServiceStatus_NotRunningPidfileDoesNotExist(t *testing.T) {
-	setupSingleProcess(t)
-	defer teardown(t)
-
-	info, status, err := GetServiceStatus()
-
-	assert.Equal(t, 0, len(info.RunningProcs))
-	assert.Equal(t, 1, len(info.NotRunningCmds))
-	assert.Equal(t, 3, status)
-	require.Error(t, err, "expected error")
-	assert.Contains(t, err.Error(), "failed to read pidfile")
-}
-
-func TestGetServiceStatus_NotRunningPidFileIsEmpty(t *testing.T) {
-	setupSingleProcess(t)
-	defer teardown(t)
-
-	_, err := os.Create(pidfile)
-	require.NoError(t, err)
-	info, status, err := GetServiceStatus()
-
-	assert.Equal(t, 0, len(info.RunningProcs))
-	assert.Equal(t, 1, len(info.NotRunningCmds))
-	assert.Equal(t, 3, status)
-	require.Error(t, err, "expected error")
-	assert.Contains(t, err.Error(), "failed to deserialize pidfile")
-}
-
-func TestGetServiceStatus_NotRunningPidFileContainsInvalidTokens(t *testing.T) {
-	setupSingleProcess(t)
-	defer teardown(t)
-
-	require.NoError(t, ioutil.WriteFile(pidfile, []byte("bogus\ndata"), 0666))
-	info, status, err := GetServiceStatus()
-
-	assert.Equal(t, 0, len(info.RunningProcs))
-	assert.Equal(t, 1, len(info.NotRunningCmds))
-	assert.Equal(t, 3, status)
-	require.Error(t, err, "expected error")
-	assert.Contains(t, err.Error(), "failed to deserialize pidfile")
-}
-
-func TestGetServiceStatus_NotRunningPidfileDoesNotExistConfigIsBad(t *testing.T) {
-	info, status, err := GetServiceStatus()
-
-	assert.Nil(t, info)
-	assert.Equal(t, 3, status)
-	require.Error(t, err, "expected error")
-	assert.Contains(t, err.Error(), "failed to get commands from static and custom configuration files")
+	cmdsByName, err := GetConfiguredCommandsByName()
+	assert.Equal(t, 2, len(cmdsByName))
+	_, ok := cmdsByName["primary"]
+	assert.True(t, ok)
+	_, ok = cmdsByName["sidecar"]
+	assert.True(t, ok)
+	assert.NoError(t, err)
 }

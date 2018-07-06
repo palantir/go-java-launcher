@@ -215,10 +215,11 @@ func TestInitStart_StartsNotRunningPidfileDoesNotExist(t *testing.T) {
 }
 
 func TestInitStart_DoesNotStartNotRunningPidfileDoesNotExistConfigIsBad(t *testing.T) {
+	setup(t)
 	exitCode, stderr := runInit(t, "start")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "failed to get commands from static and custom configuration files")
+	assert.Contains(t, stderr, "failed to determine commands to run")
 }
 
 func TestInitStart_StartsNotRunningPidfileDoesNotExistMultiProcess(t *testing.T) {
@@ -278,7 +279,7 @@ func TestInitStatus_NotRunningPidfileExistsSingleProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "pidfile exists and can be read but at least one process is not running")
+	assert.Contains(t, stderr, "commands '[primary]' are not running")
 }
 
 func TestInitStatus_PartiallyRunningPidfileExistsMultiProcess(t *testing.T) {
@@ -290,7 +291,7 @@ func TestInitStatus_PartiallyRunningPidfileExistsMultiProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "pidfile exists and can be read but at least one process is not running")
+	assert.Contains(t, stderr, "commands '[sidecar]' are not running")
 }
 
 func TestInitStatus_NotRunningPidfileExistsMultiProcess(t *testing.T) {
@@ -302,7 +303,10 @@ func TestInitStatus_NotRunningPidfileExistsMultiProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "pidfile exists and can be read but at least one process is not running")
+	assert.Contains(t, stderr, "commands")
+	assert.Contains(t, stderr, "primary")
+	assert.Contains(t, stderr, "sidecar")
+	assert.Contains(t, stderr, "are not running")
 }
 
 func TestInitStatus_NotRunningPidfileDoesNotExistSingleProcess(t *testing.T) {
@@ -432,6 +436,9 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	// Truncating the expected error message because it contains a nondeterministically ordered list of pids
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
 		"to stop: processes with pids"))
+	assert.Contains(t, stderr, strconv.Itoa(sleepPids[0]))
+	assert.Contains(t, stderr, strconv.Itoa(sleepPids[1]))
+	assert.Contains(t, stderr, "did not stop within 5 seconds")
 
 	pids = readPids(t).PidsByName
 	primary, _ := os.FindProcess(pids["primary"])

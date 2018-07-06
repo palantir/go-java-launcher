@@ -15,6 +15,8 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
@@ -35,19 +37,17 @@ stderr. Waits for at least 240 seconds for any processes to stop.`,
 }
 
 func stop() error {
-	// We take action here based on the status, not the error
-	switch info, status, _ := lib.GetServiceStatus(); status {
-	case 0:
-		fallthrough
-	case 1:
-		if err := lib.StopService(info.RunningProcs); err != nil {
-			return logErrorAndReturnWithExitCode(err, 1)
-		}
+	runningProcsByName, err := lib.GetRunningProcsByName()
+	if err != nil {
+		// If we can't determine what's running, there's nothing to stop, really.
 		return nil
-	case 3:
-		return nil
-	default:
-		return logErrorAndReturnWithExitCode(
-			errors.Errorf("internal error, process status code not a known value: %d", status), 1)
 	}
+	runningProcs := make([]*os.Process, 0, len(runningProcsByName))
+	for _, runningProc := range runningProcsByName {
+		runningProcs = append(runningProcs, runningProc)
+	}
+	if err := lib.StopService(runningProcs); err != nil {
+		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to stop service"), 1)
+	}
+	return nil
 }

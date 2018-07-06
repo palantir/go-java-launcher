@@ -363,9 +363,8 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
-	// TODO
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
-		"to stop: processes with pids '[%d]' did not stop within 5 seconds", pid))
+		"to stop: processes with pids '[%d]' did not stop within 240 seconds", pid))
 
 	pids := readPids(t).PidsByName
 	process, _ := os.FindProcess(pids["primary"])

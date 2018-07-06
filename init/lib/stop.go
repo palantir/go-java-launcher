@@ -44,8 +44,7 @@ func StopService(procs []*os.Process) error {
 }
 
 func waitForServiceToStop(procs []*os.Process) error {
-	// TODO
-	const numSecondsToWait = 5
+	const numSecondsToWait = 240
 	timer := time.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)

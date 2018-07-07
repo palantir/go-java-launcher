@@ -437,7 +437,7 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 		"to stop: processes with pids"))
 	assert.Contains(t, stderr, strconv.Itoa(sleepPids[0]))
 	assert.Contains(t, stderr, strconv.Itoa(sleepPids[1]))
-	assert.Contains(t, stderr, "did not stop within 5 seconds")
+	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
 	pids = readPids(t).PidsByName
 	primary, _ := os.FindProcess(pids["primary"])

@@ -15,8 +15,6 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
@@ -37,13 +35,9 @@ stderr. Waits for at least 240 seconds for any processes to stop.`,
 }
 
 func stop() error {
-	runningProcsByName, err := lib.GetRunningProcsByName()
+	runningProcs, err := lib.GetRunningProcs()
 	if err != nil {
 		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to stop service"), 1)
-	}
-	runningProcs := make([]*os.Process, 0, len(runningProcsByName))
-	for _, runningProc := range runningProcsByName {
-		runningProcs = append(runningProcs, runningProc)
 	}
 	if err := lib.StopService(runningProcs); err != nil {
 		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to stop service"), 1)

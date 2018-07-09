@@ -28,7 +28,7 @@ import (
 )
 
 type ServicePids struct {
-	PidsByName map[string]int `yaml:"pidsByName" validate:"nonzero"`
+	Pids map[string]int `yaml:"pids" validate:"nonzero"`
 }
 
 type CmdWithOutputFile struct {
@@ -36,25 +36,25 @@ type CmdWithOutputFile struct {
 	OutputFilename string
 }
 
-func GetNotRunningCmdsByName() (map[string]CmdWithOutputFile, error) {
-	cmdsByName, err := GetConfiguredCommandsByName()
+func GetNotRunningCmds() (map[string]CmdWithOutputFile, error) {
+	cmds, err := GetConfiguredCommands()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get commands from static and custom configuration files")
 	}
-	runningProcsByName, err := GetRunningProcsByName()
+	runningProcs, err := GetRunningProcs()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine running processes")
 	}
-	notRunningCmdsByName := make(map[string]CmdWithOutputFile)
-	for name, cmd := range cmdsByName {
-		if _, ok := runningProcsByName[name]; !ok {
-			notRunningCmdsByName[name] = cmd
+	notRunningCmds := make(map[string]CmdWithOutputFile)
+	for name, cmd := range cmds {
+		if _, ok := runningProcs[name]; !ok {
+			notRunningCmds[name] = cmd
 		}
 	}
-	return notRunningCmdsByName, nil
+	return notRunningCmds, nil
 }
 
-func GetRunningProcsByName() (map[string]*os.Process, error) {
+func GetRunningProcs() (map[string]*os.Process, error) {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "failed to read pidfile")
@@ -70,7 +70,7 @@ func GetRunningProcsByName() (map[string]*os.Process, error) {
 	}
 
 	runningProcs := make(map[string]*os.Process)
-	for name, pid := range servicePids.PidsByName {
+	for name, pid := range servicePids.Pids {
 		running, proc := isPidRunning(pid)
 		if running {
 			runningProcs[name] = proc
@@ -79,27 +79,27 @@ func GetRunningProcsByName() (map[string]*os.Process, error) {
 	return runningProcs, nil
 }
 
-func GetConfiguredCommandsByName() (cmdsByName map[string]CmdWithOutputFile, rErr error) {
-	primaryStdout, err := os.Create(launchlib.PrimaryOutputFile)
+func GetConfiguredCommands() (cmds map[string]CmdWithOutputFile, rErr error) {
+	primaryOutputFile, err := os.Create(launchlib.PrimaryOutputFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create primary output file: "+launchlib.PrimaryOutputFile)
 	}
 	defer func() {
-		if cErr := primaryStdout.Close(); rErr == nil && cErr != nil {
+		if cErr := primaryOutputFile.Close(); rErr == nil && cErr != nil {
 			rErr = errors.Wrap(err, "failed to close primary output file: "+launchlib.PrimaryOutputFile)
 		}
 	}()
 	staticConfig, customConfig, err := launchlib.GetConfigsFromFiles(launcherStaticFile, launcherCustomFile,
-		primaryStdout)
+		primaryOutputFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read static and custom configuration files")
 	}
-	serviceCmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, primaryStdout)
+	serviceCmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, primaryOutputFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
-	cmdsByName = make(map[string]CmdWithOutputFile)
-	cmdsByName["primary"] = CmdWithOutputFile{
+	cmds = make(map[string]CmdWithOutputFile)
+	cmds["primary"] = CmdWithOutputFile{
 		Cmd:            serviceCmds.Primary,
 		OutputFilename: serviceCmds.PrimaryOutputFile,
 	}
@@ -109,9 +109,9 @@ func GetConfiguredCommandsByName() (cmdsByName map[string]CmdWithOutputFile, rEr
 			return nil, errors.Wrapf(err,
 				"subProcess %s does not have a corresponding output file listed - this is a bug", name)
 		}
-		cmdsByName[name] = CmdWithOutputFile{Cmd: subProc, OutputFilename: subProcOutputFile}
+		cmds[name] = CmdWithOutputFile{Cmd: subProc, OutputFilename: subProcOutputFile}
 	}
-	return cmdsByName, nil
+	return cmds, nil
 }
 
 func isPidRunning(pid int) (bool, *os.Process) {

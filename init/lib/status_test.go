@@ -25,110 +25,110 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetNotRunningCmdsByName_NoConfiguration(t *testing.T) {
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Nil(t, notRunningCmdsByName)
+func TestGetNotRunningCmds_NoConfiguration(t *testing.T) {
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Nil(t, notRunningCmds)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get commands from static and custom configuration files")
 }
 
-func TestGetNotRunningCmdsByName_OneConfiguredNoPidfile(t *testing.T) {
+func TestGetNotRunningCmds_OneConfiguredNoPidfile(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Nil(t, notRunningCmdsByName)
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Nil(t, notRunningCmds)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to determine running processes")
 }
 
-func TestGetNotRunningCmdsByName_OneConfiguredOnePidWrittenZeroRunning(t *testing.T) {
+func TestGetNotRunningCmds_OneConfiguredOnePidWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", 99999)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Equal(t, 1, len(notRunningCmdsByName))
-	_, ok := notRunningCmdsByName["primary"]
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Equal(t, 1, len(notRunningCmds))
+	_, ok := notRunningCmds["primary"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetNotRunningCmdsByName_OneConfiguredOnePidWrittenOneRunning(t *testing.T) {
+func TestGetNotRunningCmds_OneConfiguredOnePidWrittenOneRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", os.Getpid())
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Empty(t, notRunningCmdsByName)
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Empty(t, notRunningCmds)
 	assert.NoError(t, err)
 }
 
-func TestGetNotRunningCmdsByName_TwoConfiguredNoPidfile(t *testing.T) {
+func TestGetNotRunningCmds_TwoConfiguredNoPidfile(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Nil(t, notRunningCmdsByName)
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Nil(t, notRunningCmds)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to determine running processes")
 }
 
-func TestGetNotRunningCmdsByName_TwoConfiguredOnePidWrittenZeroRunning(t *testing.T) {
+func TestGetNotRunningCmds_TwoConfiguredOnePidWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", 99999)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Equal(t, 2, len(notRunningCmdsByName))
-	_, ok := notRunningCmdsByName["primary"]
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Equal(t, 2, len(notRunningCmds))
+	_, ok := notRunningCmds["primary"]
 	assert.True(t, ok)
-	_, ok = notRunningCmdsByName["sidecar"]
+	_, ok = notRunningCmds["sidecar"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetNotRunningCmdsByName_TwoConfiguredOnePidWrittenOneRunning(t *testing.T) {
+func TestGetNotRunningCmds_TwoConfiguredOnePidWrittenOneRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", os.Getpid())
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Equal(t, 1, len(notRunningCmdsByName))
-	_, ok := notRunningCmdsByName["sidecar"]
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Equal(t, 1, len(notRunningCmds))
+	_, ok := notRunningCmds["sidecar"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenZeroRunning(t *testing.T) {
+func TestGetNotRunningCmds_TwoConfiguredTwoPidsWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", 99998)
 	writePidOrFail(t, "sidecar", 99999)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Equal(t, 2, len(notRunningCmdsByName))
-	_, ok := notRunningCmdsByName["primary"]
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Equal(t, 2, len(notRunningCmds))
+	_, ok := notRunningCmds["primary"]
 	assert.True(t, ok)
-	_, ok = notRunningCmdsByName["sidecar"]
+	_, ok = notRunningCmds["sidecar"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenOneRunning(t *testing.T) {
+func TestGetNotRunningCmds_TwoConfiguredTwoPidsWrittenOneRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", os.Getpid())
 	writePidOrFail(t, "sidecar", 99999)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Equal(t, 1, len(notRunningCmdsByName))
-	_, ok := notRunningCmdsByName["sidecar"]
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Equal(t, 1, len(notRunningCmds))
+	_, ok := notRunningCmds["sidecar"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenTwoRunning(t *testing.T) {
+func TestGetNotRunningCmds_TwoConfiguredTwoPidsWrittenTwoRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 	cmd := exec.Command("/bin/sleep", "10")
@@ -139,64 +139,64 @@ func TestGetNotRunningCmdsByName_TwoConfiguredTwoPidsWrittenTwoRunning(t *testin
 	writePidOrFail(t, "primary", os.Getpid())
 	writePidOrFail(t, "sidecar", cmd.Process.Pid)
 
-	notRunningCmdsByName, err := GetNotRunningCmdsByName()
-	assert.Empty(t, notRunningCmdsByName)
+	notRunningCmds, err := GetNotRunningCmds()
+	assert.Empty(t, notRunningCmds)
 	assert.NoError(t, err)
 }
 
-func TestGetRunningProcsByName_NoPidfile(t *testing.T) {
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Nil(t, runningProcsByName)
+func TestGetRunningProcs_NoPidfile(t *testing.T) {
+	runningProcs, err := GetRunningProcs()
+	assert.Nil(t, runningProcs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read pidfile")
 }
 
-func TestGetRunningProcsByName_EmptyPidfile(t *testing.T) {
+func TestGetRunningProcs_EmptyPidfile(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	_, err := os.Create(pidfile)
 	require.NoError(t, err)
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Nil(t, runningProcsByName)
+	runningProcs, err := GetRunningProcs()
+	assert.Nil(t, runningProcs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to deserialize pidfile")
 }
 
-func TestGetRunningProcsByName_InvalidPidfile(t *testing.T) {
+func TestGetRunningProcs_InvalidPidfile(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	require.NoError(t, ioutil.WriteFile(pidfile, []byte("bogus\ndata"), 0666))
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Nil(t, runningProcsByName)
+	runningProcs, err := GetRunningProcs()
+	assert.Nil(t, runningProcs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to deserialize pidfile")
 }
 
-func TestGetRunningProcsByName_OnePidWrittenZeroRunning(t *testing.T) {
+func TestGetRunningProcs_OnePidWrittenZeroRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	notRunningPid := 99999
 	writePidOrFail(t, "primary", notRunningPid)
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Empty(t, runningProcsByName)
+	runningProcs, err := GetRunningProcs()
+	assert.Empty(t, runningProcs)
 	assert.NoError(t, err)
 }
 
-func TestGetRunningProcsByName_OnePidWrittenOneRunning(t *testing.T) {
+func TestGetRunningProcs_OnePidWrittenOneRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	writePidOrFail(t, "primary", os.Getpid())
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Equal(t, 1, len(runningProcsByName))
-	assert.Equal(t, os.Getpid(), runningProcsByName["primary"].Pid)
+	runningProcs, err := GetRunningProcs()
+	assert.Equal(t, 1, len(runningProcs))
+	assert.Equal(t, os.Getpid(), runningProcs["primary"].Pid)
 	assert.NoError(t, err)
 }
 
-func TestGetRunningProcsByName_TwoPidsWrittenZeroRunning(t *testing.T) {
+func TestGetRunningProcs_TwoPidsWrittenZeroRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	notRunningPid := 99998
@@ -204,25 +204,25 @@ func TestGetRunningProcsByName_TwoPidsWrittenZeroRunning(t *testing.T) {
 	writePidOrFail(t, "primary", notRunningPid)
 	writePidOrFail(t, "sidecar", otherNotRunningPid)
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Empty(t, runningProcsByName)
+	runningProcs, err := GetRunningProcs()
+	assert.Empty(t, runningProcs)
 	assert.NoError(t, err)
 }
 
-func TestGetRunningProcsByName_TwoPidsWrittenOneRunning(t *testing.T) {
+func TestGetRunningProcs_TwoPidsWrittenOneRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	notRunningPid := 99999
 	writePidOrFail(t, "primary", os.Getpid())
 	writePidOrFail(t, "sidecar", notRunningPid)
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Equal(t, 1, len(runningProcsByName))
-	assert.Equal(t, os.Getpid(), runningProcsByName["primary"].Pid)
+	runningProcs, err := GetRunningProcs()
+	assert.Equal(t, 1, len(runningProcs))
+	assert.Equal(t, os.Getpid(), runningProcs["primary"].Pid)
 	assert.NoError(t, err)
 }
 
-func TestGetRunningProcsByName_TwoPidsWrittenTwoRunning(t *testing.T) {
+func TestGetRunningProcs_TwoPidsWrittenTwoRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 	cmd := exec.Command("/bin/sleep", "10")
@@ -233,41 +233,41 @@ func TestGetRunningProcsByName_TwoPidsWrittenTwoRunning(t *testing.T) {
 	writePidOrFail(t, "primary", os.Getpid())
 	writePidOrFail(t, "sidecar", cmd.Process.Pid)
 
-	runningProcsByName, err := GetRunningProcsByName()
-	assert.Equal(t, 2, len(runningProcsByName))
-	assert.Equal(t, os.Getpid(), runningProcsByName["primary"].Pid)
-	assert.Equal(t, cmd.Process.Pid, runningProcsByName["sidecar"].Pid)
+	runningProcs, err := GetRunningProcs()
+	assert.Equal(t, 2, len(runningProcs))
+	assert.Equal(t, os.Getpid(), runningProcs["primary"].Pid)
+	assert.Equal(t, cmd.Process.Pid, runningProcs["sidecar"].Pid)
 	assert.NoError(t, err)
 }
 
-func TestGetConfiguredCommandsByName_NoConfiguration(t *testing.T) {
+func TestGetConfiguredCommands_NoConfiguration(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	cmdsByName, err := GetConfiguredCommandsByName()
-	assert.Nil(t, cmdsByName)
+	cmds, err := GetConfiguredCommands()
+	assert.Nil(t, cmds)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to read static and custom configuration files")
 }
 
-func TestGetConfiguredCommandsByName_OneConfigured(t *testing.T) {
+func TestGetConfiguredCommands_OneConfigured(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
-	cmdsByName, err := GetConfiguredCommandsByName()
-	assert.Equal(t, 1, len(cmdsByName))
-	_, ok := cmdsByName["primary"]
+	cmds, err := GetConfiguredCommands()
+	assert.Equal(t, 1, len(cmds))
+	_, ok := cmds["primary"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }
 
-func TestGetConfiguredCommandsByName_TwoConfigured(t *testing.T) {
+func TestGetConfiguredCommands_TwoConfigured(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
-	cmdsByName, err := GetConfiguredCommandsByName()
-	assert.Equal(t, 2, len(cmdsByName))
-	_, ok := cmdsByName["primary"]
+	cmds, err := GetConfiguredCommands()
+	assert.Equal(t, 2, len(cmds))
+	_, ok := cmds["primary"]
 	assert.True(t, ok)
-	_, ok = cmdsByName["sidecar"]
+	_, ok = cmds["sidecar"]
 	assert.True(t, ok)
 	assert.NoError(t, err)
 }

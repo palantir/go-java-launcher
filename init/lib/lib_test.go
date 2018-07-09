@@ -68,12 +68,12 @@ func writePidOrFail(t *testing.T, name string, pid int) {
 	if err != nil && !os.IsNotExist(err) {
 		require.Fail(t, "failed to read previous pidfile")
 	} else if err != nil && os.IsNotExist(err) {
-		servicePids.PidsByName = make(map[string]int)
+		servicePids.Pids = make(map[string]int)
 	} else {
 		require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
 		require.NoError(t, validator.Validate(servicePids))
 	}
-	servicePids.PidsByName[name] = pid
+	servicePids.Pids[name] = pid
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	require.NoError(t, err)
 	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))

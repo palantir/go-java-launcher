@@ -23,11 +23,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func StopService(procs []*os.Process) error {
-	for _, proc := range procs {
+func StopService(procs map[string]*os.Process) error {
+	for name, proc := range procs {
 		if err := proc.Signal(syscall.SIGTERM); err != nil {
 			if !strings.Contains(err.Error(), "os: process already finished") {
-				return errors.Wrap(err, "failed to stop at least one process")
+				return errors.Wrapf(err, "failed to stop '%s' process", name)
 			}
 		}
 	}
@@ -43,33 +43,30 @@ func StopService(procs []*os.Process) error {
 	return nil
 }
 
-func waitForServiceToStop(procs []*os.Process) error {
-	const numSecondsToWait = 240
+func waitForServiceToStop(procs map[string]*os.Process) error {
+	// TODO
+	const numSecondsToWait = 5
 	timer := time.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	remainingProcs := make(map[*os.Process]struct{})
-	for _, proc := range procs {
-		remainingProcs[proc] = struct{}{}
-	}
 	for {
 		select {
 		case <-ticker.C:
-			for remainingProc := range remainingProcs {
+			for name, remainingProc := range procs {
 				if !isProcRunning(remainingProc) {
-					delete(remainingProcs, remainingProc)
+					delete(procs, name)
 				}
 			}
-			if len(remainingProcs) == 0 {
+			if len(procs) == 0 {
 				return nil
 			}
 		case <-timer.C:
-			remainingPids := make([]int, len(remainingProcs))
+			remainingPids := make(map[string]int, len(procs))
 			i := 0
-			for proc := range remainingProcs {
-				remainingPids[i] = proc.Pid
+			for name, proc := range procs {
+				remainingPids[name] = proc.Pid
 				i++
 			}
 			return errors.Errorf("failed to wait for all processes to stop: processes with pids '%v' did "+

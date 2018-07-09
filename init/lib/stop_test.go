@@ -34,88 +34,63 @@ func TestStopService_Running(t *testing.T) {
 
 	// Run sleep in sh so that it's not a child process of the one checking if it's running.
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	// -P specifies the PPID to filter on. In this case sleep will be orphaned and adopted by init.
-	pidBytes, err := exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
-	require.NoError(t, err)
-	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
-	require.NoError(t, err)
-
-	proc, _ := os.FindProcess(pid)
-	require.NoError(t, StopService([]*os.Process{proc}))
+	proc, _ := os.FindProcess(pgrep(t, "sleep"))
+	require.NoError(t, StopService(map[string]*os.Process{"primary": proc}))
 
 	/* 2) Unstoppable single-process service does not stop. */
 
 	// Signum 15 is SIGTERM - need a program that ignores SIGTERM and thus won't stop even after waiting.
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pidBytes, err = exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
-	require.NoError(t, err)
-	pid, err = strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
-	require.NoError(t, err)
-
+	pid := pgrep(t, "sleep")
 	proc, _ = os.FindProcess(pid)
-	require.EqualError(t, StopService([]*os.Process{proc}), fmt.Sprintf("failed to stop at least one process: "+
-		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 240 seconds",
-		[]int{pid}))
-
+	// TODO
+	require.EqualError(t, StopService(map[string]*os.Process{"primary": proc}), fmt.Sprintf("failed to stop "+
+		"'primary' process: failed to wait for all processes to stop: processes with pids '%v' did not stop "+
+		"within 5 seconds", map[string]int{"primary": pid}))
 	// Clean up the process
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
 
 	/* 3) Stoppable multi-process service stops. */
 
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 9999 &").Run())
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	pidsBytes, err := exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
-	require.NoError(t, err)
-	pidsStrings := strings.Split(string(pidsBytes), "\n")
-	pids := make([]int, len(pidsStrings)-1)
-	for i, pidString := range pidsStrings[0 : len(pidsStrings)-1] {
-		pids[i], err = strconv.Atoi(pidString)
-		require.NoError(t, err)
-	}
-	procs := make([]*os.Process, len(pids))
-	for i, pid := range pids {
-		procs[i], _ = os.FindProcess(pid)
-	}
-
-	require.NoError(t, StopService(procs))
+	procs := make(map[string]*os.Process)
+	procs["primary"], _ = os.FindProcess(pgrep(t, "sleep 9999"))
+	procs["sidecar"], _ = os.FindProcess(pgrep(t, "sleep 10000"))
+	require.NoError(t, StopService(map[string]*os.Process{}))
 
 	/* 4) Unstoppable multi-process service does not stop. */
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	unstoppablePidBytes, err := exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
-	require.NoError(t, err)
-	unstoppablePid, err := strconv.Atoi(strings.Split(string(unstoppablePidBytes), "\n")[0])
-	require.NoError(t, err)
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 9999 &").Run())
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	pidsBytes, err = exec.Command("pgrep", "-f", "-P", "1", "sleep").Output()
-	require.NoError(t, err)
-	pidsStrings = strings.Split(string(pidsBytes), "\n")
-	pids = make([]int, len(pidsStrings)-1)
-	for i, pidString := range pidsStrings[0 : len(pidsStrings)-1] {
-		pids[i], err = strconv.Atoi(pidString)
-		require.NoError(t, err)
-	}
-	procs = make([]*os.Process, len(pids))
-	for i, pid := range pids {
-		procs[i], _ = os.FindProcess(pid)
-	}
-
+	unstoppablePid := pgrep(t, "sleep 9999")
+	procs = make(map[string]*os.Process)
+	procs["primary"], _ = os.FindProcess(unstoppablePid)
+	procs["sidecar"], _ = os.FindProcess(pgrep(t, "sleep 10000"))
+	// TODO
 	require.EqualError(t, StopService(procs), fmt.Sprintf("failed to stop at least one process: "+
-		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 240 seconds",
+		"failed to wait for all processes to stop: processes with pids '%v' did not stop within 5 seconds",
 		[]int{unstoppablePid}))
-
-	unstoppableProc, _ := os.FindProcess(unstoppablePid)
-	require.NoError(t, unstoppableProc.Signal(syscall.SIGKILL))
+	require.NoError(t, procs["primary"].Signal(syscall.SIGKILL))
 }
 
 func TestStopProcess_NotRunningSingleProcess(t *testing.T) {
 	proc, _ := os.FindProcess(99999)
-	assert.NoError(t, StopService([]*os.Process{proc}))
+	assert.NoError(t, StopService(map[string]*os.Process{"primary": proc}))
 }
 
 func TestStopProcess_NotRunningMultiProcess(t *testing.T) {
-	procs := make([]*os.Process, 2)
-	procs[0], _ = os.FindProcess(99998)
-	procs[1], _ = os.FindProcess(99999)
+	procs := make(map[string]*os.Process)
+	procs["primary"], _ = os.FindProcess(99998)
+	procs["sidecar"], _ = os.FindProcess(99999)
 	assert.NoError(t, StopService(procs))
+}
+
+func pgrep(t *testing.T, key string) int {
+	// -P specifies the PPID to filter on. In these tests the processes are orphaned and adopted by init.
+	pidBytes, err := exec.Command("pgrep", "-f", "-P", "1", key).Output()
+	require.NoError(t, err)
+	pid, err := strconv.Atoi(strings.Split(string(pidBytes), "\n")[0])
+	require.NoError(t, err)
+	return pid
 }

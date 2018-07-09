@@ -44,7 +44,7 @@ func TestStartService_SingleProcess(t *testing.T) {
 	output, err := ioutil.ReadFile(launchlib.PrimaryOutputFile)
 	require.NoError(t, err)
 	assert.Contains(t, string(output), "start.go")
-	pids := readPids(t).PidsByName
+	pids := readPids(t).Pids
 	assert.Equal(t, 1, len(pids))
 	assert.Equal(t, cmds["primary"].Cmd.Process.Pid, pids["primary"])
 }
@@ -74,7 +74,7 @@ func TestStartService_MultiProcess(t *testing.T) {
 	sidecarOutput, err := ioutil.ReadFile(sidecarOutputFileName)
 	require.NoError(t, err)
 	assert.Contains(t, string(sidecarOutput), "foo")
-	pids := readPids(t).PidsByName
+	pids := readPids(t).Pids
 	assert.Equal(t, 2, len(pids))
 	assert.Equal(t, cmds["primary"].Cmd.Process.Pid, pids["primary"])
 	assert.Equal(t, cmds["sidecar"].Cmd.Process.Pid, pids["sidecar"])

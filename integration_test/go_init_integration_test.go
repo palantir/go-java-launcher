@@ -81,9 +81,9 @@ func writePid(t *testing.T, name string, pid int) {
 		require.NoError(t, err)
 		require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
 	} else {
-		servicePids.PidsByName = make(map[string]int)
+		servicePids.Pids = make(map[string]int)
 	}
-	servicePids.PidsByName[name] = pid
+	servicePids.Pids[name] = pid
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	require.NoError(t, err)
 	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))
@@ -114,7 +114,7 @@ func TestInitStart_DoesNotRestartRunningSingleProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
-	assert.Equal(t, os.Getpid(), readPids(t).PidsByName["primary"])
+	assert.Equal(t, os.Getpid(), readPids(t).Pids["primary"])
 	assert.Empty(t, stderr)
 }
 
@@ -132,7 +132,7 @@ func TestInitStart_DoesNotRestartRunningMultiProcess(t *testing.T) {
 	exitCode, stderr := runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
-	pids := readPids(t).PidsByName
+	pids := readPids(t).Pids
 	assert.Equal(t, os.Getpid(), pids["primary"])
 	assert.Equal(t, cmd.Process.Pid, pids["sidecar"])
 	assert.Empty(t, stderr)
@@ -188,7 +188,7 @@ func TestInitStart_StartsPartiallyRunningPidfileExistsMultiProcess(t *testing.T)
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
-	pids := readPids(t).PidsByName
+	pids := readPids(t).Pids
 	assert.Equal(t, os.Getpid(), pids["primary"])
 	sidecarStartupLogBytes, err := ioutil.ReadFile(fmt.Sprintf(launchlib.OutputFileFormat, "sidecar-"))
 	require.NoError(t, err)
@@ -363,10 +363,11 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
+	// TODO
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
-		"to stop: processes with pids '[%d]' did not stop within 240 seconds", pid))
+		"to stop: processes with pids '[%d]' did not stop within 5 seconds", pid))
 
-	pids := readPids(t).PidsByName
+	pids := readPids(t).Pids
 	process, _ := os.FindProcess(pids["primary"])
 	require.NoError(t, process.Signal(syscall.SIGKILL))
 
@@ -437,9 +438,10 @@ func TestInitStop_StopsRunningAndFailsRunningDoesNotTerminate(t *testing.T) {
 		"to stop: processes with pids"))
 	assert.Contains(t, stderr, strconv.Itoa(sleepPids[0]))
 	assert.Contains(t, stderr, strconv.Itoa(sleepPids[1]))
-	assert.Contains(t, stderr, "did not stop within 240 seconds")
+	// TODO
+	assert.Contains(t, stderr, "did not stop within 5 seconds")
 
-	pids = readPids(t).PidsByName
+	pids = readPids(t).Pids
 	primary, _ := os.FindProcess(pids["primary"])
 	sidecar, _ := os.FindProcess(pids["sidecar"])
 	require.NoError(t, primary.Signal(syscall.SIGKILL))

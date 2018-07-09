@@ -41,7 +41,7 @@ type ServiceCmds struct {
 }
 
 func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig,
-	primaryStdout io.Writer) (serviceCmds *ServiceCmds, rErr error) {
+	primaryOutputFile io.Writer) (serviceCmds *ServiceCmds, rErr error) {
 	serviceCmds = &ServiceCmds{
 		SubProcs:            make(map[string]*exec.Cmd),
 		SubProcsOutputFiles: make(map[string]string),
@@ -49,7 +49,7 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 
 	var err error
 	serviceCmds.Primary, err = compileCmdFromConfig(&staticConfig.StaticLauncherConfig,
-		&customConfig.CustomLauncherConfig, primaryStdout)
+		&customConfig.CustomLauncherConfig, primaryOutputFile)
 	if err != nil {
 		return nil, err
 	}

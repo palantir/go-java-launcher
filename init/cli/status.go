@@ -39,13 +39,13 @@ If exit code is nonzero, writes an error message to stderr.`,
 }
 
 func status() error {
-	notRunningCmdsByName, err := lib.GetNotRunningCmdsByName()
+	notRunningCmds, err := lib.GetNotRunningCmds()
 	if err != nil {
 		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to determine service status"), 3)
 	}
-	if len(notRunningCmdsByName) > 0 {
-		notRunningCmdNames := make([]string, 0, len(notRunningCmdsByName))
-		for name := range notRunningCmdsByName {
+	if len(notRunningCmds) > 0 {
+		notRunningCmdNames := make([]string, 0, len(notRunningCmds))
+		for name := range notRunningCmds {
 			notRunningCmdNames = append(notRunningCmdNames, name)
 		}
 		return logErrorAndReturnWithExitCode(errors.Errorf("commands '%v' are not running",

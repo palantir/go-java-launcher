@@ -39,8 +39,7 @@ stderr. Waits for at least 240 seconds for any processes to stop.`,
 func stop() error {
 	runningProcsByName, err := lib.GetRunningProcsByName()
 	if err != nil {
-		// If we can't determine what's running, there's nothing to stop, really.
-		return nil
+		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to stop service"), 1)
 	}
 	runningProcs := make([]*os.Process, 0, len(runningProcsByName))
 	for _, runningProc := range runningProcsByName {

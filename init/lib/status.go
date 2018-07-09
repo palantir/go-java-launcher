@@ -56,8 +56,10 @@ func GetNotRunningCmdsByName() (map[string]CmdWithOutputFile, error) {
 
 func GetRunningProcsByName() (map[string]*os.Process, error) {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "failed to read pidfile")
+	} else if os.IsNotExist(err) {
+		return map[string]*os.Process{}, nil
 	}
 	var servicePids ServicePids
 	if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {

@@ -15,6 +15,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/palantir/pkg/cli"
@@ -25,21 +26,21 @@ import (
 
 func logErrorAndReturnWithExitCode(err error, exitCode int) cli.ExitCoder {
 	// If there's an error logging the error to the primary output file, we still want to write the error to stderr.
-	_ = logToPrimaryOutputFile(err.Error())
+	_ = logToPrimaryOutputFile(err)
 	return cli.WithExitCode(exitCode, err)
 }
 
-func logToPrimaryOutputFile(log string) (rErr error) {
-	file, err := os.Create(launchlib.PrimaryOutputFile)
+func logToPrimaryOutputFile(errToLog error) (rErr error) {
+	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 266)
 	if err != nil {
 		return errors.Wrap(err, "failed to create primary output file")
 	}
 	defer func() {
-		if cErr := file.Close(); rErr == nil && cErr != nil {
+		if cErr := outputFile.Close(); rErr == nil && cErr != nil {
 			rErr = errors.Wrap(err, "failed to close primary output file")
 		}
 	}()
-	if _, err := file.WriteString(log + "\n"); err != nil {
+	if _, err := fmt.Fprintln(outputFile, errToLog); err != nil {
 		return errors.Wrap(err, "failed to write to primary output file")
 	}
 	return nil

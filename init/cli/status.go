@@ -15,40 +15,52 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
 	"github.com/palantir/go-java-launcher/init/lib"
+	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-func statusCommand() cli.Command {
-	return cli.Command{
-		Name: "status",
-		Usage: `
+var statusCliCommand = cli.Command{
+	Name: "status",
+	Usage: `
 Determines the status of the service defined by the static and custom configurations at service/bin/launcher-static.yml
 and var/conf/launcher-custom.yml.
 Exits:
 - 0 if all of its processes are running
 - 1 if at least one process is not running
 - 3 if the status cannot be determined
-If exit code is nonzero, writes an error message to stderr.`,
-		Action: func(_ cli.Context) error {
-			return status()
-		},
-	}
+If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
+	Action: status,
 }
 
-func status() error {
-	notRunningCmds, err := lib.GetNotRunningCmds()
+func status(ctx cli.Context) (rErr error) {
+	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, lib.OutputFileFlag, lib.OutputFileMode)
 	if err != nil {
-		return logErrorAndReturnWithExitCode(errors.Wrap(err, "failed to determine service status"), 3)
+		return cli.WithExitCode(3, errors.Errorf("failed to create primary output file: %s",
+			launchlib.PrimaryOutputFile))
 	}
-	if len(notRunningCmds) > 0 {
-		notRunningCmdNames := make([]string, 0, len(notRunningCmds))
-		for name := range notRunningCmds {
+	defer func() {
+		if cErr := outputFile.Close(); rErr == nil && cErr != nil {
+			rErr = cli.WithExitCode(3, errors.Errorf("failed to close primary output file: %s",
+				launchlib.PrimaryOutputFile))
+		}
+	}()
+	ctx.App.Stdout = outputFile
+
+	serviceStatus, err := lib.GetServiceStatus(ctx)
+	if err != nil {
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 3)
+	}
+	if len(serviceStatus.NotRunningCmds) > 0 {
+		notRunningCmdNames := make([]string, 0, len(serviceStatus.NotRunningCmds))
+		for name := range serviceStatus.NotRunningCmds {
 			notRunningCmdNames = append(notRunningCmdNames, name)
 		}
-		return logErrorAndReturnWithExitCode(errors.Errorf("commands '%v' are not running",
+		return logErrorAndReturnWithExitCode(ctx, errors.Errorf("commands '%v' are not running",
 			notRunningCmdNames), 1)
 	}
 	return nil

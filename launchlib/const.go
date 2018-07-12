@@ -15,12 +15,15 @@
 package launchlib
 
 import (
-	"fmt"
+	"path/filepath"
 )
 
 const (
-	OutputFileName   = "startup.log"
-	OutputFileFormat = "var/log/%s" + OutputFileName
+	outputLogFile = "startup.log"
 )
 
-var PrimaryOutputFile = fmt.Sprintf(OutputFileFormat, "")
+var (
+	logDir                     = "var/log"
+	PrimaryOutputFile          = filepath.Join(logDir, outputLogFile)
+	SubProcessOutputFileFormat = filepath.Join(logDir, "%s-"+outputLogFile)
+)

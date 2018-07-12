@@ -17,9 +17,10 @@ package lib
 import (
 	"io/ioutil"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"syscall"
 
+	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
@@ -27,17 +28,28 @@ import (
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
+const (
+	OutputFileFlag = os.O_WRONLY | os.O_APPEND | os.O_CREATE
+	OutputFileMode = 0666
+)
+
+var (
+	launcherStaticFile = filepath.Join("service", "bin", "launcher-static.yml")
+	launcherCustomFile = filepath.Join("var", "conf", "launcher-custom.yml")
+	Pidfile            = filepath.Join("var", "run", "pids.yml")
+)
+
 type ServicePids struct {
 	Pids map[string]int `yaml:"pids" validate:"nonzero"`
 }
 
-type CmdWithOutputFile struct {
-	Cmd            *exec.Cmd
-	OutputFilename string
+type ServiceStatus struct {
+	RunningProcs   map[string]*os.Process
+	NotRunningCmds map[string]launchlib.CmdWithOutputFileName
 }
 
-func GetNotRunningCmds() (map[string]CmdWithOutputFile, error) {
-	cmds, err := GetConfiguredCommands()
+func GetServiceStatus(ctx cli.Context) (*ServiceStatus, error) {
+	cmds, err := getConfiguredCommands(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get commands from static and custom configuration files")
 	}
@@ -45,17 +57,17 @@ func GetNotRunningCmds() (map[string]CmdWithOutputFile, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine running processes")
 	}
-	notRunningCmds := make(map[string]CmdWithOutputFile)
+	notRunningCmds := make(map[string]launchlib.CmdWithOutputFileName)
 	for name, cmd := range cmds {
 		if _, ok := runningProcs[name]; !ok {
 			notRunningCmds[name] = cmd
 		}
 	}
-	return notRunningCmds, nil
+	return &ServiceStatus{runningProcs, notRunningCmds}, nil
 }
 
 func GetRunningProcs() (map[string]*os.Process, error) {
-	pidfileBytes, err := ioutil.ReadFile(pidfile)
+	pidfileBytes, err := ioutil.ReadFile(Pidfile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, errors.Wrap(err, "failed to read pidfile")
 	} else if os.IsNotExist(err) {
@@ -79,37 +91,20 @@ func GetRunningProcs() (map[string]*os.Process, error) {
 	return runningProcs, nil
 }
 
-func GetConfiguredCommands() (cmds map[string]CmdWithOutputFile, rErr error) {
-	primaryOutputFile, err := os.Create(launchlib.PrimaryOutputFile)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create primary output file: "+launchlib.PrimaryOutputFile)
-	}
-	defer func() {
-		if cErr := primaryOutputFile.Close(); rErr == nil && cErr != nil {
-			rErr = errors.Wrap(err, "failed to close primary output file: "+launchlib.PrimaryOutputFile)
-		}
-	}()
+func getConfiguredCommands(ctx cli.Context) (cmds map[string]launchlib.CmdWithOutputFileName, rErr error) {
 	staticConfig, customConfig, err := launchlib.GetConfigsFromFiles(launcherStaticFile, launcherCustomFile,
-		primaryOutputFile)
+		ctx.App.Stdout)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read static and custom configuration files")
 	}
-	serviceCmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, primaryOutputFile)
+	serviceCmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, ctx.App.Stdout)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
-	cmds = make(map[string]CmdWithOutputFile)
-	cmds["primary"] = CmdWithOutputFile{
-		Cmd:            serviceCmds.Primary,
-		OutputFilename: serviceCmds.PrimaryOutputFile,
-	}
+	cmds = make(map[string]launchlib.CmdWithOutputFileName)
+	cmds[staticConfig.ServiceName] = serviceCmds.Primary
 	for name, subProc := range serviceCmds.SubProcs {
-		subProcOutputFile, ok := serviceCmds.SubProcsOutputFiles[name]
-		if !ok {
-			return nil, errors.Wrapf(err,
-				"subProcess %s does not have a corresponding output file listed - this is a bug", name)
-		}
-		cmds[name] = CmdWithOutputFile{Cmd: subProc, OutputFilename: subProcOutputFile}
+		cmds[name] = subProc
 	}
 	return cmds, nil
 }
@@ -117,13 +112,13 @@ func GetConfiguredCommands() (cmds map[string]CmdWithOutputFile, rErr error) {
 func isPidRunning(pid int) (bool, *os.Process) {
 	// Docs say FindProcess always succeeds on Unix.
 	proc, _ := os.FindProcess(pid)
-	if isProcRunning(proc) {
+	if IsProcRunning(proc) {
 		return true, proc
 	}
 	return false, nil
 }
 
-func isProcRunning(proc *os.Process) bool {
+func IsProcRunning(proc *os.Process) bool {
 	// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
 	return proc.Signal(syscall.Signal(0)) == nil
 }

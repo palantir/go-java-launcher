@@ -84,10 +84,16 @@ type AllowedLauncherConfigValues struct {
 var allowedLauncherConfigs = AllowedLauncherConfigValues{
 	ConfigTypes:    map[string]struct{}{"java": {}, "executable": {}},
 	ConfigVersions: map[int]struct{}{1: {}},
-	Executables:    map[string]struct{}{"java": {}, "postgres": {}, "influxd": {}, "grafana-server": {}, "envoy": {}},
+	Executables: map[string]struct{}{
+		"java":           {},
+		"postgres":       {},
+		"influxd":        {},
+		"grafana-server": {},
+		"envoy":          {}},
 }
 
-func GetConfigsFromFiles(staticConfigFile string, customConfigFile string, stdout io.Writer) (PrimaryStaticLauncherConfig, PrimaryCustomLauncherConfig, error) {
+func GetConfigsFromFiles(staticConfigFile string, customConfigFile string,
+	stdout io.Writer) (PrimaryStaticLauncherConfig, PrimaryCustomLauncherConfig, error) {
 	staticConfig, err := getStaticConfigFromFile(staticConfigFile)
 	if err != nil {
 		return PrimaryStaticLauncherConfig{}, PrimaryCustomLauncherConfig{}, err
@@ -125,7 +131,8 @@ func validateSubProcessLimit(numberSubProcesses int) error {
 
 func validateSubProcessName(name string) error {
 	if !subProcessNamePattern.MatchString(name) {
-		return errors.Errorf("subProcess name '%s' does not match required pattern '%s'", name, subProcessNamePattern)
+		return errors.Errorf("subProcess name '%s' does not match required pattern '%s'", name,
+			subProcessNamePattern)
 	}
 	return nil
 }
@@ -134,7 +141,8 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 	var config PrimaryStaticLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
 		return PrimaryStaticLauncherConfig{},
-			errors.Wrap(err, "Failed to deserialize Static Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
+			errors.Wrap(err, "Failed to deserialize Static Launcher Config, please check the syntax of "+
+				"your configuration file")
 	}
 
 	if err := config.VersionedConfig.validateVersion(allowedLauncherConfigs.ConfigVersions); err != nil {
@@ -151,8 +159,13 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 
 	for name, subProcess := range config.SubProcesses {
 		if err := validateSubProcessName(name); err != nil {
-			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err, "invalid subProcess name '%s' in static config",
-				name)
+			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
+				"invalid subProcess name '%s' in static config", name)
+		}
+
+		if name == config.ServiceName {
+			return PrimaryStaticLauncherConfig{},
+				errors.Errorf("subProcess name '%s' cannot be the same as ServiceName", name)
 		}
 
 		if err := validateStaticConfig(&subProcess); err != nil {
@@ -180,7 +193,8 @@ func validateStaticConfig(config *StaticLauncherConfig) error {
 
 func getStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConfig, error) {
 	if staticData, err := ioutil.ReadFile(staticConfigFile); err != nil {
-		return PrimaryStaticLauncherConfig{}, errors.Wrap(err, "Failed to read static config file: "+staticConfigFile)
+		return PrimaryStaticLauncherConfig{}, errors.Wrap(err, "Failed to read static config file: "+
+			staticConfigFile)
 	} else if staticConfig, err := parseStaticConfig(staticData); err != nil {
 		return PrimaryStaticLauncherConfig{}, err
 	} else {
@@ -188,7 +202,8 @@ func getStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConf
 	}
 }
 
-func verifyStaticWithCustomConfig(staticConfig PrimaryStaticLauncherConfig, customConfig PrimaryCustomLauncherConfig) error {
+func verifyStaticWithCustomConfig(staticConfig PrimaryStaticLauncherConfig,
+	customConfig PrimaryCustomLauncherConfig) error {
 	for name := range customConfig.SubProcesses {
 		if _, ok := staticConfig.SubProcesses[name]; !ok {
 			return errors.Errorf(
@@ -213,7 +228,8 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 	var config PrimaryCustomLauncherConfig
 	if err := yaml.Unmarshal(yamlString, &config); err != nil {
 		return PrimaryCustomLauncherConfig{},
-			errors.Wrap(err, "Failed to deserialize Custom Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file")
+			errors.Wrap(err, "Failed to deserialize Custom Launcher Config, please check the syntax of "+
+				"your configuration file")
 	}
 
 	if err := config.VersionedConfig.validateVersion(allowedLauncherConfigs.ConfigVersions); err != nil {
@@ -230,8 +246,8 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 
 	for name, subProcess := range config.SubProcesses {
 		if err := validateSubProcessName(name); err != nil {
-			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid subProcess name '%s' in static config",
-				name)
+			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid subProcess name '%s' in "+
+				"custom config", name)
 		}
 
 		if err := subProcess.TypedConfig.validateType(allowedLauncherConfigs.ConfigTypes); err != nil {
@@ -244,7 +260,8 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 
 func getCustomConfigFromFile(customConfigFile string, stdout io.Writer) (PrimaryCustomLauncherConfig, error) {
 	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
-		fmt.Fprintln(stdout, "Failed to read custom config file, assuming no custom config:", customConfigFile)
+		fmt.Fprintln(stdout, "Failed to read custom config file, assuming no custom config:",
+			customConfigFile)
 		return PrimaryCustomLauncherConfig{}, nil
 	} else if customConfig, err := parseCustomConfig(customData); err != nil {
 		return PrimaryCustomLauncherConfig{}, err

@@ -23,6 +23,6 @@ func App() *cli.App {
 	app.Name = "go-init"
 	app.Usage = "A simple init.sh-style service launcher CLI."
 
-	app.Subcommands = []cli.Command{startCommand(), statusCommand(), stopCommand()}
+	app.Subcommands = []cli.Command{startCliCommand, statusCliCommand, stopCliCommand}
 	return app
 }

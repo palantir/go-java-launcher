@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 
-	"github.com/palantir/go-java-launcher/init/lib"
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
@@ -37,7 +36,7 @@ stderr and var/log/startup.log.`,
 }
 
 func start(ctx cli.Context) (rErr error) {
-	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, lib.OutputFileFlag, lib.OutputFileMode)
+	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
 	if err != nil {
 		return cli.WithExitCode(1, errors.Errorf("failed to create primary output file: %s",
 			launchlib.PrimaryOutputFile))
@@ -50,16 +49,16 @@ func start(ctx cli.Context) (rErr error) {
 	}()
 	ctx.App.Stdout = outputFile
 
-	serviceStatus, err := lib.GetServiceStatus(ctx)
+	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx,
 			errors.Wrap(err, "failed to determine service status to determine what commands to run"), 1)
 	}
-	pids, err := startService(serviceStatus.NotRunningCmds)
+	pids, err := startService(serviceStatus.notRunningCmds)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to start service"), 1)
 	}
-	for name, runningProc := range serviceStatus.RunningProcs {
+	for name, runningProc := range serviceStatus.runningProcs {
 		pids[name] = runningProc.Pid
 	}
 	if err := writePids(pids); err != nil {
@@ -81,7 +80,7 @@ func startService(notRunningCmds map[string]launchlib.CmdWithOutputFileName) (ma
 }
 
 func startCommand(cmd launchlib.CmdWithOutputFileName) (rErr error) {
-	stdout, err := os.OpenFile(cmd.OutputFileName, lib.OutputFileFlag, lib.OutputFileMode)
+	stdout, err := os.OpenFile(cmd.OutputFileName, outputFileFlag, outputFileMode)
 	if err != nil {
 		return errors.Wrap(err, "failed to open output file: "+cmd.OutputFileName)
 	}
@@ -99,7 +98,7 @@ func startCommand(cmd launchlib.CmdWithOutputFileName) (rErr error) {
 }
 
 func writePids(pids map[string]int) error {
-	servicePids := lib.ServicePids{Pids: make(map[string]int)}
+	servicePids := servicePids{Pids: make(map[string]int)}
 	for name, pid := range pids {
 		servicePids.Pids[name] = pid
 	}
@@ -107,7 +106,7 @@ func writePids(pids map[string]int) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to serialize pidfile")
 	}
-	if err := ioutil.WriteFile(lib.Pidfile, servicePidsBytes, 0666); err != nil {
+	if err := ioutil.WriteFile(pidfile, servicePidsBytes, 0666); err != nil {
 		return errors.Wrap(err, "failed to write pidfile")
 	}
 	return nil

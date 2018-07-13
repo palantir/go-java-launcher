@@ -1,9 +1,0 @@
-configType: java
-configVersion: 1
-mainClass: Main
-classpath:
-  - ./testdata/
-jvmOpts:
-  - '-Xmx4M'
-args:
-  - arg1

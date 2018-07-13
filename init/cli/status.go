@@ -20,7 +20,6 @@ import (
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
-	"github.com/palantir/go-java-launcher/init/lib"
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
@@ -31,37 +30,46 @@ Determines the status of the service defined by the static and custom configurat
 and var/conf/launcher-custom.yml.
 Exits:
 - 0 if all of its processes are running
-- 1 if at least one process is not running
-- 3 if the status cannot be determined
+- 1 if at least one process is not running but there is a record of processes having been started
+- 3 if no processes are running and there is no record of processes having been started
+- 4 if the status cannot be determined
 If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
 	Action: status,
 }
 
 func status(ctx cli.Context) (rErr error) {
-	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, lib.OutputFileFlag, lib.OutputFileMode)
+	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
 	if err != nil {
-		return cli.WithExitCode(3, errors.Errorf("failed to create primary output file: %s",
+		return cli.WithExitCode(4, errors.Errorf("failed to create primary output file: %s",
 			launchlib.PrimaryOutputFile))
 	}
 	defer func() {
 		if cErr := outputFile.Close(); rErr == nil && cErr != nil {
-			rErr = cli.WithExitCode(3, errors.Errorf("failed to close primary output file: %s",
+			rErr = cli.WithExitCode(4, errors.Errorf("failed to close primary output file: %s",
 				launchlib.PrimaryOutputFile))
 		}
 	}()
 	ctx.App.Stdout = outputFile
 
-	serviceStatus, err := lib.GetServiceStatus(ctx)
+	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
-		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 3)
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 4)
 	}
-	if len(serviceStatus.NotRunningCmds) > 0 {
-		notRunningCmdNames := make([]string, 0, len(serviceStatus.NotRunningCmds))
-		for name := range serviceStatus.NotRunningCmds {
+	if len(serviceStatus.notRunningCmds) > 0 {
+		notRunningCmdNames := make([]string, 0, len(serviceStatus.notRunningCmds))
+		for name := range serviceStatus.notRunningCmds {
 			notRunningCmdNames = append(notRunningCmdNames, name)
 		}
+		if len(serviceStatus.writtenPids) > 0 {
+			return logErrorAndReturnWithExitCode(
+				ctx,
+				errors.Errorf("commands '%v' are not running but there is a record of commands '%v'"+
+					"having been started", notRunningCmdNames, serviceStatus.writtenPids),
+				1,
+			)
+		}
 		return logErrorAndReturnWithExitCode(ctx, errors.Errorf("commands '%v' are not running",
-			notRunningCmdNames), 1)
+			notRunningCmdNames), 3)
 	}
 	return nil
 }

@@ -16,34 +16,34 @@ package integration_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
+	"time"
+
 	"github.com/palantir/godel/pkg/products/v2/products"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/palantir/go-java-launcher/init/lib"
-	"gopkg.in/validator.v2"
-	"github.com/stretchr/testify/assert"
-	"time"
-	"fmt"
 	"github.com/palantir/go-java-launcher/launchlib"
-	"strconv"
-	"sort"
 )
 
 const (
 	launcherStaticFile = "service/bin/launcher-static.yml"
 	launcherCustomFile = "var/conf/launcher-custom.yml"
-	logDir = "var/log"
-	outputLogFile = "startup.log"
+	logDir             = "var/log"
+	outputLogFile      = "startup.log"
+	pidfile            = "var/run/pids.yml"
 )
 
 var staticSingle, _, _ = launchlib.GetConfigsFromFiles("testdata/launcher-static.yml", "testdata/launcher-custom.yml",
@@ -62,7 +62,11 @@ var multiProcessPrimaryName = staticMulti.ServiceName
 var primaryOutputFile = filepath.Join(logDir, outputLogFile)
 var subProcessOutputFile = fmt.Sprintf(filepath.Join(logDir, "%s-%s"), multiProcessSubProcessName, outputLogFile)
 
-var files = []string{launcherStaticFile, launcherCustomFile, primaryOutputFile, lib.Pidfile}
+var files = []string{launcherStaticFile, launcherCustomFile, primaryOutputFile, pidfile}
+
+type servicePids struct {
+	Pids map[string]int `yaml:"pids"`
+}
 
 func setupBadConfig(t *testing.T) {
 	setup(t)
@@ -100,13 +104,13 @@ func teardown(t *testing.T) {
 }
 
 /*
- * Each test for init start and init status tests what happens given a prior state. Prior states are defined by a triple
+ * Each test tests what happens given a prior state. Prior states for 'start' and 'status' are defined by a triple
  * denoting the number of the following items: (number of commands configured, number of pids written to the pidfile,
- * number of processes running).
+ * number of processes running). For (a, b, c), only a >= b >= c is a valid input.
  */
 
 /*
- * In these tests, init start should exit 1.
+ * In these tests, start should exit 1.
  */
 
 // (0, 0, 0)
@@ -132,7 +136,7 @@ func TestInitStart_BadConfig(t *testing.T) {
 }
 
 /*
- * In these tests, init start should exit 0 and do nothing.
+ * In these tests, start should exit 0 and do nothing.
  */
 
 // (1, 1, 1)
@@ -171,10 +175,9 @@ func TestInitStart_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 	assert.Empty(t, stderr)
 }
 
-
 /*
- * In these tests, init start should actually start something. Have to run all in the same test function since they all
- * need to have exclusive use of the process table.
+ * In these tests, start should actually start something. Have to run all in the same test function since they all need
+ * to have exclusive use of the process table.
  */
 func TestInitStart_Starts(t *testing.T) {
 	defer teardown(t)
@@ -362,7 +365,6 @@ func TestInitStart_Starts(t *testing.T) {
 
 	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
 }
 
 // (0, 0, 0)
@@ -372,7 +374,7 @@ func TestInitStatus_NoConfig(t *testing.T) {
 
 	exitCode, stderr := runInit(t, "status")
 
-	assert.Equal(t, 3, exitCode)
+	assert.Equal(t, 4, exitCode)
 	assert.Contains(t, stderr, "failed to determine service status")
 }
 
@@ -383,7 +385,7 @@ func TestInitStatus_BadConfig(t *testing.T) {
 
 	exitCode, stderr := runInit(t, "status")
 
-	assert.Equal(t, 3, exitCode)
+	assert.Equal(t, 4, exitCode)
 	assert.Contains(t, stderr, "failed to determine service status")
 }
 
@@ -395,7 +397,7 @@ func TestInitStatus_OneConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 3, exitCode)
-	assert.Contains(t, stderr, "failed to determine service status")
+	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
 }
 
 // (1, 1, 0)
@@ -430,7 +432,10 @@ func TestInitStatus_TwoConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 3, exitCode)
-	assert.Contains(t, stderr, "failed to determine service status")
+	assert.Contains(t, stderr, "commands")
+	assert.Contains(t, stderr, multiProcessPrimaryName)
+	assert.Contains(t, stderr, multiProcessSubProcessName)
+	assert.Contains(t, stderr, "are not running")
 }
 
 // (2, 1, 0)
@@ -504,10 +509,183 @@ func TestInitStatus_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 	assert.Empty(t, stderr)
 }
 
-// Prior states for init stop are defined by pairs of the following: (number of processes listed
+/*
+ * Prior states for stop are defined by pairs of the following: (number of processes written to the pidfile, number of
+ * processes running). As above, for (a, b), only a >= b is a valid input.
+ */
 
-// (0,
-//
+/*
+ * In these tests, stop should exit 0 and do nothing.
+ */
+
+// (0, 0)
+func TestInitStop_ZeroWrittenZeroRunning(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	exitCode, stderr := runInit(t, "stop")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	_, err := ioutil.ReadFile(pidfile)
+	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+}
+
+// (1, 0)
+func TestInitStop_OneWrittenZeroRunning(t *testing.T) {
+	setupSingleProcess(t)
+	defer teardown(t)
+
+	writePids(t, map[string]int{singleProcessPrimaryName: 99999})
+	exitCode, stderr := runInit(t, "stop")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	_, err := ioutil.ReadFile(pidfile)
+	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+}
+
+// (2, 0)
+func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+
+	writePids(t, map[string]int{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
+	exitCode, stderr := runInit(t, "stop")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	_, err := ioutil.ReadFile(pidfile)
+	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+}
+
+/*
+ * In these tests, stop should actually stop something. Have to run all in the same test function since they all need
+ * to have exclusive use of the process table.
+ */
+
+func TestInitStop_StopsOrWaits(t *testing.T) {
+	defer teardown(t)
+
+	// Stoppable processes:
+
+	// (1, 1)
+
+	setupSingleProcess(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	writePids(t, map[string]int{singleProcessPrimaryName: pgrepSinglePid(t, "sleep")})
+	exitCode, stderr := runInit(t, "stop")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	_, err := ioutil.ReadFile(pidfile)
+	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+
+	teardown(t)
+
+	// (2, 1)
+
+	setupMultiProcess(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	writePids(t, map[string]int{multiProcessPrimaryName: pgrepSinglePid(t, "sleep")})
+	exitCode, stderr = runInit(t, "stop")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	_, err = ioutil.ReadFile(pidfile)
+	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+
+	teardown(t)
+
+	// (2, 2)
+
+	setupMultiProcess(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+
+	pidsSlice := pgrepMultiPids(t, "sleep")
+	require.Len(t, pidsSlice, 2)
+	writePids(t, map[string]int{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
+	exitCode, stderr = runInit(t, "stop")
+
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	_, err = ioutil.ReadFile(pidfile)
+	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+
+	teardown(t)
+
+	// Unstoppable processes:
+
+	// (1, 1)
+	setupSingleProcess(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	pid := pgrepSinglePid(t, "sleep")
+	writePids(t, map[string]int{singleProcessPrimaryName: pid})
+	exitCode, stderr = runInit(t, "stop")
+
+	assert.Equal(t, 1, exitCode)
+	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
+		"to stop: processes with pids"))
+	assert.Contains(t, stderr, strconv.Itoa(pid))
+	// TODO
+	assert.Contains(t, stderr, "did not stop within 5 seconds")
+
+	pids := readPids(t)
+	require.Len(t, pids, 1)
+	assert.Contains(t, pids, singleProcessPrimaryName)
+
+	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	teardown(t)
+
+	// (2, 1)
+	setupMultiProcess(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	pid = pgrepSinglePid(t, "sleep")
+	writePids(t, map[string]int{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
+	exitCode, stderr = runInit(t, "stop")
+
+	assert.Equal(t, 1, exitCode)
+	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
+		"to stop: processes with pids"))
+	assert.Contains(t, stderr, strconv.Itoa(pid))
+	// TODO
+	assert.Contains(t, stderr, "did not stop within 5 seconds")
+
+	pids = readPids(t)
+	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	teardown(t)
+
+	// (2, 2)
+	setupMultiProcess(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	pidsSlice = pgrepMultiPids(t, "sleep")
+	writePids(t, map[string]int{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
+	exitCode, stderr = runInit(t, "stop")
+
+	assert.Equal(t, 1, exitCode)
+	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
+		"to stop: processes with pids"))
+	assert.Contains(t, stderr, strconv.Itoa(pidsSlice[0]))
+	assert.Contains(t, stderr, strconv.Itoa(pidsSlice[1]))
+	// TODO
+	assert.Contains(t, stderr, "did not stop within 5 seconds")
+
+	pids = readPids(t)
+	primary, _ := os.FindProcess(pids[multiProcessPrimaryName])
+	sidecar, _ := os.FindProcess(pids[multiProcessSubProcessName])
+	require.NoError(t, primary.Signal(syscall.SIGKILL))
+	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
+}
 
 // Adapted from Stack Overflow: http://stackoverflow.com/questions/10385551/get-exit-code-go
 func runInit(t *testing.T, args ...string) (int, string) {
@@ -543,26 +721,25 @@ func runInit(t *testing.T, args ...string) (int, string) {
 }
 
 func writePids(t *testing.T, pids map[string]int) {
-	servicePids := lib.ServicePids{Pids: make(map[string]int)}
+	servicePids := servicePids{Pids: make(map[string]int)}
 	for name, pid := range pids {
 		servicePids.Pids[name] = pid
 	}
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	require.NoError(t, err)
-	require.NoError(t, ioutil.WriteFile(lib.Pidfile, servicePidsBytes, 0666))
+	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))
 }
 
 func readPids(t *testing.T) map[string]int {
-	pidfileBytes, err := ioutil.ReadFile(lib.Pidfile)
+	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	require.NoError(t, err)
 	if err != nil && !os.IsNotExist(err) {
 		require.Fail(t, "failed to read pidfile")
 	} else if os.IsNotExist(err) {
 		return map[string]int{}
 	}
-	var servicePids lib.ServicePids
+	var servicePids servicePids
 	require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
-	require.NoError(t, validator.Validate(servicePids))
 	return servicePids.Pids
 }
 

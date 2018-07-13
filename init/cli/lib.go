@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package lib
+package cli
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -22,38 +23,38 @@ import (
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-	"gopkg.in/validator.v2"
 	"gopkg.in/yaml.v2"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
 const (
-	OutputFileFlag = os.O_WRONLY | os.O_APPEND | os.O_CREATE
-	OutputFileMode = 0666
+	outputFileFlag = os.O_WRONLY | os.O_APPEND | os.O_CREATE
+	outputFileMode = 0666
 )
 
 var (
 	launcherStaticFile = filepath.Join("service", "bin", "launcher-static.yml")
 	launcherCustomFile = filepath.Join("var", "conf", "launcher-custom.yml")
-	Pidfile            = filepath.Join("var", "run", "pids.yml")
+	pidfile            = filepath.Join("var", "run", "Pids.yml")
 )
 
-type ServicePids struct {
-	Pids map[string]int `yaml:"pids" validate:"nonzero"`
+type servicePids struct {
+	Pids map[string]int `yaml:"pids"`
 }
 
-type ServiceStatus struct {
-	RunningProcs   map[string]*os.Process
-	NotRunningCmds map[string]launchlib.CmdWithOutputFileName
+type serviceStatus struct {
+	notRunningCmds map[string]launchlib.CmdWithOutputFileName
+	writtenPids    map[string]int
+	runningProcs   map[string]*os.Process
 }
 
-func GetServiceStatus(ctx cli.Context) (*ServiceStatus, error) {
+func getServiceStatus(ctx cli.Context) (*serviceStatus, error) {
 	cmds, err := getConfiguredCommands(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get commands from static and custom configuration files")
 	}
-	runningProcs, err := GetRunningProcs()
+	writtenPids, runningProcs, err := getPidfileInfo()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine running processes")
 	}
@@ -63,24 +64,20 @@ func GetServiceStatus(ctx cli.Context) (*ServiceStatus, error) {
 			notRunningCmds[name] = cmd
 		}
 	}
-	return &ServiceStatus{runningProcs, notRunningCmds}, nil
+	return &serviceStatus{notRunningCmds, writtenPids, runningProcs}, nil
 }
 
-func GetRunningProcs() (map[string]*os.Process, error) {
-	pidfileBytes, err := ioutil.ReadFile(Pidfile)
+func getPidfileInfo() (map[string]int, map[string]*os.Process, error) {
+	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	if err != nil && !os.IsNotExist(err) {
-		return nil, errors.Wrap(err, "failed to read pidfile")
+		return nil, nil, errors.Wrap(err, "failed to read pidfile")
 	} else if os.IsNotExist(err) {
-		return map[string]*os.Process{}, nil
+		return map[string]int{}, map[string]*os.Process{}, nil
 	}
-	var servicePids ServicePids
+	var servicePids servicePids
 	if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {
-		return nil, errors.Wrap(err, "failed to deserialize pidfile")
+		return nil, nil, errors.Wrap(err, "failed to deserialize pidfile")
 	}
-	if err := validator.Validate(servicePids); err != nil {
-		return nil, errors.Wrap(err, "failed to deserialize pidfile")
-	}
-
 	runningProcs := make(map[string]*os.Process)
 	for name, pid := range servicePids.Pids {
 		running, proc := isPidRunning(pid)
@@ -88,7 +85,7 @@ func GetRunningProcs() (map[string]*os.Process, error) {
 			runningProcs[name] = proc
 		}
 	}
-	return runningProcs, nil
+	return servicePids.Pids, runningProcs, nil
 }
 
 func getConfiguredCommands(ctx cli.Context) (cmds map[string]launchlib.CmdWithOutputFileName, rErr error) {
@@ -112,13 +109,19 @@ func getConfiguredCommands(ctx cli.Context) (cmds map[string]launchlib.CmdWithOu
 func isPidRunning(pid int) (bool, *os.Process) {
 	// Docs say FindProcess always succeeds on Unix.
 	proc, _ := os.FindProcess(pid)
-	if IsProcRunning(proc) {
+	if isProcRunning(proc) {
 		return true, proc
 	}
 	return false, nil
 }
 
-func IsProcRunning(proc *os.Process) bool {
+func isProcRunning(proc *os.Process) bool {
 	// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
 	return proc.Signal(syscall.Signal(0)) == nil
+}
+
+func logErrorAndReturnWithExitCode(ctx cli.Context, err error, exitCode int) cli.ExitCoder {
+	// We still want to write the error to stderr if we can't write it to the startup log file.
+	_, _ = fmt.Println(ctx.App.Stdout, err)
+	return cli.WithExitCode(exitCode, err)
 }

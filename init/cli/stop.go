@@ -23,7 +23,6 @@ import (
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
-	"github.com/palantir/go-java-launcher/init/lib"
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
@@ -37,7 +36,7 @@ stderr and var/log/startup.log. Waits for at least 240 seconds for any processes
 }
 
 func stop(ctx cli.Context) (rErr error) {
-	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, lib.OutputFileFlag, lib.OutputFileMode)
+	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
 	if err != nil {
 		return cli.WithExitCode(1, errors.Errorf("failed to create primary output file: %s",
 			launchlib.PrimaryOutputFile))
@@ -50,7 +49,7 @@ func stop(ctx cli.Context) (rErr error) {
 	}()
 	ctx.App.Stdout = outputFile
 
-	runningProcs, err := lib.GetRunningProcs()
+	_, runningProcs, err := getPidfileInfo()
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
 	}
@@ -72,8 +71,8 @@ func stopService(procs map[string]*os.Process) error {
 		return errors.Wrap(err, "failed to stop at least one process")
 	}
 
-	if err := os.Remove(lib.Pidfile); err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, "failed to remove Pidfile")
+	if err := os.Remove(pidfile); err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to remove pidfile")
 	}
 
 	return nil
@@ -91,7 +90,7 @@ func waitForServiceToStop(procs map[string]*os.Process) error {
 		select {
 		case <-ticker.C:
 			for name, remainingProc := range procs {
-				if !lib.IsProcRunning(remainingProc) {
+				if !isProcRunning(remainingProc) {
 					delete(procs, name)
 				}
 			}

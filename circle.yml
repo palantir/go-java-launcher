@@ -43,7 +43,7 @@ test:
     - mkdir -p "$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME"
     - cd "$GO_PROJECT_SRC_PATH" && ./godelw verify --apply=false --tags none --junit-output="$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME/$CIRCLE_PROJECT_REPONAME-tests.xml"
     - mkdir -p "$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME-integration"
-    - cd "$GO_PROJECT_SRC_PATH" && ./godelw test --tags=integration --junit-output="$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME/$CIRCLE_PROJECT_REPONAME-integration.xml"
+    - cd "$GO_PROJECT_SRC_PATH" && ./godelw test --tags=integration --junit-output="$CIRCLE_TEST_REPORTS/$CIRCLE_PROJECT_REPONAME/$CIRCLE_PROJECT_REPONAME-integration.xml" -- -timeout 20m
     - cd "$GO_PROJECT_SRC_PATH" && ./godelw dist
 
 deployment:

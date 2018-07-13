@@ -42,7 +42,7 @@ func start(ctx cli.Context) (rErr error) {
 		return logErrorAndReturnWithExitCode(ctx,
 			errors.Wrap(err, "failed to determine service status to determine what commands to run"), 1)
 	}
-	servicePids, err := startService(serviceStatus.notRunningCmds)
+	servicePids, err := startService(ctx, serviceStatus.notRunningCmds)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to start service"), 1)
 	}
@@ -56,10 +56,10 @@ func start(ctx cli.Context) (rErr error) {
 	return nil
 }
 
-func startService(notRunningCmds map[string]launchlib.CmdWithOutputFileName) (servicePids, error) {
+func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithOutputFileName) (servicePids, error) {
 	servicePids := servicePids{}
 	for name, cmd := range notRunningCmds {
-		if err := startCommand(cmd); err != nil {
+		if err := startCommand(ctx, cmd); err != nil {
 			return nil, errors.Wrapf(err, "failed to start command '%s'", name)
 		}
 		servicePids[name] = cmd.Cmd.Process.Pid

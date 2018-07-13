@@ -632,8 +632,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
 		"to stop: processes with pids"))
 	assert.Contains(t, stderr, strconv.Itoa(pid))
-	// TODO
-	assert.Contains(t, stderr, "did not stop within 5 seconds")
+	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
 	pids := readPids(t)
 	require.Len(t, pids, 1)
@@ -655,8 +654,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
 		"to stop: processes with pids"))
 	assert.Contains(t, stderr, strconv.Itoa(pid))
-	// TODO
-	assert.Contains(t, stderr, "did not stop within 5 seconds")
+	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
 	pids = readPids(t)
 	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
@@ -677,8 +675,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 		"to stop: processes with pids"))
 	assert.Contains(t, stderr, strconv.Itoa(pidsSlice[0]))
 	assert.Contains(t, stderr, strconv.Itoa(pidsSlice[1]))
-	// TODO
-	assert.Contains(t, stderr, "did not stop within 5 seconds")
+	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
 	pids = readPids(t)
 	primary, _ := os.FindProcess(pids[multiProcessPrimaryName])

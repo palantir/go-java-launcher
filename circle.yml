@@ -31,6 +31,7 @@ dependencies:
     - mkdir -p "$GOPATH/src/$IMPORT_PATH"
     - rsync -az --delete ./ "$GOPATH/src/$IMPORT_PATH/"
     - cd "$GO_PROJECT_SRC_PATH" && ./godelw version
+      timeout: 1200
   cache_directories:
     - ~/.godel
     - ~/download

@@ -15,6 +15,7 @@
 package cli
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -66,14 +67,14 @@ func startService(notRunningCmds map[string]launchlib.CmdWithOutputFileName) (se
 	return servicePids, nil
 }
 
-func startCommand(cmd launchlib.CmdWithOutputFileName) (rErr error) {
+func startCommand(ctx cli.Context, cmd launchlib.CmdWithOutputFileName) error {
 	stdout, err := os.OpenFile(cmd.OutputFileName, outputFileFlag, outputFileMode)
 	if err != nil {
-		return errors.Wrap(err, "failed to open output file: "+cmd.OutputFileName)
+		return errors.Wrapf(err, "failed to open output file: %s", cmd.OutputFileName)
 	}
 	defer func() {
-		if cErr := stdout.Close(); rErr == nil && cErr != nil {
-			rErr = errors.Wrap(err, "failed to close output file: "+cmd.OutputFileName)
+		if cErr := stdout.Close(); cErr != nil {
+			fmt.Fprintf(ctx.App.Stdout, "failed to close output file: %s", cmd.OutputFileName)
 		}
 	}()
 	cmd.Cmd.Stdout = stdout

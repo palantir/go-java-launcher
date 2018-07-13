@@ -49,7 +49,6 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 		SubProcs: make(map[string]CmdWithOutputFileName),
 	}
 
-	var err error
 	primaryCmd, err := compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig,
 		stdout)
 	if err != nil {
@@ -57,29 +56,39 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 	}
 	serviceCmds.Primary = CmdWithOutputFileName{Cmd: primaryCmd, OutputFileName: PrimaryOutputFile}
 	for name, subProcStatic := range staticConfig.SubProcesses {
-		subProcCustom, ok := customConfig.SubProcesses[name]
-		if !ok {
-			return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
-		}
-		subProcOutputFileName := fmt.Sprintf(SubProcessOutputFileFormat, name)
-		subProcStdout, err := os.Create(subProcOutputFileName)
+		subProcCmd, err := compileSubProcCmdWithOutputFile(name, subProcStatic, customConfig.SubProcesses)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create subProcess output file: %s",
-				subProcOutputFileName)
+			return nil, errors.Wrapf(err, "failed to compile command with output file for subProcess %s",
+				name)
 		}
-		defer func() {
-			if cErr := subProcStdout.Close(); rErr == nil && cErr != nil {
-				rErr = errors.Wrapf(err, "failed to close subProcess output file: %s",
-					subProcOutputFileName)
-			}
-		}()
-		subProc, err := compileCmdFromConfig(&subProcStatic, &subProcCustom, subProcStdout)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to compile command for subProcess config '%s'", name)
-		}
-		serviceCmds.SubProcs[name] = CmdWithOutputFileName{Cmd: subProc, OutputFileName: subProcOutputFileName}
+		serviceCmds.SubProcs[name] = *subProcCmd
 	}
 	return serviceCmds, nil
+}
+
+func compileSubProcCmdWithOutputFile(name string, subProcStatic StaticLauncherConfig,
+	subProcCustoms map[string]CustomLauncherConfig) (subProcCmd *CmdWithOutputFileName, rErr error) {
+	subProcCustom, ok := subProcCustoms[name]
+	if !ok {
+		return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
+	}
+	subProcOutputFileName := fmt.Sprintf(SubProcessOutputFileFormat, name)
+	subProcStdout, err := os.Create(subProcOutputFileName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create subProcess output file: %s",
+			subProcOutputFileName)
+	}
+	defer func() {
+		if cErr := subProcStdout.Close(); rErr == nil && cErr != nil {
+			rErr = errors.Wrapf(err, "failed to close subProcess output file: %s",
+				subProcOutputFileName)
+		}
+	}()
+	cmd, err := compileCmdFromConfig(&subProcStatic, &subProcCustom, subProcStdout)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to compile command for subProcess config '%s'", name)
+	}
+	return &CmdWithOutputFileName{Cmd: cmd, OutputFileName: subProcOutputFileName}, nil
 }
 
 func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,

@@ -22,8 +22,6 @@ import (
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-
-	"github.com/palantir/go-java-launcher/launchlib"
 )
 
 var stopCliCommand = cli.Command{
@@ -32,23 +30,10 @@ var stopCliCommand = cli.Command{
 Ensures the service defined by the static and custom configurations are service/bin/launcher-static.yml and
 var/conf/launcher-custom.yml is not running. If successful, exits 0, otherwise exits 1 and writes an error message to
 stderr and var/log/startup.log. Waits for at least 240 seconds for any processes to stop.`,
-	Action: stop,
+	Action: executeWithContext(stop),
 }
 
 func stop(ctx cli.Context) (rErr error) {
-	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
-	if err != nil {
-		return cli.WithExitCode(1, errors.Errorf("failed to create primary output file: %s",
-			launchlib.PrimaryOutputFile))
-	}
-	defer func() {
-		if cErr := outputFile.Close(); rErr == nil && cErr != nil {
-			rErr = cli.WithExitCode(1, errors.Errorf("failed to close primary output file: %s",
-				launchlib.PrimaryOutputFile))
-		}
-	}()
-	ctx.App.Stdout = outputFile
-
 	_, runningProcs, err := getPidfileInfo()
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)

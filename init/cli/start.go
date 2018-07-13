@@ -32,23 +32,10 @@ Ensures the service defined by the static and custom configurations at service/b
 var/conf/launcher-custom.yml is running and its outputs are redirecting to var/log/startup.log and other
 var/log/${SUB_PROCESS}-startup.log files. If successful, exits 0, otherwise exits 1 and writes an error message to
 stderr and var/log/startup.log.`,
-	Action: start,
+	Action: executeWithContext(start),
 }
 
 func start(ctx cli.Context) (rErr error) {
-	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
-	if err != nil {
-		return cli.WithExitCode(1, errors.Errorf("failed to create primary output file: %s",
-			launchlib.PrimaryOutputFile))
-	}
-	defer func() {
-		if cErr := outputFile.Close(); rErr == nil && cErr != nil {
-			rErr = cli.WithExitCode(1, errors.Errorf("failed to close primary output file: %s",
-				launchlib.PrimaryOutputFile))
-		}
-	}()
-	ctx.App.Stdout = outputFile
-
 	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx,

@@ -15,7 +15,6 @@
 package cli
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"syscall"
@@ -77,15 +76,14 @@ func getPidfileInfo() (servicePids, map[string]*os.Process, error) {
 	}
 	runningProcs := make(map[string]*os.Process)
 	for name, pid := range servicePids {
-		running, proc := isPidRunning(pid)
-		if running {
+		if running, proc := isPidRunning(pid); running {
 			runningProcs[name] = proc
 		}
 	}
 	return servicePids, runningProcs, nil
 }
 
-func getConfiguredCommands(ctx cli.Context) (cmds map[string]launchlib.CmdWithOutputFileName, rErr error) {
+func getConfiguredCommands(ctx cli.Context) (map[string]launchlib.CmdWithOutputFileName, error) {
 	staticConfig, customConfig, err := launchlib.GetConfigsFromFiles(launcherStaticFile, launcherCustomFile,
 		ctx.App.Stdout)
 	if err != nil {
@@ -95,7 +93,7 @@ func getConfiguredCommands(ctx cli.Context) (cmds map[string]launchlib.CmdWithOu
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
-	cmds = make(map[string]launchlib.CmdWithOutputFileName)
+	cmds := make(map[string]launchlib.CmdWithOutputFileName)
 	cmds[staticConfig.ServiceName] = serviceCmds.Primary
 	for name, subProc := range serviceCmds.SubProcs {
 		cmds[name] = subProc
@@ -115,10 +113,4 @@ func isPidRunning(pid int) (bool, *os.Process) {
 func isProcRunning(proc *os.Process) bool {
 	// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
 	return proc.Signal(syscall.Signal(0)) == nil
-}
-
-func logErrorAndReturnWithExitCode(ctx cli.Context, err error, exitCode int) cli.ExitCoder {
-	// We still want to write the error to stderr if we can't write it to the startup log file.
-	_, _ = fmt.Println(ctx.App.Stdout, err)
-	return cli.WithExitCode(exitCode, err)
 }

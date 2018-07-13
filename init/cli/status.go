@@ -15,12 +15,8 @@
 package cli
 
 import (
-	"os"
-
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-
-	"github.com/palantir/go-java-launcher/launchlib"
 )
 
 var statusCliCommand = cli.Command{
@@ -34,23 +30,10 @@ Exits:
 - 3 if no processes are running and there is no record of processes having been started
 - 4 if the status cannot be determined
 If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
-	Action: status,
+	Action: executeWithContext(status),
 }
 
-func status(ctx cli.Context) (rErr error) {
-	outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
-	if err != nil {
-		return cli.WithExitCode(4, errors.Errorf("failed to create primary output file: %s",
-			launchlib.PrimaryOutputFile))
-	}
-	defer func() {
-		if cErr := outputFile.Close(); rErr == nil && cErr != nil {
-			rErr = cli.WithExitCode(4, errors.Errorf("failed to close primary output file: %s",
-				launchlib.PrimaryOutputFile))
-		}
-	}()
-	ctx.App.Stdout = outputFile
-
+func status(ctx cli.Context) error {
 	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 4)

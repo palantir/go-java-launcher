@@ -38,13 +38,11 @@ var (
 	pidfile            = "var/run/pids.yml"
 )
 
-type servicePids struct {
-	Pids map[string]int `yaml:"pids"`
-}
+type servicePids map[string]int
 
 type serviceStatus struct {
 	notRunningCmds map[string]launchlib.CmdWithOutputFileName
-	writtenPids    map[string]int
+	writtenPids    servicePids
 	runningProcs   map[string]*os.Process
 }
 
@@ -66,25 +64,25 @@ func getServiceStatus(ctx cli.Context) (*serviceStatus, error) {
 	return &serviceStatus{notRunningCmds, writtenPids, runningProcs}, nil
 }
 
-func getPidfileInfo() (map[string]int, map[string]*os.Process, error) {
+func getPidfileInfo() (servicePids, map[string]*os.Process, error) {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, nil, errors.Wrap(err, "failed to read pidfile")
 	} else if os.IsNotExist(err) {
-		return map[string]int{}, map[string]*os.Process{}, nil
+		return servicePids{}, map[string]*os.Process{}, nil
 	}
 	var servicePids servicePids
 	if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to deserialize pidfile")
 	}
 	runningProcs := make(map[string]*os.Process)
-	for name, pid := range servicePids.Pids {
+	for name, pid := range servicePids {
 		running, proc := isPidRunning(pid)
 		if running {
 			runningProcs[name] = proc
 		}
 	}
-	return servicePids.Pids, runningProcs, nil
+	return servicePids, runningProcs, nil
 }
 
 func getConfiguredCommands(ctx cli.Context) (cmds map[string]launchlib.CmdWithOutputFileName, rErr error) {

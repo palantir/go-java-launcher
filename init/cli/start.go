@@ -54,29 +54,29 @@ func start(ctx cli.Context) (rErr error) {
 		return logErrorAndReturnWithExitCode(ctx,
 			errors.Wrap(err, "failed to determine service status to determine what commands to run"), 1)
 	}
-	pids, err := startService(serviceStatus.notRunningCmds)
+	servicePids, err := startService(serviceStatus.notRunningCmds)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to start service"), 1)
 	}
 	for name, runningProc := range serviceStatus.runningProcs {
-		pids[name] = runningProc.Pid
+		servicePids[name] = runningProc.Pid
 	}
-	if err := writePids(pids); err != nil {
+	if err := writePids(servicePids); err != nil {
 		return logErrorAndReturnWithExitCode(ctx,
 			errors.Wrap(err, "failed to record pids when starting service"), 1)
 	}
 	return nil
 }
 
-func startService(notRunningCmds map[string]launchlib.CmdWithOutputFileName) (map[string]int, error) {
-	pids := make(map[string]int)
+func startService(notRunningCmds map[string]launchlib.CmdWithOutputFileName) (servicePids, error) {
+	servicePids := servicePids{}
 	for name, cmd := range notRunningCmds {
 		if err := startCommand(cmd); err != nil {
 			return nil, errors.Wrapf(err, "failed to start command '%s'", name)
 		}
-		pids[name] = cmd.Cmd.Process.Pid
+		servicePids[name] = cmd.Cmd.Process.Pid
 	}
-	return pids, nil
+	return servicePids, nil
 }
 
 func startCommand(cmd launchlib.CmdWithOutputFileName) (rErr error) {
@@ -97,11 +97,7 @@ func startCommand(cmd launchlib.CmdWithOutputFileName) (rErr error) {
 	return nil
 }
 
-func writePids(pids map[string]int) error {
-	servicePids := servicePids{Pids: make(map[string]int)}
-	for name, pid := range pids {
-		servicePids.Pids[name] = pid
-	}
+func writePids(servicePids servicePids) error {
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	if err != nil {
 		return errors.Wrap(err, "failed to serialize pidfile")

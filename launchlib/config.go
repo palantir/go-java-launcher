@@ -50,7 +50,6 @@ type JavaConfig struct {
 type StaticLauncherConfig struct {
 	TypedConfig `yaml:",inline"`
 	JavaConfig  `yaml:",inline"`
-	ServiceName string            `yaml:"serviceName"`
 	Env         map[string]string `yaml:"env"`
 	Executable  string            `yaml:"executable,omitempty"`
 	Args        []string          `yaml:"args"`
@@ -59,6 +58,7 @@ type StaticLauncherConfig struct {
 
 type PrimaryStaticLauncherConfig struct {
 	VersionedConfig      `yaml:",inline"`
+	ServiceName          string `yaml:"serviceName"`
 	StaticLauncherConfig `yaml:",inline"`
 	SubProcesses         map[string]StaticLauncherConfig `yaml:"subProcesses"`
 }

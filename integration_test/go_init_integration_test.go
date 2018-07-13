@@ -64,9 +64,7 @@ var subProcessOutputFile = fmt.Sprintf(filepath.Join(logDir, "%s-%s"), multiProc
 
 var files = []string{launcherStaticFile, launcherCustomFile, primaryOutputFile, pidfile}
 
-type servicePids struct {
-	Pids map[string]int `yaml:"pids"`
-}
+type servicePids map[string]int
 
 func setupBadConfig(t *testing.T) {
 	setup(t)
@@ -164,7 +162,7 @@ func TestInitStart_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 	defer func() {
 		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
 	}()
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
 	exitCode, stderr := runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
@@ -209,7 +207,7 @@ func TestInitStart_Starts(t *testing.T) {
 
 	setupSingleProcess(t)
 
-	writePids(t, map[string]int{singleProcessPrimaryName: 99999})
+	writePids(t, servicePids{singleProcessPrimaryName: 99999})
 	exitCode, stderr = runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
@@ -262,7 +260,7 @@ func TestInitStart_Starts(t *testing.T) {
 
 	setupMultiProcess(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: 99999})
 	exitCode, stderr = runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
@@ -292,7 +290,7 @@ func TestInitStart_Starts(t *testing.T) {
 	// (2, 1, 1)
 	setupMultiProcess(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid()})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
 	exitCode, stderr = runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
@@ -316,7 +314,7 @@ func TestInitStart_Starts(t *testing.T) {
 
 	setupMultiProcess(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
 	exitCode, stderr = runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
@@ -347,7 +345,7 @@ func TestInitStart_Starts(t *testing.T) {
 
 	setupMultiProcess(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
 	exitCode, stderr = runInit(t, "start")
 
 	assert.Equal(t, 0, exitCode)
@@ -405,7 +403,7 @@ func TestInitStatus_OneConfiguredOneWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{singleProcessPrimaryName: 99999})
+	writePids(t, servicePids{singleProcessPrimaryName: 99999})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
@@ -417,7 +415,7 @@ func TestInitStatus_OneConfiguredOneWrittenOneRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{singleProcessPrimaryName: os.Getpid()})
+	writePids(t, servicePids{singleProcessPrimaryName: os.Getpid()})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 0, exitCode)
@@ -443,7 +441,7 @@ func TestInitStatus_TwoConfiguredOneWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: 99999})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
@@ -458,7 +456,7 @@ func TestInitStatus_TwoConfiguredOneWrittenOneRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid()})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
@@ -470,7 +468,7 @@ func TestInitStatus_TwoConfiguredTwoWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
@@ -485,7 +483,7 @@ func TestInitStatus_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 1, exitCode)
@@ -502,7 +500,7 @@ func TestInitStatus_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 	defer func() {
 		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
 	}()
-	writePids(t, map[string]int{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
 	exitCode, stderr := runInit(t, "status")
 
 	assert.Equal(t, 0, exitCode)
@@ -536,7 +534,7 @@ func TestInitStop_OneWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{singleProcessPrimaryName: 99999})
+	writePids(t, servicePids{singleProcessPrimaryName: 99999})
 	exitCode, stderr := runInit(t, "stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -550,7 +548,7 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	writePids(t, map[string]int{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
 	exitCode, stderr := runInit(t, "stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -574,7 +572,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupSingleProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	writePids(t, map[string]int{singleProcessPrimaryName: pgrepSinglePid(t, "sleep")})
+	writePids(t, servicePids{singleProcessPrimaryName: pgrepSinglePid(t, "sleep")})
 	exitCode, stderr := runInit(t, "stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -589,7 +587,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupMultiProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	writePids(t, map[string]int{multiProcessPrimaryName: pgrepSinglePid(t, "sleep")})
+	writePids(t, servicePids{multiProcessPrimaryName: pgrepSinglePid(t, "sleep")})
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -608,7 +606,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	pidsSlice := pgrepMultiPids(t, "sleep")
 	require.Len(t, pidsSlice, 2)
-	writePids(t, map[string]int{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
+	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -625,7 +623,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	pid := pgrepSinglePid(t, "sleep")
-	writePids(t, map[string]int{singleProcessPrimaryName: pid})
+	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
@@ -647,7 +645,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	pid = pgrepSinglePid(t, "sleep")
-	writePids(t, map[string]int{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
+	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
@@ -667,7 +665,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	pidsSlice = pgrepMultiPids(t, "sleep")
-	writePids(t, map[string]int{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
+	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
 	exitCode, stderr = runInit(t, "stop")
 
 	assert.Equal(t, 1, exitCode)
@@ -717,27 +715,27 @@ func runInit(t *testing.T, args ...string) (int, string) {
 	}
 }
 
-func writePids(t *testing.T, pids map[string]int) {
-	servicePids := servicePids{Pids: make(map[string]int)}
+func writePids(t *testing.T, pids servicePids) {
+	servicePids := servicePids{}
 	for name, pid := range pids {
-		servicePids.Pids[name] = pid
+		servicePids[name] = pid
 	}
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	require.NoError(t, err)
 	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))
 }
 
-func readPids(t *testing.T) map[string]int {
+func readPids(t *testing.T) servicePids {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	require.NoError(t, err)
 	if err != nil && !os.IsNotExist(err) {
 		require.Fail(t, "failed to read pidfile")
 	} else if os.IsNotExist(err) {
-		return map[string]int{}
+		return servicePids{}
 	}
 	var servicePids servicePids
 	require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
-	return servicePids.Pids
+	return servicePids
 }
 
 func pgrepSinglePid(t *testing.T, key string) int {

@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"syscall"
 
 	"github.com/palantir/pkg/cli"
@@ -34,9 +33,9 @@ const (
 )
 
 var (
-	launcherStaticFile = filepath.Join("service", "bin", "launcher-static.yml")
-	launcherCustomFile = filepath.Join("var", "conf", "launcher-custom.yml")
-	pidfile            = filepath.Join("var", "run", "Pids.yml")
+	launcherStaticFile = "service/bin/launcher-static.yml"
+	launcherCustomFile = "var/conf/launcher-custom.yml"
+	pidfile            = "var/run/pids.yml"
 )
 
 type servicePids struct {

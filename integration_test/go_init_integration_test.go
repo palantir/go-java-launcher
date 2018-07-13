@@ -619,6 +619,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	// Unstoppable processes:
 
 	// (1, 1)
+	println("testing one (running) unstoppable process written")
 	setupSingleProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
@@ -641,6 +642,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	teardown(t)
 
 	// (2, 1)
+	println("testing one (running) unstoppable process written, one dead process written")
 	setupMultiProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
@@ -660,6 +662,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	teardown(t)
 
 	// (2, 2)
+	println("testing two (running) unstoppable processes written")
 	setupMultiProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())

@@ -33,13 +33,11 @@ func App() *cli.App {
 	return app
 }
 
-func executeWithContext(action func(cli.Context) error) func(cli.Context) error {
+func executeWithContext(action func(cli.Context) error, fileFlag int) func(cli.Context) error {
 	return func(ctx cli.Context) (rErr error) {
-		outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, outputFileFlag, outputFileMode)
-		if err != nil {
-			// Logging is secondary to actually starting the service, so just log to stdout and move on.
-			ctx.App.Stdout = os.Stdout
-		} else {
+		// Fall back to default stdout if error opening log file
+		if outputFile, err :=
+			os.OpenFile(launchlib.PrimaryOutputFile, fileFlag, outputFileMode); err == nil {
 			defer func() {
 				if cErr := outputFile.Close(); rErr == nil && cErr != nil {
 					/*
@@ -49,8 +47,8 @@ func executeWithContext(action func(cli.Context) error) func(cli.Context) error 
 					 * 2. there's no standard exit code that specifies cli failure for all commands
 					 */
 					rErr = cli.WithExitCode(0,
-						errors.Errorf("failed to close primary output file: %s",
-							launchlib.PrimaryOutputFile))
+					errors.Errorf("failed to close primary output file: %s",
+					launchlib.PrimaryOutputFile))
 				}
 			}()
 			ctx.App.Stdout = outputFile

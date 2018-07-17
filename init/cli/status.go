@@ -30,7 +30,7 @@ Exits:
 - 3 if no processes are running and there is no record of processes having been started
 - 4 if the status cannot be determined
 If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
-	Action: executeWithContext(status),
+	Action: executeWithContext(status, appendOutputFileFlag),
 }
 
 func status(ctx cli.Context) error {

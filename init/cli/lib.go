@@ -27,8 +27,10 @@ import (
 )
 
 const (
-	outputFileFlag = os.O_WRONLY | os.O_APPEND | os.O_CREATE
-	outputFileMode = 0666
+	outputFileFlag	     = os.O_CREATE | os.O_WRONLY
+	truncOutputFileFlag  = outputFileFlag | os.O_TRUNC
+	appendOutputFileFlag = outputFileFlag | os.O_APPEND
+	outputFileMode       = 0666
 )
 
 var (

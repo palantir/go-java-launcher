@@ -50,6 +50,7 @@ args:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
+				ServiceName: "",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "java",
@@ -74,6 +75,7 @@ args:
 			data: `
 configType: executable
 configVersion: 1
+serviceName: foo
 executable: /usr/bin/postgres
 env:
   SOME_ENV_VAR: /etc/profile
@@ -86,6 +88,7 @@ args:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
+				ServiceName: "foo",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "executable",
@@ -122,6 +125,7 @@ subProcesses:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
+				ServiceName: "",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "executable",

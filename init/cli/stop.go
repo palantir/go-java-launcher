@@ -30,7 +30,7 @@ var stopCliCommand = cli.Command{
 Ensures the service defined by the static and custom configurations are service/bin/launcher-static.yml and
 var/conf/launcher-custom.yml is not running. If successful, exits 0, otherwise exits 1 and writes an error message to
 stderr and var/log/startup.log. Waits for at least 240 seconds for any processes to stop.`,
-	Action: executeWithContext(stop),
+	Action: executeWithContext(stop, appendOutputFileFlag),
 }
 
 func stop(ctx cli.Context) (rErr error) {

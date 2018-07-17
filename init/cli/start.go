@@ -33,7 +33,7 @@ Ensures the service defined by the static and custom configurations at service/b
 var/conf/launcher-custom.yml is running and its outputs are redirecting to var/log/startup.log and other
 var/log/${SUB_PROCESS}-startup.log files. If successful, exits 0, otherwise exits 1 and writes an error message to
 stderr and var/log/startup.log.`,
-	Action: executeWithContext(start),
+	Action: executeWithContext(start, truncOutputFileFlag),
 }
 
 func start(ctx cli.Context) (rErr error) {
@@ -68,7 +68,7 @@ func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithOu
 }
 
 func startCommand(ctx cli.Context, cmd launchlib.CmdWithOutputFileName) error {
-	stdout, err := os.OpenFile(cmd.OutputFileName, outputFileFlag, outputFileMode)
+	stdout, err := os.OpenFile(cmd.OutputFileName, appendOutputFileFlag, outputFileMode)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open output file: %s", cmd.OutputFileName)
 	}

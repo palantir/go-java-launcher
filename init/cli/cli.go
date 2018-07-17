@@ -47,8 +47,8 @@ func executeWithContext(action func(cli.Context) error, fileFlag int) func(cli.C
 					 * 2. there's no standard exit code that specifies cli failure for all commands
 					 */
 					rErr = cli.WithExitCode(0,
-					errors.Errorf("failed to close primary output file: %s",
-					launchlib.PrimaryOutputFile))
+						errors.Errorf("failed to close primary output file: %s",
+							launchlib.PrimaryOutputFile))
 				}
 			}()
 			ctx.App.Stdout = outputFile

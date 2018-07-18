@@ -62,7 +62,7 @@ var multiProcessPrimaryName = staticMulti.ServiceName
 var primaryOutputFile = filepath.Join(logDir, outputLogFile)
 var subProcessOutputFile = fmt.Sprintf(filepath.Join(logDir, "%s-%s"), multiProcessSubProcessName, outputLogFile)
 
-var files = []string{launcherStaticFile, launcherCustomFile, primaryOutputFile, pidfile}
+var files = []string{launcherStaticFile, launcherCustomFile}
 
 type servicePids map[string]int
 
@@ -91,7 +91,7 @@ func setup(t *testing.T) {
 		teardown(t)
 	}()
 	for _, file := range files {
-		require.NoError(t, os.MkdirAll(filepath.Dir(file), 0777))
+		require.NoError(t, os.MkdirAll(filepath.Dir(file), 0755))
 	}
 }
 
@@ -770,6 +770,7 @@ func writePids(t *testing.T, pids servicePids) {
 	}
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Dir(pidfile), 0755))
 	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))
 }
 

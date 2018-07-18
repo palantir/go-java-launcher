@@ -17,6 +17,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
@@ -36,23 +37,24 @@ func App() *cli.App {
 func executeWithContext(action func(cli.Context) error, fileFlag int) func(cli.Context) error {
 	return func(ctx cli.Context) (rErr error) {
 		// Fall back to default stdout if error opening log file
-		if outputFile, err :=
-			os.OpenFile(launchlib.PrimaryOutputFile, fileFlag, outputFileMode); err == nil {
-			defer func() {
-				if cErr := outputFile.Close(); rErr == nil && cErr != nil {
-					/*
-					 * Exit 0 and communicate "success with errors" because:
-					 * 1. although we failed to close the output file, we're a cli and the OS will
-					 *    close it for us momentarily
-					 * 2. there's no standard exit code that specifies cli failure for all commands
-					 */
-					rErr = cli.WithExitCode(0,
-						errors.Errorf("failed to close primary output file: %s",
-							launchlib.PrimaryOutputFile))
-				}
-			}()
-			ctx.App.Stdout = outputFile
+		if err := os.MkdirAll(filepath.Dir(launchlib.PrimaryOutputFile), 0755); err != nil {
+			return action(ctx)
 		}
+		outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, fileFlag, outputFileMode)
+		if err != nil {
+			return action(ctx)
+		}
+		defer func() {
+			if cErr := outputFile.Close(); rErr == nil && cErr != nil {
+				/*
+				 * Exit 0 and communicate "success with errors" because although we failed to close the
+				 * output file, we're a cli and the OS will close it for us momentarily
+				 */
+				rErr = cli.WithExitCode(0, errors.Errorf("failed to close primary output file: %s",
+					launchlib.PrimaryOutputFile))
+			}
+		}()
+		ctx.App.Stdout = outputFile
 		return action(ctx)
 	}
 }

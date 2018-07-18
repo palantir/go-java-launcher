@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
@@ -89,6 +90,9 @@ func writePids(servicePids servicePids) error {
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	if err != nil {
 		return errors.Wrap(err, "failed to serialize pidfile")
+	}
+	if err := os.MkdirAll(filepath.Dir(pidfile), 0755); err != nil {
+		return cli.WithExitCode(1, errors.Errorf("failed to mkdir for pidfile: %s", pidfile))
 	}
 	if err := ioutil.WriteFile(pidfile, servicePidsBytes, 0666); err != nil {
 		return errors.Wrap(err, "failed to write pidfile")

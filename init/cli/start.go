@@ -57,7 +57,7 @@ func start(ctx cli.Context) (rErr error) {
 	return nil
 }
 
-func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithOutputFileName) (servicePids, error) {
+func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithContext) (servicePids, error) {
 	servicePids := servicePids{}
 	for name, cmd := range notRunningCmds {
 		if err := startCommand(ctx, cmd); err != nil {
@@ -68,7 +68,10 @@ func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithOu
 	return servicePids, nil
 }
 
-func startCommand(ctx cli.Context, cmd launchlib.CmdWithOutputFileName) error {
+func startCommand(ctx cli.Context, cmd launchlib.CmdWithContext) error {
+	if err := launchlib.MkDirs(cmd.Dirs, ctx.App.Stdout); err != nil {
+		return errors.Wrap(err, "failed to create directories")
+	}
 	stdout, err := os.OpenFile(cmd.OutputFileName, appendOutputFileFlag, outputFileMode)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open output file: %s", cmd.OutputFileName)

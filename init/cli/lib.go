@@ -42,7 +42,7 @@ var (
 type servicePids map[string]int
 
 type serviceStatus struct {
-	notRunningCmds map[string]launchlib.CmdWithOutputFileName
+	notRunningCmds map[string]launchlib.CmdWithContext
 	writtenPids    servicePids
 	runningProcs   map[string]*os.Process
 }
@@ -56,7 +56,7 @@ func getServiceStatus(ctx cli.Context) (*serviceStatus, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine running processes")
 	}
-	notRunningCmds := make(map[string]launchlib.CmdWithOutputFileName)
+	notRunningCmds := make(map[string]launchlib.CmdWithContext)
 	for name, cmd := range cmds {
 		if _, ok := runningProcs[name]; !ok {
 			notRunningCmds[name] = cmd
@@ -85,7 +85,7 @@ func getPidfileInfo() (servicePids, map[string]*os.Process, error) {
 	return servicePids, runningProcs, nil
 }
 
-func getConfiguredCommands(ctx cli.Context) (map[string]launchlib.CmdWithOutputFileName, error) {
+func getConfiguredCommands(ctx cli.Context) (map[string]launchlib.CmdWithContext, error) {
 	staticConfig, customConfig, err := launchlib.GetConfigsFromFiles(launcherStaticFile, launcherCustomFile,
 		ctx.App.Stdout)
 	if err != nil {
@@ -95,7 +95,7 @@ func getConfiguredCommands(ctx cli.Context) (map[string]launchlib.CmdWithOutputF
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
-	cmds := make(map[string]launchlib.CmdWithOutputFileName)
+	cmds := make(map[string]launchlib.CmdWithContext)
 	cmds[staticConfig.ServiceName] = serviceCmds.Primary
 	for name, subProc := range serviceCmds.SubProcs {
 		cmds[name] = subProc

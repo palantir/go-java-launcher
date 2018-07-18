@@ -33,20 +33,21 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-type CmdWithOutputFileName struct {
+type CmdWithContext struct {
 	Cmd            *exec.Cmd
 	OutputFileName string
+	Dirs	       []string
 }
 
 type ServiceCmds struct {
-	Primary  CmdWithOutputFileName
-	SubProcs map[string]CmdWithOutputFileName
+	Primary  CmdWithContext
+	SubProcs map[string]CmdWithContext
 }
 
 func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig,
 	stdout io.Writer) (serviceCmds *ServiceCmds, rErr error) {
 	serviceCmds = &ServiceCmds{
-		SubProcs: make(map[string]CmdWithOutputFileName),
+		SubProcs: make(map[string]CmdWithContext),
 	}
 
 	primaryCmd, err := compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig,
@@ -54,7 +55,11 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile command for primary command")
 	}
-	serviceCmds.Primary = CmdWithOutputFileName{Cmd: primaryCmd, OutputFileName: PrimaryOutputFile}
+	serviceCmds.Primary = CmdWithContext{
+		Cmd: primaryCmd,
+		OutputFileName: PrimaryOutputFile,
+		Dirs: staticConfig.StaticLauncherConfig.Dirs,
+	}
 	for name, subProcStatic := range staticConfig.SubProcesses {
 		subProcCmd, err := compileSubProcCmdWithOutputFile(name, subProcStatic, customConfig.SubProcesses)
 		if err != nil {
@@ -67,7 +72,7 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 }
 
 func compileSubProcCmdWithOutputFile(name string, subProcStatic StaticLauncherConfig,
-	subProcCustoms map[string]CustomLauncherConfig) (subProcCmd *CmdWithOutputFileName, rErr error) {
+	subProcCustoms map[string]CustomLauncherConfig) (subProcCmd *CmdWithContext, rErr error) {
 	subProcCustom, ok := subProcCustoms[name]
 	if !ok {
 		return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
@@ -88,7 +93,7 @@ func compileSubProcCmdWithOutputFile(name string, subProcStatic StaticLauncherCo
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to compile command for subProcess config '%s'", name)
 	}
-	return &CmdWithOutputFileName{Cmd: cmd, OutputFileName: subProcOutputFileName}, nil
+	return &CmdWithContext{Cmd: cmd, OutputFileName: subProcOutputFileName, Dirs: subProcStatic.Dirs}, nil
 }
 
 func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,

@@ -107,7 +107,8 @@ func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
 
 	stringThatShouldDisappear := "this should disappear from the log file after starting"
 
-	ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0666)
+	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
+	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0666))
 	_, _ = runInit(t, "start")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
@@ -417,7 +418,8 @@ func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 	stringThatShouldRemain := "this should remain in the log file after running"
 
-	ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666)
+	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
+	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666))
 	_, _ = runInit(t, "status")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
@@ -574,7 +576,8 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 	stringThatShouldRemain := "this should remain in the log file after running"
 
-	ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666)
+	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
+	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666))
 	_, _ = runInit(t, "stop")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)

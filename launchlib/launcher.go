@@ -36,7 +36,7 @@ const (
 type CmdWithContext struct {
 	Cmd            *exec.Cmd
 	OutputFileName string
-	Dirs	       []string
+	Dirs           []string
 }
 
 type ServiceCmds struct {
@@ -56,9 +56,9 @@ func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConf
 		return nil, errors.Wrap(err, "failed to compile command for primary command")
 	}
 	serviceCmds.Primary = CmdWithContext{
-		Cmd: primaryCmd,
+		Cmd:            primaryCmd,
 		OutputFileName: PrimaryOutputFile,
-		Dirs: staticConfig.StaticLauncherConfig.Dirs,
+		Dirs:           staticConfig.StaticLauncherConfig.Dirs,
 	}
 	for name, subProcStatic := range staticConfig.SubProcesses {
 		subProcCmd, err := compileSubProcCmdWithOutputFile(name, subProcStatic, customConfig.SubProcesses)

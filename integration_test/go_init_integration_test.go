@@ -195,9 +195,10 @@ func TestInitStart_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 func TestInitStart_Starts(t *testing.T) {
 	defer teardown(t)
 
-	// (1, 0, 0)
+	// Creates dirs on startup
 
-	setupSingleProcess(t)
+	setup(t)
+	require.NoError(t, os.Link("testdata/launcher-static-with-dirs.yml", launcherStaticFile))
 
 	exitCode, stderr := runInit(t, "start")
 
@@ -209,12 +210,42 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
 	assert.Empty(t, stderr)
+	dir, err := os.Stat("foo")
+	assert.NoError(t, err)
+	assert.True(t, dir.IsDir())
+	dir, err = os.Stat("bar/baz")
+	assert.NoError(t, err)
+	assert.True(t, dir.IsDir())
+
+	require.NoError(t, os.RemoveAll("foo"))
+	require.NoError(t, os.RemoveAll("bar"))
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	// grep for testdata since it will be on the classpath
+	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[""])
+	proc, _ := os.FindProcess(pids[""])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	teardown(t)
+
+	// (1, 0, 0)
+
+	setupSingleProcess(t)
+
+	exitCode, stderr = runInit(t, "start")
+
+	assert.Equal(t, 0, exitCode)
+	time.Sleep(time.Second)
+	startupLogBytes, err = ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	startupLog = string(startupLogBytes)
+	assert.Contains(t, startupLog, "Using JAVA_HOME")
+	assert.Contains(t, startupLog, "main method")
+	assert.Empty(t, stderr)
+	pids = readPids(t)
+	require.Len(t, pids, 1)
 	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[singleProcessPrimaryName])
 
-	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
+	proc, _ = os.FindProcess(pids[singleProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
 	teardown(t)
 

@@ -101,6 +101,21 @@ func teardown(t *testing.T) {
 	}
 }
 
+func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	stringThatShouldDisappear := "this should disappear from the log file after starting"
+
+	ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0666)
+	_, _ = runInit(t, "start")
+
+	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	startupLog := string(startupLogBytes)
+	assert.NotContains(t, startupLog, stringThatShouldDisappear)
+}
+
 /*
  * Each test tests what happens given a prior state. Prior states for 'start' and 'status' are defined by a triple
  * denoting the number of the following items: (number of commands configured, number of pids written to the pidfile,
@@ -365,6 +380,21 @@ func TestInitStart_Starts(t *testing.T) {
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
 }
 
+func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	stringThatShouldRemain := "this should remain in the log file after running"
+
+	ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666)
+	_, _ = runInit(t, "status")
+
+	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	startupLog := string(startupLogBytes)
+	assert.Contains(t, startupLog, stringThatShouldRemain)
+}
+
 // (0, 0, 0)
 func TestInitStatus_NoConfig(t *testing.T) {
 	setup(t)
@@ -505,6 +535,21 @@ func TestInitStatus_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
+}
+
+func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
+	setup(t)
+	defer teardown(t)
+
+	stringThatShouldRemain := "this should remain in the log file after running"
+
+	ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666)
+	_, _ = runInit(t, "stop")
+
+	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	startupLog := string(startupLogBytes)
+	assert.Contains(t, startupLog, stringThatShouldRemain)
 }
 
 /*

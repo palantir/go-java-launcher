@@ -167,7 +167,7 @@ func (fc *fakeClock) newTimerOrTicker(d time.Duration, periodic bool) (chan time
 	defer fc.l.Unlock()
 	now := fc.time
 	done := make(chan time.Time, 1)
-	var s *sleeper = nil
+	var s *sleeper
 	if d.Nanoseconds() == 0 {
 		// special case - trigger immediately
 		done <- now

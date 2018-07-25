@@ -44,8 +44,9 @@ type ServiceCmds struct {
 	SubProcs map[string]CmdWithContext
 }
 
-func CompileCmdsFromConfig(staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig,
-	stdout io.Writer) (serviceCmds *ServiceCmds, rErr error) {
+func CompileCmdsFromConfig(
+	staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (
+	serviceCmds *ServiceCmds, rErr error) {
 	serviceCmds = &ServiceCmds{
 		SubProcs: make(map[string]CmdWithContext),
 	}

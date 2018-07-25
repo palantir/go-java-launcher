@@ -275,7 +275,7 @@ func getCustomConfigFromFile(customConfigFile string, stdout io.Writer) (Primary
 
 func (config *VersionedConfig) validateVersion(allowedVersions map[int]struct{}) error {
 	if _, ok := allowedVersions[config.Version]; !ok {
-		return fmt.Errorf("can handle configVersion=%v only, found %d",
+		return fmt.Errorf("Can handle configVersion=%v only, found %d",
 			toString(convertMap(allowedVersions)), config.Version)
 	}
 	return nil
@@ -283,7 +283,7 @@ func (config *VersionedConfig) validateVersion(allowedVersions map[int]struct{})
 
 func (config *TypedConfig) validateType(allowedTypes map[string]struct{}) error {
 	if _, ok := allowedTypes[config.Type]; !ok {
-		return fmt.Errorf("can handle configType=%v only, found %s",
+		return fmt.Errorf("Can handle configType=%v only, found %s",
 			toString(allowedTypes), config.Type)
 	}
 	return nil
@@ -294,7 +294,7 @@ func validateExecutableConfig(executable string) error {
 		return errors.New("Config type \"executable\" requires top-level \"executable:\" value")
 	}
 	if _, ok := allowedLauncherConfigs.Executables[path.Base(executable)]; !ok {
-		return fmt.Errorf("can handle executable=%v only, found %v",
+		return fmt.Errorf("Can handle executable=%v only, found %v",
 			toString(allowedLauncherConfigs.Executables), executable)
 	}
 	return nil

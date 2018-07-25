@@ -72,8 +72,9 @@ func CompileCmdsFromConfig(
 	return serviceCmds, nil
 }
 
-func compileSubProcCmdWithOutputFile(name string, subProcStatic StaticLauncherConfig,
-	subProcCustoms map[string]CustomLauncherConfig) (subProcCmd *CmdWithContext, rErr error) {
+func compileSubProcCmdWithOutputFile(
+	name string, subProcStatic StaticLauncherConfig, subProcCustoms map[string]CustomLauncherConfig) (
+	subProcCmd *CmdWithContext, rErr error) {
 	subProcCustom, ok := subProcCustoms[name]
 	if !ok {
 		return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
@@ -97,8 +98,8 @@ func compileSubProcCmdWithOutputFile(name string, subProcStatic StaticLauncherCo
 	return &CmdWithContext{Cmd: cmd, OutputFileName: subProcOutputFileName, Dirs: subProcStatic.Dirs}, nil
 }
 
-func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig,
-	stdout io.Writer) (*exec.Cmd, error) {
+func compileCmdFromConfig(
+	staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig, stdout io.Writer) (*exec.Cmd, error) {
 	fmt.Fprintf(stdout, "Launching with static configuration %v and custom configuration %v\n",
 		*staticConfig, *customConfig)
 

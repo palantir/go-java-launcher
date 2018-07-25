@@ -48,7 +48,7 @@ type FakeClock interface {
 	// Advance advances the FakeClock to a new point in time, ensuring any existing
 	// sleepers are notified appropriately before returning
 	Advance(d time.Duration)
-	// BlockUntilNumSleepers will block until the FakeClock has the given number of
+	// BlockUntil will block until the FakeClock has the given number of
 	// sleepers (callers of Sleep or After)
 	BlockUntil(n int)
 }
@@ -194,7 +194,7 @@ type sleeper struct {
 	done   chan time.Time
 }
 
-// blocker represents a caller of BlockUntilNumSleepers
+// blocker represents a caller of BlockUntil
 type blocker struct {
 	count int
 	ch    chan struct{}
@@ -264,9 +264,9 @@ func (fc *fakeClock) Advance(d time.Duration) {
 	fc.time = end
 }
 
-// BlockUntilNumSleepers will block until the fakeClock has the given number of sleepers
+// BlockUntil will block until the fakeClock has the given number of sleepers
 // (callers of Sleep or After)
-func (fc *fakeClock) BlockUntilNumSleepers(n int) {
+func (fc *fakeClock) BlockUntil(n int) {
 	fc.l.Lock()
 	// Fast path: current number of sleepers is what we're looking for
 	if len(fc.sleepers) == n {

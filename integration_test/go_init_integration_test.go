@@ -223,7 +223,7 @@ func TestInitStart_Starts(t *testing.T) {
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	// grep for testdata since it will be on the classpath
-	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[""])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[""])
 	proc, _ := os.FindProcess(pids[""])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
 	teardown(t)
@@ -244,7 +244,7 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Empty(t, stderr)
 	pids = readPids(t)
 	require.Len(t, pids, 1)
-	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[singleProcessPrimaryName])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[singleProcessPrimaryName])
 
 	proc, _ = os.FindProcess(pids[singleProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
@@ -267,7 +267,7 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Empty(t, stderr)
 	pids = readPids(t)
 	require.Len(t, pids, 1)
-	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[singleProcessPrimaryName])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[singleProcessPrimaryName])
 
 	proc, _ = os.FindProcess(pids[singleProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
@@ -294,7 +294,7 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Empty(t, stderr)
 	pids = readPids(t)
 	require.Len(t, pids, 2)
-	assertContainSameElements(t, pgrepMultiPids(t, "testdata"),
+	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
 		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
 
 	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
@@ -325,7 +325,7 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Empty(t, stderr)
 	pids = readPids(t)
 	require.Len(t, pids, 2)
-	assertContainSameElements(t, pgrepMultiPids(t, "testdata"),
+	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
 		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
 
 	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
@@ -351,7 +351,7 @@ func TestInitStart_Starts(t *testing.T) {
 	pids = readPids(t)
 	require.Len(t, pids, 2)
 	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
-	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[multiProcessSubProcessName])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[multiProcessSubProcessName])
 
 	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
@@ -379,7 +379,7 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Empty(t, stderr)
 	pids = readPids(t)
 	require.Len(t, pids, 2)
-	assertContainSameElements(t, pgrepMultiPids(t, "testdata"),
+	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
 		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
 
 	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
@@ -406,7 +406,7 @@ func TestInitStart_Starts(t *testing.T) {
 	pids = readPids(t)
 	require.Len(t, pids, 2)
 	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
-	assert.Equal(t, pgrepSinglePid(t, "testdata"), pids[multiProcessSubProcessName])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[multiProcessSubProcessName])
 
 	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
@@ -651,7 +651,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupSingleProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	writePids(t, servicePids{singleProcessPrimaryName: pgrepSinglePid(t, "sleep")})
+	writePids(t, servicePids{singleProcessPrimaryName: pgrepSinglePid(t, "sleep", 1)})
 	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -666,7 +666,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupMultiProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	writePids(t, servicePids{multiProcessPrimaryName: pgrepSinglePid(t, "sleep")})
+	writePids(t, servicePids{multiProcessPrimaryName: pgrepSinglePid(t, "sleep", 1)})
 	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -683,7 +683,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
 
-	pidsSlice := pgrepMultiPids(t, "sleep")
+	pidsSlice := pgrepMultiPids(t, "sleep", 1)
 	require.Len(t, pidsSlice, 2)
 	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
 	exitCode, stderr = runInit("stop")
@@ -702,7 +702,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupSingleProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pid := pgrepSinglePid(t, "sleep")
+	pid := pgrepSinglePid(t, "sleep", 1)
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	exitCode, stderr = runInit("stop")
 
@@ -725,7 +725,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupMultiProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pid = pgrepSinglePid(t, "sleep")
+	pid = pgrepSinglePid(t, "sleep", 1)
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
 	exitCode, stderr = runInit("stop")
 
@@ -746,7 +746,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pidsSlice = pgrepMultiPids(t, "sleep")
+	pidsSlice = pgrepMultiPids(t, "sleep", 1)
 	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
 	exitCode, stderr = runInit("stop")
 
@@ -763,6 +763,31 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, primary.Signal(syscall.SIGKILL))
 	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
 }
+
+/*func TestStuff(t *testing.T) {
+	setupSingleProcess(t)
+	defer teardown(t)
+
+	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
+	pid := pgrepSinglePid(t, "sleep", 1)
+	writePids(t, servicePids{singleProcessPrimaryName: pid})
+	clock := time2.NewFakeClock()
+	initChan := runInitWithClock(clock, "stop")
+	println("made it here")
+	clock.BlockUntil(2) // wait for timer and ticker to attach
+	println("also made it here")
+	clock.Advance(239 * time.Second)
+	assertInitChanIsEmpty(t, initChan)
+	clock.Advance(241 * time.Second)
+	assertInitChanContainsResult(t, initChan, RunInitResult{exitStatus: 1, stderr: "failed to stop"})
+
+	pids := readPids(t)
+	require.Len(t, pids, 1)
+	assert.Contains(t, pids, singleProcessPrimaryName)
+
+	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+}*/
 
 type RunInitResult struct {
 	exitStatus int
@@ -782,6 +807,7 @@ func runInitWithClock(clock time2.Clock, args ...string) <-chan RunInitResult {
 
 	out := make(chan RunInitResult)
 	go func() {
+		// Empty string as placeholder for executable path as would be the case in real invocation
 		exitStatus := app.Run(append([]string{""}, args...))
 		stderr := errbuf.String()
 		out <- RunInitResult{exitStatus, stderr}
@@ -814,13 +840,13 @@ func readPids(t *testing.T) servicePids {
 	return servicePids
 }
 
-func pgrepSinglePid(t *testing.T, key string) int {
-	return pgrepMultiPids(t, key)[0]
+func pgrepSinglePid(t *testing.T, key string, ppid int) int {
+	return pgrepMultiPids(t, key, ppid)[0]
 }
 
-func pgrepMultiPids(t *testing.T, key string) []int {
+func pgrepMultiPids(t *testing.T, key string, ppid int) []int {
 	// -P specifies the PPID to filter on. The started processes are always orphaned and adopted by init.
-	pidBytes, err := exec.Command("pgrep", "-f", "-P", "1", key).Output()
+	pidBytes, err := exec.Command("pgrep", "-f", "-P", strconv.Itoa(ppid), key).Output()
 	require.NoError(t, err)
 	pidsStrings := strings.Split(string(pidBytes), "\n")
 	pids := make([]int, len(pidsStrings)-1)
@@ -836,3 +862,29 @@ func assertContainSameElements(t *testing.T, a []int, b []int) {
 	sort.Ints(b)
 	assert.Equal(t, a, b)
 }
+
+/*func assertInitChanIsEmpty(t *testing.T, initChan <-chan RunInitResult) {
+	select {
+	case _, ok := <-initChan:
+		if ok {
+			assert.Fail(t, "initChan is not empty")
+		} else {
+			assert.Fail(t, "initChan is closed")
+			t.Fail()
+		}
+	default:
+	}
+}
+
+func assertInitChanContainsResult(t *testing.T, initChan <-chan RunInitResult, expectedResult RunInitResult) {
+	select {
+	case actualResult, ok := <-initChan:
+		if ok {
+			assert.Equal(t, expectedResult, actualResult)
+		} else {
+			assert.Fail(t, "initChan is closed")
+		}
+	default:
+		assert.Fail(t, "initChan is empty")
+	}
+}*/

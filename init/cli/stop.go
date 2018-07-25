@@ -26,6 +26,7 @@ import (
 )
 
 var (
+	// This is overridden in the tests to be a fake clock
 	Clock = cliTime.NewRealClock()
 )
 

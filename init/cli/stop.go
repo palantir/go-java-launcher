@@ -20,8 +20,13 @@ import (
 	"syscall"
 	"time"
 
+	cliTime "github.com/palantir/go-java-launcher/init/cli/time"
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
+)
+
+var (
+	Clock = cliTime.NewRealClock()
 )
 
 var stopCliCommand = cli.Command{
@@ -65,14 +70,15 @@ func stopService(procs map[string]*os.Process) error {
 
 func waitForServiceToStop(procs map[string]*os.Process) error {
 	const numSecondsToWait = 240
-	timer := time.NewTimer(numSecondsToWait * time.Second)
+	timer := Clock.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
-	ticker := time.NewTicker(time.Second)
+
+	ticker := Clock.NewTicker(time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
+		case <-ticker.Chan():
 			for name, remainingProc := range procs {
 				if !isProcRunning(remainingProc) {
 					delete(procs, name)
@@ -81,7 +87,7 @@ func waitForServiceToStop(procs map[string]*os.Process) error {
 			if len(procs) == 0 {
 				return nil
 			}
-		case <-timer.C:
+		case <-timer.Chan():
 			remainingPids := make(map[string]int, len(procs))
 			i := 0
 			for name, proc := range procs {

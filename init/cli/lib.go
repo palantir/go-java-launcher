@@ -30,7 +30,7 @@ const (
 	outputFileFlag       = os.O_CREATE | os.O_WRONLY
 	truncOutputFileFlag  = outputFileFlag | os.O_TRUNC
 	appendOutputFileFlag = outputFileFlag | os.O_APPEND
-	outputFileMode       = 0666
+	outputFileMode       = 0644
 )
 
 var (

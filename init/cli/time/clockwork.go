@@ -125,7 +125,7 @@ type fakeClock struct {
 }
 
 type fakeTimer struct {
-	c       <-chan time.Time
+	c       chan time.Time
 	fc      *fakeClock
 	sleeper *sleeper
 }
@@ -137,6 +137,8 @@ func (ft *fakeTimer) Chan() <-chan time.Time {
 func (ft *fakeTimer) Stop() {
 	if ft.sleeper != nil {
 		fc := ft.fc
+		// Close the channel before locking! That's important
+		close(ft.c)
 		fc.l.Lock()
 		defer fc.l.Unlock()
 		// Remove the sleeper (if it exists) and notify any blockers
@@ -146,6 +148,7 @@ func (ft *fakeTimer) Stop() {
 				newSleepers = append(newSleepers, s)
 			}
 		}
+		fc.sleepers = newSleepers
 		fc.blockers = notifyBlockers(fc.blockers, len(fc.sleepers))
 	}
 }
@@ -166,7 +169,7 @@ func (fc *fakeClock) newTimerOrTicker(d time.Duration, periodic bool) (chan time
 	fc.l.Lock()
 	defer fc.l.Unlock()
 	now := fc.time
-	done := make(chan time.Time, 1)
+	done := make(chan time.Time, 0)
 	var s *sleeper
 	if d.Nanoseconds() == 0 {
 		// special case - trigger immediately
@@ -228,9 +231,10 @@ func (fc *fakeClock) Now() time.Time {
 }
 
 // Advance time until `end` given the sleepers, recursing to re-evaluate periodic sleepers
-func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) {
+func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) []*sleeper {
 	periodicSleepers := make([]*sleeper, 0)
 	for _, s := range sleepers {
+		//log.Printf("Examining sleeper at %v\n", s.until)
 		if end.Sub(s.until) >= 0 {
 			s.done <- s.until
 			// Re-schedule if necessary
@@ -240,15 +244,20 @@ func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) 
 					period: s.period,
 					done:   s.done,
 				}
+				//log.Printf("Ran periodic sleeper at %v\n", s.until)
 				periodicSleepers = append(periodicSleepers, s)
+			} else {
+				//log.Printf("FINISHED sleeper at %v\n", s.until)
 			}
 		} else {
+			//log.Printf("Copying over sleeper at %v\n", s.until)
 			newSleepers = append(newSleepers, s)
 		}
 	}
 	if len(periodicSleepers) != 0 {
-		advanceTailRec(end, periodicSleepers, newSleepers)
+		return advanceTailRec(end, periodicSleepers, newSleepers)
 	}
+	return newSleepers
 }
 
 // Advance advances fakeClock to a new point in time, ensuring channels from any
@@ -257,8 +266,9 @@ func (fc *fakeClock) Advance(d time.Duration) {
 	fc.l.Lock()
 	defer fc.l.Unlock()
 	end := fc.time.Add(d)
+	//log.Printf("Advancing from %v -> %v\n", fc.time.String(), end.String())
 	newSleepers := make([]*sleeper, 0)
-	advanceTailRec(end, fc.sleepers, newSleepers)
+	newSleepers = advanceTailRec(end, fc.sleepers, newSleepers)
 	fc.sleepers = newSleepers
 	fc.blockers = notifyBlockers(fc.blockers, len(fc.sleepers))
 	fc.time = end

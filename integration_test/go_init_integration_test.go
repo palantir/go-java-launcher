@@ -109,7 +109,7 @@ func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
 	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0644))
-	_, _ = runInit(t, "start")
+	_, _ = runInit("start")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
 	require.NoError(t, err)
@@ -132,7 +132,7 @@ func TestInitStart_NoConfig(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "failed to determine service status to determine what commands to run")
@@ -143,7 +143,7 @@ func TestInitStart_BadConfig(t *testing.T) {
 	setupBadConfig(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "failed to determine service status to determine what commands to run")
@@ -159,7 +159,7 @@ func TestInitStart_OneConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, map[string]int{singleProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit(t, "start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	pids := readPids(t)
@@ -179,7 +179,7 @@ func TestInitStart_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
 	}()
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
-	exitCode, stderr := runInit(t, "start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	pids := readPids(t)
@@ -201,7 +201,7 @@ func TestInitStart_Starts(t *testing.T) {
 	setup(t)
 	require.NoError(t, os.Link("testdata/launcher-static-with-dirs.yml", launcherStaticFile))
 
-	exitCode, stderr := runInit(t, "start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -232,7 +232,7 @@ func TestInitStart_Starts(t *testing.T) {
 
 	setupSingleProcess(t)
 
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -255,7 +255,7 @@ func TestInitStart_Starts(t *testing.T) {
 	setupSingleProcess(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second) // Wait for JVM to start and print output
@@ -277,7 +277,7 @@ func TestInitStart_Starts(t *testing.T) {
 
 	setupMultiProcess(t)
 
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -308,7 +308,7 @@ func TestInitStart_Starts(t *testing.T) {
 	setupMultiProcess(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99999})
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -338,7 +338,7 @@ func TestInitStart_Starts(t *testing.T) {
 	setupMultiProcess(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -362,7 +362,7 @@ func TestInitStart_Starts(t *testing.T) {
 	setupMultiProcess(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -393,7 +393,7 @@ func TestInitStart_Starts(t *testing.T) {
 	setupMultiProcess(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr = runInit(t, "start")
+	exitCode, stderr = runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -420,7 +420,7 @@ func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
 	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
-	_, _ = runInit(t, "status")
+	_, _ = runInit("status")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
 	require.NoError(t, err)
@@ -433,7 +433,7 @@ func TestInitStatus_NoConfig(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 4, exitCode)
 	assert.Contains(t, stderr, "failed to determine service status")
@@ -444,7 +444,7 @@ func TestInitStatus_BadConfig(t *testing.T) {
 	setupBadConfig(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 4, exitCode)
 	assert.Contains(t, stderr, "failed to determine service status")
@@ -455,7 +455,7 @@ func TestInitStatus_OneConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 3, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
@@ -467,7 +467,7 @@ func TestInitStatus_OneConfiguredOneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
@@ -479,7 +479,7 @@ func TestInitStatus_OneConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -490,7 +490,7 @@ func TestInitStatus_TwoConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 3, exitCode)
 	assert.Contains(t, stderr, "commands")
@@ -505,7 +505,7 @@ func TestInitStatus_TwoConfiguredOneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99999})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "commands")
@@ -520,7 +520,7 @@ func TestInitStatus_TwoConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", multiProcessSubProcessName))
@@ -532,7 +532,7 @@ func TestInitStatus_TwoConfiguredTwoWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, "commands")
@@ -547,7 +547,7 @@ func TestInitStatus_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", multiProcessSubProcessName))
@@ -564,7 +564,7 @@ func TestInitStatus_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
 	}()
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
-	exitCode, stderr := runInit(t, "status")
+	exitCode, stderr := runInit("status")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -578,7 +578,7 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
 	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
-	_, _ = runInit(t, "stop")
+	_, _ = runInit("stop")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
 	require.NoError(t, err)
@@ -600,7 +600,7 @@ func TestInitStop_ZeroWrittenZeroRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit(t, "stop")
+	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -614,7 +614,7 @@ func TestInitStop_OneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr := runInit(t, "stop")
+	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -628,7 +628,7 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit(t, "stop")
+	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -652,7 +652,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
 	writePids(t, servicePids{singleProcessPrimaryName: pgrepSinglePid(t, "sleep")})
-	exitCode, stderr := runInit(t, "stop")
+	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -667,7 +667,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
 	writePids(t, servicePids{multiProcessPrimaryName: pgrepSinglePid(t, "sleep")})
-	exitCode, stderr = runInit(t, "stop")
+	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -686,7 +686,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	pidsSlice := pgrepMultiPids(t, "sleep")
 	require.Len(t, pidsSlice, 2)
 	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
-	exitCode, stderr = runInit(t, "stop")
+	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
@@ -704,7 +704,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	pid := pgrepSinglePid(t, "sleep")
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
-	exitCode, stderr = runInit(t, "stop")
+	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -727,7 +727,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	pid = pgrepSinglePid(t, "sleep")
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
-	exitCode, stderr = runInit(t, "stop")
+	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -748,7 +748,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
 	pidsSlice = pgrepMultiPids(t, "sleep")
 	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
-	exitCode, stderr = runInit(t, "stop")
+	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -769,12 +769,12 @@ type RunInitResult struct {
 	stderr     string
 }
 
-func runInit(t *testing.T, args ...string) (int, string) {
-	initResult := <-runInitChan(t, time2.NewRealClock(), args...)
+func runInit(args ...string) (int, string) {
+	initResult := <-runInitWithClock(time2.NewRealClock(), args...)
 	return initResult.exitStatus, initResult.stderr
 }
 
-func runInitChan(t *testing.T, clock time2.Clock, args ...string) <-chan RunInitResult {
+func runInitWithClock(clock time2.Clock, args ...string) <-chan RunInitResult {
 	var errbuf bytes.Buffer
 	cli2.Clock = clock
 	app := cli2.App()

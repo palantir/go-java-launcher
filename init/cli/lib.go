@@ -67,9 +67,10 @@ func getServiceStatus(ctx cli.Context) (*serviceStatus, error) {
 
 func getPidfileInfo() (servicePids, map[string]*os.Process, error) {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
-	if err != nil && !os.IsNotExist(err) {
+	pidfileExists := !os.IsNotExist(err)
+	if err != nil && pidfileExists {
 		return nil, nil, errors.Wrap(err, "failed to read pidfile")
-	} else if os.IsNotExist(err) {
+	} else if !pidfileExists {
 		return servicePids{}, map[string]*os.Process{}, nil
 	}
 	var servicePids servicePids

@@ -108,7 +108,7 @@ func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
 	stringThatShouldDisappear := "this should disappear from the log file after starting"
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
-	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0666))
+	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0644))
 	_, _ = runInit(t, "start")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
@@ -419,7 +419,7 @@ func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
 	stringThatShouldRemain := "this should remain in the log file after running"
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
-	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666))
+	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
 	_, _ = runInit(t, "status")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
@@ -577,7 +577,7 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 	stringThatShouldRemain := "this should remain in the log file after running"
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
-	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0666))
+	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
 	_, _ = runInit(t, "stop")
 
 	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
@@ -805,15 +805,16 @@ func writePids(t *testing.T, pids servicePids) {
 	servicePidsBytes, err := yaml.Marshal(servicePids)
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(filepath.Dir(pidfile), 0755))
-	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0666))
+	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0644))
 }
 
 func readPids(t *testing.T) servicePids {
 	pidfileBytes, err := ioutil.ReadFile(pidfile)
 	require.NoError(t, err)
-	if err != nil && !os.IsNotExist(err) {
+	pidfileExists := !os.IsNotExist(err)
+	if err != nil && pidfileExists {
 		require.Fail(t, "failed to read pidfile")
-	} else if os.IsNotExist(err) {
+	} else if !pidfileExists {
 		return servicePids{}
 	}
 	var servicePids servicePids

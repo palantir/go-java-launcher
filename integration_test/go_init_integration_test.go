@@ -764,7 +764,8 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
 }
 
-/*func TestStuff(t *testing.T) {
+// Version of unstoppable (1, 1) isolated to test clock mocking
+/*func TestStopShorter(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
@@ -773,13 +774,12 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	clock := time2.NewFakeClock()
 	initChan := runInitWithClock(clock, "stop")
-	println("made it here")
 	clock.BlockUntil(2) // wait for timer and ticker to attach
-	println("also made it here")
 	clock.Advance(239 * time.Second)
-	assertInitChanIsEmpty(t, initChan)
+	assert.Nil(t, readChannel(initChan, 2 * time.Second))
 	clock.Advance(241 * time.Second)
-	assertInitChanContainsResult(t, initChan, RunInitResult{exitStatus: 1, stderr: "failed to stop"})
+	result := readChannel(initChan, 10 * time.Second)
+	assert.NotNil(t, result) // this always fails (channel still has no result after a lot of waiting)
 
 	pids := readPids(t)
 	require.Len(t, pids, 1)
@@ -863,28 +863,11 @@ func assertContainSameElements(t *testing.T, a []int, b []int) {
 	assert.Equal(t, a, b)
 }
 
-/*func assertInitChanIsEmpty(t *testing.T, initChan <-chan RunInitResult) {
+/*func readChannel(c <-chan RunInitResult, timeout time.Duration) *RunInitResult {
 	select {
-	case _, ok := <-initChan:
-		if ok {
-			assert.Fail(t, "initChan is not empty")
-		} else {
-			assert.Fail(t, "initChan is closed")
-			t.Fail()
-		}
-	default:
-	}
-}
-
-func assertInitChanContainsResult(t *testing.T, initChan <-chan RunInitResult, expectedResult RunInitResult) {
-	select {
-	case actualResult, ok := <-initChan:
-		if ok {
-			assert.Equal(t, expectedResult, actualResult)
-		} else {
-			assert.Fail(t, "initChan is closed")
-		}
-	default:
-		assert.Fail(t, "initChan is empty")
+	case <-time.After(timeout):
+		return nil
+	case result := <-c:
+		return &result
 	}
 }*/

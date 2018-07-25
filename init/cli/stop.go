@@ -20,14 +20,15 @@ import (
 	"syscall"
 	"time"
 
-	cliTime "github.com/palantir/go-java-launcher/init/cli/time"
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
+
+	time2 "github.com/palantir/go-java-launcher/init/cli/time"
 )
 
 var (
-	// This is overridden in the tests to be a fake clock
-	Clock = cliTime.NewRealClock()
+	// Clock is overridden in the tests to be a fake clock
+	Clock = time2.NewRealClock()
 )
 
 var stopCliCommand = cli.Command{

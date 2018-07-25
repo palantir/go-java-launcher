@@ -196,8 +196,8 @@ func validateStaticConfig(config *StaticLauncherConfig) error {
 
 func getStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConfig, error) {
 	if staticData, err := ioutil.ReadFile(staticConfigFile); err != nil {
-		return PrimaryStaticLauncherConfig{}, errors.Wrap(err, "Failed to read static config file: "+
-			staticConfigFile)
+		return PrimaryStaticLauncherConfig{},
+			errors.Wrap(err, "Failed to read static config file: "+staticConfigFile)
 	} else if staticConfig, err := parseStaticConfig(staticData); err != nil {
 		return PrimaryStaticLauncherConfig{}, err
 	} else {

@@ -153,7 +153,7 @@ func MkDirs(dirs []string, stdout io.Writer) error {
 	isDirMatcher := regexp.MustCompile(`^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$`).MatchString
 	for _, dir := range dirs {
 		if !isDirMatcher(dir) {
-			return fmt.Errorf("cannot create directory with non [A-Za-z0-9] characters: %s", dir)
+			return fmt.Errorf("Cannot create directory with non [A-Za-z0-9] characters: %s", dir)
 		}
 
 		fmt.Fprintf(stdout, "Creating directory: %s\n", dir)

@@ -162,8 +162,8 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 
 	for name, subProcess := range config.SubProcesses {
 		if err := validateSubProcessName(name); err != nil {
-			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
-				"invalid subProcess name '%s' in static config", name)
+			return PrimaryStaticLauncherConfig{},
+				errors.Wrapf(err, "invalid subProcess name '%s' in static config", name)
 		}
 
 		if name == config.ServiceName {
@@ -172,8 +172,8 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 		}
 
 		if err := validateStaticConfig(&subProcess); err != nil {
-			return PrimaryStaticLauncherConfig{}, errors.Wrapf(err,
-				"failed to validate subProcess launcher configuration '%s'", name)
+			return PrimaryStaticLauncherConfig{},
+				errors.Wrapf(err, "failed to validate subProcess launcher configuration '%s'", name)
 		}
 	}
 	return config, nil

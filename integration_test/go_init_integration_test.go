@@ -636,6 +636,20 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
 
+func runCommandGetOutput(t *testing.T, cmd *exec.Cmd) string {
+	cmd.Stderr = nil
+	out, err := cmd.Output()
+	require.NoError(t, err, "Couldn't run command '%v'", cmd)
+	return string(out)
+}
+
+func runCommandGetIntOutput(t *testing.T, cmd *exec.Cmd) int {
+	stdout := strings.TrimSpace(runCommandGetOutput(t, cmd))
+	i, e := strconv.Atoi(stdout)
+	require.NoError(t, e, "Expected int output but got: %v", stdout)
+	return i
+}
+
 /*
  * In these tests, stop should actually stop something. Have to run all in the same test function since they all need
  * to have exclusive use of the process table.
@@ -650,8 +664,8 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	setupSingleProcess(t)
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	writePids(t, servicePids{singleProcessPrimaryName: pgrepSinglePid(t, "sleep", 1)})
+	pid := runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
+	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -702,7 +716,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	setupSingleProcess(t)
 
 	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pid := pgrepSinglePid(t, "sleep", 1)
+	pid = pgrepSinglePid(t, "sleep", 1)
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	exitCode, stderr = runInit("stop")
 

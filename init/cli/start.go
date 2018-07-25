@@ -37,7 +37,7 @@ stderr and var/log/startup.log.`,
 	Action: executeWithContext(start, truncOutputFileFlag),
 }
 
-func start(ctx cli.Context) (rErr error) {
+func start(ctx cli.Context) error {
 	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx,

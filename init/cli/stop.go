@@ -38,7 +38,7 @@ stderr and var/log/startup.log. Waits for at least 240 seconds for any processes
 	Action: executeWithContext(stop, appendOutputFileFlag),
 }
 
-func stop(ctx cli.Context) (rErr error) {
+func stop(ctx cli.Context) error {
 	_, runningProcs, err := getPidfileInfo()
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)

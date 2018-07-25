@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -30,11 +29,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/palantir/godel/pkg/products/v2/products"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
+	cli2 "github.com/palantir/go-java-launcher/init/cli"
+	time2 "github.com/palantir/go-java-launcher/init/cli/time"
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
@@ -764,37 +764,29 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
 }
 
-// Adapted from Stack Overflow: http://stackoverflow.com/questions/10385551/get-exit-code-go
-func runInit(t *testing.T, args ...string) (int, string) {
-	var errbuf bytes.Buffer
-	cli, err := products.Bin("go-init")
-	require.NoError(t, err)
-	cmd := exec.Command(cli, args...)
-	cmd.Stderr = &errbuf
-	err = cmd.Run()
-	stderr := errbuf.String()
+type RunInitResult struct {
+	exitStatus int
+	stderr     string
+}
 
-	if err != nil {
-		// try to get the exit code
-		if exitError, ok := err.(*exec.ExitError); ok {
-			ws := exitError.Sys().(syscall.WaitStatus)
-			return ws.ExitStatus(), stderr
-		} else {
-			// This will happen (in OSX) if `name` is not available in $PATH,
-			// in this situation, exit code could not be get, and stderr will be
-			// empty string very likely, so we use the default fail code, and format err
-			// to string and set to stderr
-			log.Printf("Could not get exit code for failed program: %v, %v", cli, args)
-			if stderr == "" {
-				stderr = err.Error()
-			}
-			return -1, stderr
-		}
-	} else {
-		// success, exitCode should be 0 if go is ok
-		ws := cmd.ProcessState.Sys().(syscall.WaitStatus)
-		return ws.ExitStatus(), stderr
-	}
+func runInit(t *testing.T, args ...string) (int, string) {
+	initResult := <-runInitChan(t, time2.NewRealClock(), args...)
+	return initResult.exitStatus, initResult.stderr
+}
+
+func runInitChan(t *testing.T, clock time2.Clock, args ...string) <-chan RunInitResult {
+	var errbuf bytes.Buffer
+	cli2.Clock = clock
+	app := cli2.App()
+	app.Stderr = &errbuf
+
+	out := make(chan RunInitResult)
+	go func() {
+		exitStatus := app.Run(append([]string{""}, args...))
+		stderr := errbuf.String()
+		out <- RunInitResult{exitStatus, stderr}
+	}()
+	return out
 }
 
 func writePids(t *testing.T, pids servicePids) {

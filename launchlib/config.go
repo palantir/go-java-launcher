@@ -92,8 +92,9 @@ var allowedLauncherConfigs = AllowedLauncherConfigValues{
 		"envoy":          {}},
 }
 
-func GetConfigsFromFiles(staticConfigFile string, customConfigFile string,
-	stdout io.Writer) (PrimaryStaticLauncherConfig, PrimaryCustomLauncherConfig, error) {
+func GetConfigsFromFiles(
+	staticConfigFile string, customConfigFile string, stdout io.Writer) (
+	PrimaryStaticLauncherConfig, PrimaryCustomLauncherConfig, error) {
 	staticConfig, err := getStaticConfigFromFile(staticConfigFile)
 	if err != nil {
 		return PrimaryStaticLauncherConfig{}, PrimaryCustomLauncherConfig{}, err
@@ -131,7 +132,9 @@ func validateSubProcessLimit(numberSubProcesses int) error {
 
 func validateSubProcessName(name string) error {
 	if !subProcessNamePattern.MatchString(name) {
-		return errors.Errorf("subProcess name '%s' does not match required pattern '%s'", name,
+		return errors.Errorf(
+			"subProcess name '%s' does not match required pattern '%s'",
+			name,
 			subProcessNamePattern)
 	}
 	return nil

@@ -190,13 +190,11 @@ func TestInitStart_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 }
 
 /*
- * In these tests, start should actually start something. Have to run all in the same test function since they all need
- * to have exclusive use of the process table.
+ * In these tests, start should actually start something.
  */
-func TestInitStart_Starts(t *testing.T) {
-	defer teardown(t)
 
-	// Creates dirs on startup
+func TestInitStart_CreatesDirs(t *testing.T) {
+	defer teardown(t)
 
 	setup(t)
 	require.NoError(t, os.Link("testdata/launcher-static-with-dirs.yml", launcherStaticFile))
@@ -226,58 +224,61 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[""])
 	proc, _ := os.FindProcess(pids[""])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
+}
 
-	// (1, 0, 0)
-
+// (1, 0, 0)
+func TestInitStart_OneConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
+	defer teardown(t)
 
-	exitCode, stderr = runInit("start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
-	startupLogBytes, err = ioutil.ReadFile(primaryOutputFile)
+	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
 	require.NoError(t, err)
-	startupLog = string(startupLogBytes)
+	startupLog := string(startupLogBytes)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
 	assert.Empty(t, stderr)
-	pids = readPids(t)
+	pids := readPids(t)
 	require.Len(t, pids, 1)
 	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[singleProcessPrimaryName])
 
-	proc, _ = os.FindProcess(pids[singleProcessPrimaryName])
+	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
+}
 
-	// (1, 1, 0)
-
+// (1, 1, 0)
+func TestInitStart_OneConfiguredOneWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
+	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr = runInit("start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second) // Wait for JVM to start and print output
-	startupLogBytes, err = ioutil.ReadFile(primaryOutputFile)
+	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
 	require.NoError(t, err)
-	startupLog = string(startupLogBytes)
+	startupLog := string(startupLogBytes)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
 	assert.Empty(t, stderr)
-	pids = readPids(t)
+	pids := readPids(t)
 	require.Len(t, pids, 1)
 	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[singleProcessPrimaryName])
 
-	proc, _ = os.FindProcess(pids[singleProcessPrimaryName])
+	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
+}
 
-	// (2, 0, 0)
-
+// (2, 0, 0)
+func TestInitStart_TwoConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
+	defer teardown(t)
 
-	exitCode, stderr = runInit("start")
+	exitCode, stderr := runInit("start")
 
 	assert.Equal(t, 0, exitCode)
 	time.Sleep(time.Second)
@@ -292,125 +293,134 @@ func TestInitStart_Starts(t *testing.T) {
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
 	assert.Contains(t, sidecarStartupLog, "main method")
 	assert.Empty(t, stderr)
-	pids = readPids(t)
+	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
 		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
 
-	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
+	proc, _ := os.FindProcess(pids[multiProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
-
-	// (2, 1, 0)
-
-	setupMultiProcess(t)
-
-	writePids(t, servicePids{multiProcessPrimaryName: 99999})
-	exitCode, stderr = runInit("start")
-
-	assert.Equal(t, 0, exitCode)
-	time.Sleep(time.Second)
-	primaryStartupLogBytes, err = ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	primaryStartupLog = string(primaryStartupLogBytes)
-	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, primaryStartupLog, "main method")
-	sidecarStartupLogBytes, err = ioutil.ReadFile(subProcessOutputFile)
-	require.NoError(t, err)
-	sidecarStartupLog = string(sidecarStartupLogBytes)
-	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
-	pids = readPids(t)
-	require.Len(t, pids, 2)
-	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
-		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
-
-	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
-
-	// (2, 1, 1)
-	setupMultiProcess(t)
-
-	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
-	exitCode, stderr = runInit("start")
-
-	assert.Equal(t, 0, exitCode)
-	time.Sleep(time.Second)
-	sidecarStartupLogBytes, err = ioutil.ReadFile(subProcessOutputFile)
-	require.NoError(t, err)
-	sidecarStartupLog = string(sidecarStartupLogBytes)
-	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
-	pids = readPids(t)
-	require.Len(t, pids, 2)
-	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
-	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[multiProcessSubProcessName])
-
-	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
-
-	// (2, 2, 0)
-
-	setupMultiProcess(t)
-
-	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
-	exitCode, stderr = runInit("start")
-
-	assert.Equal(t, 0, exitCode)
-	time.Sleep(time.Second)
-	primaryStartupLogBytes, err = ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	primaryStartupLog = string(primaryStartupLogBytes)
-	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, primaryStartupLog, "main method")
-	sidecarStartupLogBytes, err = ioutil.ReadFile(subProcessOutputFile)
-	require.NoError(t, err)
-	sidecarStartupLog = string(sidecarStartupLogBytes)
-	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
-	pids = readPids(t)
-	require.Len(t, pids, 2)
-	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
-		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
-
-	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
-
-	// (2, 2, 1)
-
-	setupMultiProcess(t)
-
-	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr = runInit("start")
-
-	assert.Equal(t, 0, exitCode)
-	time.Sleep(time.Second)
-	sidecarStartupLogBytes, err = ioutil.ReadFile(subProcessOutputFile)
-	require.NoError(t, err)
-	sidecarStartupLog = string(sidecarStartupLogBytes)
-	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
-	pids = readPids(t)
-	require.Len(t, pids, 2)
-	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
-	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[multiProcessSubProcessName])
-
 	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
 }
+
+// (2, 1, 0)
+func TestInitStart_TwoConfiguredOneWrittenZeroRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+
+	writePids(t, servicePids{multiProcessPrimaryName: 99999})
+	exitCode, stderr := runInit("start")
+
+	assert.Equal(t, 0, exitCode)
+	time.Sleep(time.Second)
+	primaryStartupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	primaryStartupLog := string(primaryStartupLogBytes)
+	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
+	assert.Contains(t, primaryStartupLog, "main method")
+	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	require.NoError(t, err)
+	sidecarStartupLog := string(sidecarStartupLogBytes)
+	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
+	assert.Contains(t, sidecarStartupLog, "main method")
+	assert.Empty(t, stderr)
+	pids := readPids(t)
+	require.Len(t, pids, 2)
+	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
+		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
+
+	proc, _ := os.FindProcess(pids[multiProcessPrimaryName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+}
+
+// (2, 1, 1)
+func TestInitStart_TwoConfiguredOneWrittenOneRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
+	exitCode, stderr := runInit("start")
+
+	assert.Equal(t, 0, exitCode)
+	time.Sleep(time.Second)
+	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	require.NoError(t, err)
+	sidecarStartupLog := string(sidecarStartupLogBytes)
+	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
+	assert.Contains(t, sidecarStartupLog, "main method")
+	assert.Empty(t, stderr)
+	pids := readPids(t)
+	require.Len(t, pids, 2)
+	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[multiProcessSubProcessName])
+
+	proc, _ := os.FindProcess(pids[multiProcessSubProcessName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+}
+
+// (2, 2, 0)
+func TestInitStart_TwoConfiguredTwoWrittenZeroRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+
+	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
+	exitCode, stderr := runInit("start")
+
+	assert.Equal(t, 0, exitCode)
+	time.Sleep(time.Second)
+	primaryStartupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	primaryStartupLog := string(primaryStartupLogBytes)
+	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
+	assert.Contains(t, primaryStartupLog, "main method")
+	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	require.NoError(t, err)
+	sidecarStartupLog := string(sidecarStartupLogBytes)
+	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
+	assert.Contains(t, sidecarStartupLog, "main method")
+	assert.Empty(t, stderr)
+	pids := readPids(t)
+	require.Len(t, pids, 2)
+	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
+		[]int{pids[multiProcessPrimaryName], pids[multiProcessSubProcessName]})
+
+	proc, _ := os.FindProcess(pids[multiProcessPrimaryName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	proc, _ = os.FindProcess(pids[multiProcessSubProcessName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+}
+
+// (2, 2, 1)
+func TestInitStart_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
+	setupMultiProcess(t)
+	defer teardown(t)
+
+	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
+	exitCode, stderr := runInit("start")
+
+	assert.Equal(t, 0, exitCode)
+	time.Sleep(time.Second)
+	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	require.NoError(t, err)
+	sidecarStartupLog := string(sidecarStartupLogBytes)
+	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
+	assert.Contains(t, sidecarStartupLog, "main method")
+	assert.Empty(t, stderr)
+	pids := readPids(t)
+	require.Len(t, pids, 2)
+	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[multiProcessSubProcessName])
+
+	proc, _ := os.FindProcess(pids[multiProcessSubProcessName])
+	require.NoError(t, proc.Signal(syscall.SIGKILL))
+}
+
+/*
+ * Same states appy to status.
+ */
 
 func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
 	setup(t)
@@ -635,6 +645,10 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
+
+/*
+ * In these tests, stop should actually stop something.
+ */
 
 // (1, 1)
 func TestInitStop_Stoppable_OneWrittenOneRunning(t *testing.T) {

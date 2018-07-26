@@ -18,6 +18,7 @@
 package time
 
 import (
+	"log"
 	"sync"
 	"time"
 )
@@ -137,7 +138,9 @@ func (ft *fakeTimer) Chan() <-chan time.Time {
 func (ft *fakeTimer) Stop() {
 	if ft.sleeper != nil {
 		fc := ft.fc
-		// Close the channel before locking! That's important
+		// Notify the stop channel. This should not block since we give it a buffer of 1.
+		ft.sleeper.stop <- true
+		// Close the channel before locking! That's important to prevent deadlocks
 		close(ft.c)
 		fc.l.Lock()
 		defer fc.l.Unlock()
@@ -151,6 +154,7 @@ func (ft *fakeTimer) Stop() {
 		fc.sleepers = newSleepers
 		fc.blockers = notifyBlockers(fc.blockers, len(fc.sleepers))
 	}
+	ft.sleeper = nil
 }
 
 // NewTimer mimics time.NewTimer; it waits for the given duration to elapse on the
@@ -169,7 +173,7 @@ func (fc *fakeClock) newTimerOrTicker(d time.Duration, periodic bool) (chan time
 	fc.l.Lock()
 	defer fc.l.Unlock()
 	now := fc.time
-	done := make(chan time.Time, 0)
+	done := make(chan time.Time, 0) // intentionally unbuffered
 	var s *sleeper
 	if d.Nanoseconds() == 0 {
 		// special case - trigger immediately
@@ -179,6 +183,7 @@ func (fc *fakeClock) newTimerOrTicker(d time.Duration, periodic bool) (chan time
 		s = &sleeper{
 			until: now.Add(d),
 			done:  done,
+			stop:  make(chan bool, 1),
 		}
 		if periodic {
 			s.period = &d
@@ -195,6 +200,7 @@ type sleeper struct {
 	until  time.Time
 	period *time.Duration
 	done   chan time.Time
+	stop   chan bool // side channel to signal that Stop() has been called
 }
 
 // blocker represents a caller of BlockUntil
@@ -236,13 +242,21 @@ func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) 
 	for _, s := range sleepers {
 		//log.Printf("Examining sleeper at %v\n", s.until)
 		if end.Sub(s.until) >= 0 {
-			s.done <- s.until
+			select {
+			case s.done <- s.until:
+				// Great, we've sent it.
+			case <-s.stop:
+				// Channel was stopped instead, forget this sleeper.
+				log.Printf("Timer/ticker '%p' was stopped, not sending update at %v\n", s, s.until)
+				continue
+			}
 			// Re-schedule if necessary
 			if s.period != nil {
 				s := &sleeper{
 					until:  s.until.Add(*s.period),
 					period: s.period,
 					done:   s.done,
+					stop:   s.stop,
 				}
 				//log.Printf("Ran periodic sleeper at %v\n", s.until)
 				periodicSleepers = append(periodicSleepers, s)

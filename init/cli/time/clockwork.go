@@ -18,7 +18,6 @@
 package time
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -240,14 +239,12 @@ func (fc *fakeClock) Now() time.Time {
 func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) []*sleeper {
 	periodicSleepers := make([]*sleeper, 0)
 	for _, s := range sleepers {
-		//log.Printf("Examining sleeper at %v\n", s.until)
 		if end.Sub(s.until) >= 0 {
 			select {
 			case s.done <- s.until:
 				// Great, we've sent it.
 			case <-s.stop:
 				// Channel was stopped instead, forget this sleeper.
-				log.Printf("Timer/ticker '%p' was stopped, not sending update at %v\n", s, s.until)
 				continue
 			}
 			// Re-schedule if necessary
@@ -258,13 +255,10 @@ func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) 
 					done:   s.done,
 					stop:   s.stop,
 				}
-				//log.Printf("Ran periodic sleeper at %v\n", s.until)
 				periodicSleepers = append(periodicSleepers, s)
 			} else {
-				//log.Printf("FINISHED sleeper at %v\n", s.until)
 			}
 		} else {
-			//log.Printf("Copying over sleeper at %v\n", s.until)
 			newSleepers = append(newSleepers, s)
 		}
 	}
@@ -280,7 +274,6 @@ func (fc *fakeClock) Advance(d time.Duration) {
 	fc.l.Lock()
 	defer fc.l.Unlock()
 	end := fc.time.Add(d)
-	//log.Printf("Advancing from %v -> %v\n", fc.time.String(), end.String())
 	newSleepers := make([]*sleeper, 0)
 	newSleepers = advanceTailRec(end, fc.sleepers, newSleepers)
 	fc.sleepers = newSleepers

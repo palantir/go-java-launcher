@@ -105,6 +105,7 @@ func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 			}
 			fmt.Fprintf(ctx.App.Stdout, "processes '%v' did not stop within %d seconds, so a SIGKILL was "+
 				"sent", killedProcs, numSecondsToWait)
+			return nil
 		}
 	}
 }

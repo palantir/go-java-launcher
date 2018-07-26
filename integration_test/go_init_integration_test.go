@@ -844,7 +844,6 @@ func pgrepSinglePid(t *testing.T, key string, ppid int) int {
 }
 
 func pgrepMultiPids(t *testing.T, key string, ppid int) []int {
-	// -P specifies the PPID to filter on. The started processes are always orphaned and adopted by init.
 	pidBytes, err := exec.Command("pgrep", "-f", "-P", strconv.Itoa(ppid), key).Output()
 	require.NoError(t, err)
 	pidsStrings := strings.Split(string(pidBytes), "\n")

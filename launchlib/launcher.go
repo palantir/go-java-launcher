@@ -62,7 +62,7 @@ func CompileCmdsFromConfig(
 		Dirs:           staticConfig.StaticLauncherConfig.Dirs,
 	}
 	for name, subProcStatic := range staticConfig.SubProcesses {
-		subProcCmd, err := compileSubProcCmdWithOutputFile(name, subProcStatic, customConfig.SubProcesses)
+		subProcCmd, err := compileSubProcCmdWithOutputFile(name, &subProcStatic, customConfig.SubProcesses)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to compile command with output file for subProcess %s",
 				name)
@@ -73,7 +73,7 @@ func CompileCmdsFromConfig(
 }
 
 func compileSubProcCmdWithOutputFile(
-	name string, subProcStatic StaticLauncherConfig, subProcCustoms map[string]CustomLauncherConfig) (
+	name string, subProcStatic *StaticLauncherConfig, subProcCustoms map[string]CustomLauncherConfig) (
 	subProcCmd *CmdWithContext, rErr error) {
 	subProcCustom, ok := subProcCustoms[name]
 	if !ok {
@@ -91,7 +91,7 @@ func compileSubProcCmdWithOutputFile(
 				subProcOutputFileName)
 		}
 	}()
-	cmd, err := compileCmdFromConfig(&subProcStatic, &subProcCustom, subProcStdout)
+	cmd, err := compileCmdFromConfig(subProcStatic, &subProcCustom, subProcStdout)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to compile command for subProcess config '%s'", name)
 	}

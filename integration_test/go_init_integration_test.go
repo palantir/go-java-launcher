@@ -690,7 +690,6 @@ func TestInitStop_Stoppable_TwoWrittenTwoRunning(t *testing.T) {
 // (1, 1)
 func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
-	println("testing one (running) unstoppable process written")
 	setupSingleProcess(t)
 
 	pid, killer := forkUnkillableSleep(t)
@@ -699,24 +698,18 @@ func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
 
 	exitCode, stderr := runStopAssertTimesOut(t)
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
-		"to stop: processes with pids"))
-	assert.Contains(t, stderr, strconv.Itoa(pid))
-	assert.Contains(t, stderr, "did not stop within 240 seconds")
-
-	pids := readPids(t)
-	require.Len(t, pids, 1)
-	assert.Contains(t, pids, singleProcessPrimaryName)
-
-	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	logBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	log := string(logBytes)
+	assert.Contains(t, log, "processes")
+	assert.Contains(t, log, "did not stop within 240 seconds, so a SIGKILL was sent")
 }
 
 // (2, 1)
 func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
-	println("testing one (running) unstoppable process written, one dead process written")
 	setupMultiProcess(t)
 
 	pid, killer := forkUnkillableSleep(t)
@@ -724,21 +717,18 @@ func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
 	exitCode, stderr := runStopAssertTimesOut(t)
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
-		"to stop: processes with pids"))
-	assert.Contains(t, stderr, strconv.Itoa(pid))
-	assert.Contains(t, stderr, "did not stop within 240 seconds")
-
-	pids := readPids(t)
-	proc, _ := os.FindProcess(pids[multiProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	logBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	log := string(logBytes)
+	assert.Contains(t, log, "processes")
+	assert.Contains(t, log, "did not stop within 240 seconds, so a SIGKILL was sent")
 }
 
 // (2, 2)
 func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	defer teardown(t)
-	println("testing two (running) unstoppable processes written")
 	setupMultiProcess(t)
 
 	pid1, killer1 := forkUnkillableSleep(t)
@@ -749,26 +739,21 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
 	exitCode, stderr := runStopAssertTimesOut(t)
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
-		"to stop: processes with pids"))
-	assert.Contains(t, stderr, strconv.Itoa(pid1))
-	assert.Contains(t, stderr, strconv.Itoa(pid2))
-	assert.Contains(t, stderr, "did not stop within 240 seconds")
-
-	pids := readPids(t)
-	primary, _ := os.FindProcess(pids[multiProcessPrimaryName])
-	sidecar, _ := os.FindProcess(pids[multiProcessSubProcessName])
-	require.NoError(t, primary.Signal(syscall.SIGKILL))
-	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
+	assert.Equal(t, 0, exitCode)
+	assert.Empty(t, stderr)
+	logBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	log := string(logBytes)
+	assert.Contains(t, log, "processes")
+	assert.Contains(t, log, "did not stop within 240 seconds, so a SIGKILL was sent")
 }
 
 func forkKillableSleep(t *testing.T) (pid int, killer func()) {
-	return forkAndGetPid(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000"))
+	return forkAndGetPid(t, exec.Command("/bin/sleep", "10000"))
 }
 
 func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
-	return forkAndGetPid(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000"))
+	return forkAndGetPid(t, exec.Command("testdata/unstoppable.sh"))
 }
 
 func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
@@ -777,8 +762,13 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 	command.Stdin = nil
 	require.NoError(t, command.Start())
 	// Reap it!
-	go command.Process.Wait()
-	return command.Process.Pid, func() { command.Process.Kill() }
+	go func() {
+		_, err := command.Process.Wait()
+		require.NoError(t, err)
+	}()
+	return command.Process.Pid, func() {
+		require.NoError(t, command.Process.Kill())
+	}
 }
 
 type RunInitResult struct {

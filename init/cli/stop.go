@@ -15,6 +15,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
@@ -36,7 +37,7 @@ var stopCliCommand = cli.Command{
 	Usage: `
 Ensures the service defined by the static and custom configurations are service/bin/launcher-static.yml and
 var/conf/launcher-custom.yml is not running. If successful, exits 0, otherwise exits 1 and writes an error message to
-stderr and var/log/startup.log. Waits for at least 240 seconds for any processes to stop.`,
+stderr and var/log/startup.log. Waits for at least 240 seconds for any processes to stop before sending a SIGKILL.`,
 	Action: executeWithContext(stop, appendOutputFileFlag),
 }
 
@@ -45,13 +46,13 @@ func stop(ctx cli.Context) error {
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
 	}
-	if err := stopService(runningProcs); err != nil {
+	if err := stopService(ctx, runningProcs); err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
 	}
 	return nil
 }
 
-func stopService(procs map[string]*os.Process) error {
+func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 	for name, proc := range procs {
 		if err := proc.Signal(syscall.SIGTERM); err != nil && !strings.Contains(err.Error(),
 			"os: process already finished") {
@@ -59,7 +60,7 @@ func stopService(procs map[string]*os.Process) error {
 		}
 	}
 
-	if err := waitForServiceToStop(procs); err != nil {
+	if err := waitForServiceToStop(ctx, procs); err != nil {
 		return errors.Wrap(err, "failed to stop at least one process")
 	}
 
@@ -70,7 +71,7 @@ func stopService(procs map[string]*os.Process) error {
 	return nil
 }
 
-func waitForServiceToStop(procs map[string]*os.Process) error {
+func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 	const numSecondsToWait = 240
 	timer := Clock.NewTimer(numSecondsToWait * time.Second)
 	defer timer.Stop()
@@ -90,14 +91,20 @@ func waitForServiceToStop(procs map[string]*os.Process) error {
 				return nil
 			}
 		case <-timer.Chan():
-			remainingPids := make(map[string]int, len(procs))
-			i := 0
-			for name, proc := range procs {
-				remainingPids[name] = proc.Pid
-				i++
+			killedProcs := make([]string, 0, len(procs))
+			for name, remainingProc := range procs {
+				if isProcRunning(remainingProc) {
+					if err := remainingProc.Kill(); err != nil {
+						// If this actually errors, something is probably seriously wrong.
+						// Just stop immediately.
+						return errors.Wrapf(err, "failed to kill process with pid %d",
+							remainingProc.Pid)
+					}
+					killedProcs = append(killedProcs, name)
+				}
 			}
-			return errors.Errorf("failed to wait for all processes to stop: processes with pids '%v' did "+
-				"not stop within %d seconds", remainingPids, numSecondsToWait)
+			fmt.Fprintf(ctx.App.Stdout, "processes '%v' did not stop within %d seconds, so a SIGKILL was "+
+				"sent", killedProcs, numSecondsToWait)
 		}
 	}
 }

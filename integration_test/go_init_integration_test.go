@@ -664,7 +664,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	setupSingleProcess(t)
 
-	pid := runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
+	pid := forkKillableSleep(t)
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	exitCode, stderr := runInit("stop")
 
@@ -679,8 +679,8 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	setupMultiProcess(t)
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	writePids(t, servicePids{multiProcessPrimaryName: pgrepSinglePid(t, "sleep", 1)})
+	pid = forkKillableSleep(t)
+	writePids(t, servicePids{multiProcessPrimaryName: pid})
 	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -694,12 +694,10 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	setupMultiProcess(t)
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
-	require.NoError(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 &").Run())
+	pid1 := forkKillableSleep(t)
+	pid2 := forkKillableSleep(t)
 
-	pidsSlice := pgrepMultiPids(t, "sleep", 1)
-	require.Len(t, pidsSlice, 2)
-	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
+	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
 	exitCode, stderr = runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
@@ -715,10 +713,10 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	println("testing one (running) unstoppable process written")
 	setupSingleProcess(t)
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pid = pgrepSinglePid(t, "sleep", 1)
+	pid = forkUnkillableSleep(t)
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
-	exitCode, stderr = runInit("stop")
+
+	exitCode, stderr = runStopAssertTimesOut(t)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -738,10 +736,9 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	println("testing one (running) unstoppable process written, one dead process written")
 	setupMultiProcess(t)
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pid = pgrepSinglePid(t, "sleep", 1)
+	pid = forkUnkillableSleep(t)
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
-	exitCode, stderr = runInit("stop")
+	exitCode, stderr = runStopAssertTimesOut(t)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -758,17 +755,16 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	println("testing two (running) unstoppable processes written")
 	setupMultiProcess(t)
 
-	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pidsSlice = pgrepMultiPids(t, "sleep", 1)
-	writePids(t, servicePids{multiProcessPrimaryName: pidsSlice[0], multiProcessSubProcessName: pidsSlice[1]})
-	exitCode, stderr = runInit("stop")
+	pid1 = forkUnkillableSleep(t)
+	pid2 = forkUnkillableSleep(t)
+	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
+	exitCode, stderr = runStopAssertTimesOut(t)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
 		"to stop: processes with pids"))
-	assert.Contains(t, stderr, strconv.Itoa(pidsSlice[0]))
-	assert.Contains(t, stderr, strconv.Itoa(pidsSlice[1]))
+	assert.Contains(t, stderr, strconv.Itoa(pid1))
+	assert.Contains(t, stderr, strconv.Itoa(pid2))
 	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
 	pids = readPids(t)
@@ -776,6 +772,14 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	sidecar, _ := os.FindProcess(pids[multiProcessSubProcessName])
 	require.NoError(t, primary.Signal(syscall.SIGKILL))
 	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
+}
+
+func forkKillableSleep(t *testing.T) (pid int) {
+	return runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
+}
+
+func forkUnkillableSleep(t *testing.T) (pid int) {
+	return runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
 }
 
 // Version of unstoppable (1, 1) isolated to test clock mocking
@@ -877,11 +881,28 @@ func assertContainSameElements(t *testing.T, a []int, b []int) {
 	assert.Equal(t, a, b)
 }
 
-/*func readChannel(c <-chan RunInitResult, timeout time.Duration) *RunInitResult {
+// Returns the read value if it was supplied within the timeout, otherwise nil.
+func readFromChannel(c <-chan RunInitResult, timeout time.Duration) (result *RunInitResult) {
 	select {
 	case <-time.After(timeout):
 		return nil
 	case result := <-c:
 		return &result
 	}
-}*/
+}
+
+// Runs init 'stop' and asserts that it will time out after 240 seconds.
+func runStopAssertTimesOut(t *testing.T) (int, string) {
+	clock := time2.NewFakeClock()
+	initChan := runInitWithClock(clock, "stop")
+	clock.BlockUntil(2) // wait for timer and ticker to attach
+	clock.Advance(239 * time.Second)
+	result := readFromChannel(initChan, 1*time.Second)
+	require.Nil(t, result, "Expected `stop` to still wait after 239 seconds")
+
+	clock.Advance(1 * time.Second)
+	result2 := readFromChannel(initChan, 1*time.Second)
+	require.NotNil(t, result2, "Expected `stop` to finish after 240 seconds")
+
+	return result2.exitStatus, result2.stderr
+}

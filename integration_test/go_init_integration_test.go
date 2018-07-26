@@ -782,31 +782,6 @@ func forkUnkillableSleep(t *testing.T) (pid int) {
 	return runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
 }
 
-// Version of unstoppable (1, 1) isolated to test clock mocking
-/*func TestStopShorter(t *testing.T) {
-	setupSingleProcess(t)
-	defer teardown(t)
-
-	require.NoError(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 &").Run())
-	pid := pgrepSinglePid(t, "sleep", 1)
-	writePids(t, servicePids{singleProcessPrimaryName: pid})
-	clock := time2.NewFakeClock()
-	initChan := runInitWithClock(clock, "stop")
-	clock.BlockUntil(2) // wait for timer and ticker to attach
-	clock.Advance(239 * time.Second)
-	assert.Nil(t, readChannel(initChan, 2 * time.Second))
-	clock.Advance(241 * time.Second)
-	result := readChannel(initChan, 10 * time.Second)
-	assert.NotNil(t, result) // this always fails (channel still has no result after a lot of waiting)
-
-	pids := readPids(t)
-	require.Len(t, pids, 1)
-	assert.Contains(t, pids, singleProcessPrimaryName)
-
-	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
-}*/
-
 type RunInitResult struct {
 	exitStatus int
 	stderr     string

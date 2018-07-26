@@ -636,26 +636,13 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
 
-func runCommandGetOutput(t *testing.T, cmd *exec.Cmd) string {
-	cmd.Stderr = nil
-	out, err := cmd.Output()
-	require.NoError(t, err, "Couldn't run command '%v'", cmd)
-	return string(out)
-}
-
-func runCommandGetIntOutput(t *testing.T, cmd *exec.Cmd) int {
-	stdout := strings.TrimSpace(runCommandGetOutput(t, cmd))
-	i, e := strconv.Atoi(stdout)
-	require.NoError(t, e, "Expected int output but got: %v", stdout)
-	return i
-}
-
 // (1, 1)
 func TestInitStop_Stoppable_OneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 	setupSingleProcess(t)
 
-	pid := forkKillableSleep(t)
+	pid, killer := forkKillableSleep(t)
+	defer killer()
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 	exitCode, stderr := runInit("stop")
 
@@ -670,7 +657,8 @@ func TestInitStop_Stoppable_TwoWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 	setupMultiProcess(t)
 
-	pid := forkKillableSleep(t)
+	pid, killer := forkKillableSleep(t)
+	defer killer()
 	writePids(t, servicePids{multiProcessPrimaryName: pid})
 	exitCode, stderr := runInit("stop")
 
@@ -685,8 +673,10 @@ func TestInitStop_Stoppable_TwoWrittenTwoRunning(t *testing.T) {
 	defer teardown(t)
 	setupMultiProcess(t)
 
-	pid1 := forkKillableSleep(t)
-	pid2 := forkKillableSleep(t)
+	pid1, killer1 := forkKillableSleep(t)
+	defer killer1()
+	pid2, killer2 := forkKillableSleep(t)
+	defer killer2()
 
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
 	exitCode, stderr := runInit("stop")
@@ -703,7 +693,8 @@ func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
 	println("testing one (running) unstoppable process written")
 	setupSingleProcess(t)
 
-	pid := forkUnkillableSleep(t)
+	pid, killer := forkUnkillableSleep(t)
+	defer killer()
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 
 	exitCode, stderr := runStopAssertTimesOut(t)
@@ -728,7 +719,8 @@ func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
 	println("testing one (running) unstoppable process written, one dead process written")
 	setupMultiProcess(t)
 
-	pid := forkUnkillableSleep(t)
+	pid, killer := forkUnkillableSleep(t)
+	defer killer()
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
 	exitCode, stderr := runStopAssertTimesOut(t)
 
@@ -749,8 +741,11 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	println("testing two (running) unstoppable processes written")
 	setupMultiProcess(t)
 
-	pid1 := forkUnkillableSleep(t)
-	pid2 := forkUnkillableSleep(t)
+	pid1, killer1 := forkUnkillableSleep(t)
+	defer killer1()
+	pid2, killer2 := forkUnkillableSleep(t)
+	defer killer2()
+
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
 	exitCode, stderr := runStopAssertTimesOut(t)
 
@@ -768,12 +763,22 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
 }
 
-func forkKillableSleep(t *testing.T) (pid int) {
-	return runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
+func forkKillableSleep(t *testing.T) (pid int, killer func()) {
+	return forkAndGetPid(t, exec.Command("/bin/sh", "-c", "/bin/sleep 10000"))
 }
 
-func forkUnkillableSleep(t *testing.T) (pid int) {
-	return runCommandGetIntOutput(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000 >/dev/null 2>&1 & echo $!"))
+func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
+	return forkAndGetPid(t, exec.Command("/bin/sh", "-c", "trap '' 15; /bin/sleep 10000"))
+}
+
+func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
+	command.Stderr = nil
+	command.Stdout = nil
+	command.Stdin = nil
+	require.NoError(t, command.Start())
+	// Reap it!
+	go command.Process.Wait()
+	return command.Process.Pid, func() { command.Process.Kill() }
 }
 
 type RunInitResult struct {

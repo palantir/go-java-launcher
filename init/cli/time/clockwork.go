@@ -139,10 +139,11 @@ func (ft *fakeTimer) Stop() {
 		fc := ft.fc
 		// Notify the stop channel. This should not block since we give it a buffer of 1.
 		ft.sleeper.stop <- true
-		// Close the channel before locking! That's important to prevent deadlocks
-		close(ft.c)
 		fc.l.Lock()
 		defer fc.l.Unlock()
+		// Close the channel. There are weird concurrency issues if we close it before locking.
+		// The 'Advance' logic won't block sending to the channel, since we signalled ft.sleeper.stop.
+		close(ft.c)
 		// Remove the sleeper (if it exists) and notify any blockers
 		newSleepers := make([]*sleeper, 0)
 		for _, s := range fc.sleepers {

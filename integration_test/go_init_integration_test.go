@@ -708,9 +708,6 @@ func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	assert.Contains(t, pids, singleProcessPrimaryName)
-
-	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
 }
 
 // (2, 1)
@@ -729,10 +726,6 @@ func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
 		"to stop: processes with pids"))
 	assert.Contains(t, stderr, strconv.Itoa(pid))
 	assert.Contains(t, stderr, "did not stop within 240 seconds")
-
-	pids := readPids(t)
-	proc, _ := os.FindProcess(pids[multiProcessPrimaryName])
-	require.NoError(t, proc.Signal(syscall.SIGKILL))
 }
 
 // (2, 2)
@@ -755,12 +748,6 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	assert.Contains(t, stderr, strconv.Itoa(pid1))
 	assert.Contains(t, stderr, strconv.Itoa(pid2))
 	assert.Contains(t, stderr, "did not stop within 240 seconds")
-
-	pids := readPids(t)
-	primary, _ := os.FindProcess(pids[multiProcessPrimaryName])
-	sidecar, _ := os.FindProcess(pids[multiProcessSubProcessName])
-	require.NoError(t, primary.Signal(syscall.SIGKILL))
-	require.NoError(t, sidecar.Signal(syscall.SIGKILL))
 }
 
 func forkKillableSleep(t *testing.T) (pid int, killer func()) {

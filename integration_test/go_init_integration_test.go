@@ -650,18 +650,9 @@ func runCommandGetIntOutput(t *testing.T, cmd *exec.Cmd) int {
 	return i
 }
 
-/*
- * In these tests, stop should actually stop something. Have to run all in the same test function since they all need
- * to have exclusive use of the process table.
- */
-
-func TestInitStop_StopsOrWaits(t *testing.T) {
+// (1, 1)
+func TestInitStop_Stoppable_OneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
-
-	// Stoppable processes:
-
-	// (1, 1)
-
 	setupSingleProcess(t)
 
 	pid := forkKillableSleep(t)
@@ -672,51 +663,50 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	assert.Empty(t, stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+}
 
-	teardown(t)
-
-	// (2, 1)
-
+// (2, 1)
+func TestInitStop_Stoppable_TwoWrittenOneRunning(t *testing.T) {
+	defer teardown(t)
 	setupMultiProcess(t)
 
-	pid = forkKillableSleep(t)
+	pid := forkKillableSleep(t)
 	writePids(t, servicePids{multiProcessPrimaryName: pid})
-	exitCode, stderr = runInit("stop")
+	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
-	_, err = ioutil.ReadFile(pidfile)
+	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+}
 
-	teardown(t)
-
-	// (2, 2)
-
+// (2, 2)
+func TestInitStop_Stoppable_TwoWrittenTwoRunning(t *testing.T) {
+	defer teardown(t)
 	setupMultiProcess(t)
 
 	pid1 := forkKillableSleep(t)
 	pid2 := forkKillableSleep(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
-	exitCode, stderr = runInit("stop")
+	exitCode, stderr := runInit("stop")
 
 	assert.Equal(t, 0, exitCode)
 	assert.Empty(t, stderr)
-	_, err = ioutil.ReadFile(pidfile)
+	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+}
 
-	teardown(t)
-
-	// Unstoppable processes:
-
-	// (1, 1)
+// (1, 1)
+func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
+	defer teardown(t)
 	println("testing one (running) unstoppable process written")
 	setupSingleProcess(t)
 
-	pid = forkUnkillableSleep(t)
+	pid := forkUnkillableSleep(t)
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 
-	exitCode, stderr = runStopAssertTimesOut(t)
+	exitCode, stderr := runStopAssertTimesOut(t)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -730,15 +720,17 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 
 	proc, _ := os.FindProcess(pids[singleProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
+}
 
-	// (2, 1)
+// (2, 1)
+func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
+	defer teardown(t)
 	println("testing one (running) unstoppable process written, one dead process written")
 	setupMultiProcess(t)
 
-	pid = forkUnkillableSleep(t)
+	pid := forkUnkillableSleep(t)
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
-	exitCode, stderr = runStopAssertTimesOut(t)
+	exitCode, stderr := runStopAssertTimesOut(t)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -746,19 +738,21 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	assert.Contains(t, stderr, strconv.Itoa(pid))
 	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
-	pids = readPids(t)
-	proc, _ = os.FindProcess(pids[multiProcessPrimaryName])
+	pids := readPids(t)
+	proc, _ := os.FindProcess(pids[multiProcessPrimaryName])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
-	teardown(t)
+}
 
-	// (2, 2)
+// (2, 2)
+func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
+	defer teardown(t)
 	println("testing two (running) unstoppable processes written")
 	setupMultiProcess(t)
 
-	pid1 = forkUnkillableSleep(t)
-	pid2 = forkUnkillableSleep(t)
+	pid1 := forkUnkillableSleep(t)
+	pid2 := forkUnkillableSleep(t)
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
-	exitCode, stderr = runStopAssertTimesOut(t)
+	exitCode, stderr := runStopAssertTimesOut(t)
 
 	assert.Equal(t, 1, exitCode)
 	assert.Contains(t, stderr, fmt.Sprintf("failed to stop at least one process: failed to wait for all processes "+
@@ -767,7 +761,7 @@ func TestInitStop_StopsOrWaits(t *testing.T) {
 	assert.Contains(t, stderr, strconv.Itoa(pid2))
 	assert.Contains(t, stderr, "did not stop within 240 seconds")
 
-	pids = readPids(t)
+	pids := readPids(t)
 	primary, _ := os.FindProcess(pids[multiProcessPrimaryName])
 	sidecar, _ := os.FindProcess(pids[multiProcessSubProcessName])
 	require.NoError(t, primary.Signal(syscall.SIGKILL))

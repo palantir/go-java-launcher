@@ -419,7 +419,7 @@ func TestInitStart_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
 }
 
 /*
- * Same states appy to status.
+ * Same states apply to status.
  */
 
 func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {

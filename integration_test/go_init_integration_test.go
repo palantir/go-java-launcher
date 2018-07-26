@@ -767,7 +767,10 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 		require.NoError(t, err)
 	}()
 	return command.Process.Pid, func() {
-		require.NoError(t, command.Process.Kill())
+		if err := command.Process.Kill(); err != nil && !strings.Contains(err.Error(),
+			"os: process already finished") {
+				t.Fatalf("failed to kill forked process with error %s", err.Error())
+		}
 	}
 }
 

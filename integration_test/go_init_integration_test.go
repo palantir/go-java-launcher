@@ -771,8 +771,8 @@ func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
 }
 
 func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
-	command.Stderr = nil
-	command.Stdout = nil
+	command.Stderr = os.Stderr
+	command.Stdout = os.Stdout
 	command.Stdin = nil
 	require.NoError(t, command.Start())
 	// Reap it!

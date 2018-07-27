@@ -790,6 +790,7 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 
 type RunInitResult struct {
 	exitStatus int
+	startupLog string
 	stderr     string
 }
 
@@ -809,7 +810,13 @@ func runInitWithClock(clock time2.Clock, args ...string) <-chan RunInitResult {
 		// Empty string as placeholder for executable path as would be the case in real invocation
 		exitStatus := app.Run(append([]string{""}, args...))
 		stderr := errbuf.String()
-		out <- RunInitResult{exitStatus, stderr}
+		startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+		if err != nil {
+			panic(err)
+		}
+		//require.NoError(t, err)
+		startupLog := string(startupLogBytes)
+		out <- RunInitResult{exitStatus, startupLog, stderr}
 	}()
 	return out
 }

@@ -61,6 +61,6 @@ func executeWithContext(action func(cli.Context) error, fileFlag int) func(cli.C
 
 func logErrorAndReturnWithExitCode(ctx cli.Context, err error, exitCode int) cli.ExitCoder {
 	// We still want to write the error to stderr if we can't write it to the startup log file.
-	_, _ = fmt.Println(ctx.App.Stdout, err)
+	_, _ = fmt.Fprintln(ctx.App.Stdout, err)
 	return cli.WithExitCode(exitCode, err)
 }

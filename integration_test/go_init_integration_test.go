@@ -109,12 +109,9 @@ func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
 	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0644))
-	_, _ = runInit("start")
+	result := runInit(t, "start")
 
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	startupLog := string(startupLogBytes)
-	assert.NotContains(t, startupLog, stringThatShouldDisappear)
+	assert.NotContains(t, result.startupLog, stringThatShouldDisappear)
 }
 
 /*
@@ -132,10 +129,11 @@ func TestInitStart_NoConfig(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "failed to determine service status to determine what commands to run")
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.startupLog, "failed to determine service status to determine what commands to run")
+	assert.Contains(t, result.stderr, "failed to determine service status to determine what commands to run")
 }
 
 // (0, 0, 0)
@@ -143,10 +141,11 @@ func TestInitStart_BadConfig(t *testing.T) {
 	setupBadConfig(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "failed to determine service status to determine what commands to run")
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.startupLog, "failed to determine service status to determine what commands to run")
+	assert.Contains(t, result.stderr, "failed to determine service status to determine what commands to run")
 }
 
 /*
@@ -159,13 +158,13 @@ func TestInitStart_OneConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, map[string]int{singleProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	assert.Equal(t, os.Getpid(), readPids(t)[singleProcessPrimaryName])
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 }
 
 // (2, 2, 2)
@@ -179,14 +178,14 @@ func TestInitStart_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
 	}()
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
 	assert.Equal(t, cmd.Process.Pid, pids[multiProcessSubProcessName])
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 }
 
 /*
@@ -199,16 +198,16 @@ func TestInitStart_CreatesDirs(t *testing.T) {
 	setup(t)
 	require.NoError(t, os.Link("testdata/launcher-static-with-dirs.yml", launcherStaticFile))
 
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
+	// Wait for JVM to start up and print output
 	time.Sleep(time.Second)
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	startupLog := string(startupLogBytes)
+	// Re-read startup log to get what JVM wrote after go-init executed
+	startupLog := readStartupLog(t)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	dir, err := os.Stat("foo")
 	assert.NoError(t, err)
 	assert.True(t, dir.IsDir())
@@ -231,16 +230,14 @@ func TestInitStart_OneConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	startupLog := string(startupLogBytes)
+	startupLog := readStartupLog(t)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[singleProcessPrimaryName])
@@ -255,16 +252,14 @@ func TestInitStart_OneConfiguredOneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
-	time.Sleep(time.Second) // Wait for JVM to start and print output
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	startupLog := string(startupLogBytes)
+	assert.Equal(t, 0, result.exitCode)
+	time.Sleep(time.Second)
+	startupLog := readStartupLog(t)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[singleProcessPrimaryName])
@@ -278,21 +273,19 @@ func TestInitStart_TwoConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
-	primaryStartupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	primaryStartupLog := string(primaryStartupLogBytes)
-	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, primaryStartupLog, "main method")
+	startupLog := readStartupLog(t)
+	assert.Contains(t, startupLog, "Using JAVA_HOME")
+	assert.Contains(t, startupLog, "main method")
 	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
 	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
@@ -310,21 +303,19 @@ func TestInitStart_TwoConfiguredOneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99999})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
-	primaryStartupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	primaryStartupLog := string(primaryStartupLogBytes)
-	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, primaryStartupLog, "main method")
+	startupLog := readStartupLog(t)
+	assert.Contains(t, startupLog, "Using JAVA_HOME")
+	assert.Contains(t, startupLog, "main method")
 	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
 	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
@@ -342,16 +333,16 @@ func TestInitStart_TwoConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
 	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
 	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
@@ -367,21 +358,19 @@ func TestInitStart_TwoConfiguredTwoWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
-	primaryStartupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	primaryStartupLog := string(primaryStartupLogBytes)
-	assert.Contains(t, primaryStartupLog, "Using JAVA_HOME")
-	assert.Contains(t, primaryStartupLog, "main method")
+	startupLog := readStartupLog(t)
+	assert.Contains(t, startupLog, "Using JAVA_HOME")
+	assert.Contains(t, startupLog, "main method")
 	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
 	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assertContainSameElements(t, pgrepMultiPids(t, "testdata", os.Getpid()),
@@ -399,16 +388,16 @@ func TestInitStart_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit("start")
+	result := runInit(t, "start")
 
-	assert.Equal(t, 0, exitCode)
+	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
 	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
 	assert.Contains(t, sidecarStartupLog, "main method")
-	assert.Empty(t, stderr)
+	assert.Empty(t, result.stderr)
 	pids := readPids(t)
 	require.Len(t, pids, 2)
 	assert.Equal(t, os.Getpid(), pids[multiProcessPrimaryName])
@@ -430,12 +419,9 @@ func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
 	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
-	_, _ = runInit("status")
+	result := runInit(t, "status")
 
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	startupLog := string(startupLogBytes)
-	assert.Contains(t, startupLog, stringThatShouldRemain)
+	assert.Contains(t, result.startupLog, stringThatShouldRemain)
 }
 
 // (0, 0, 0)
@@ -443,10 +429,11 @@ func TestInitStatus_NoConfig(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 4, exitCode)
-	assert.Contains(t, stderr, "failed to determine service status")
+	assert.Equal(t, 4, result.exitCode)
+	assert.Contains(t, result.stderr, "failed to determine service status")
+	assert.Contains(t, result.startupLog, "failed to determine service status")
 }
 
 // (0, 0, 0)
@@ -454,10 +441,11 @@ func TestInitStatus_BadConfig(t *testing.T) {
 	setupBadConfig(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 4, exitCode)
-	assert.Contains(t, stderr, "failed to determine service status")
+	assert.Equal(t, 4, result.exitCode)
+	assert.Contains(t, result.stderr, "failed to determine service status")
+	assert.Contains(t, result.startupLog, "failed to determine service status")
 }
 
 // (1, 0, 0)
@@ -465,10 +453,11 @@ func TestInitStatus_OneConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupSingleProcess(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 3, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
+	assert.Equal(t, 3, result.exitCode)
+	assert.Contains(t, result.stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
+	assert.Contains(t, result.startupLog, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
 }
 
 // (1, 1, 0)
@@ -477,10 +466,11 @@ func TestInitStatus_OneConfiguredOneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.stderr, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
+	assert.Contains(t, result.startupLog, fmt.Sprintf("commands '[%s]' are not running", singleProcessPrimaryName))
 }
 
 // (1, 1, 1)
@@ -489,10 +479,10 @@ func TestInitStatus_OneConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 }
 
 // (2, 0, 0)
@@ -500,13 +490,17 @@ func TestInitStatus_TwoConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	setupMultiProcess(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 3, exitCode)
-	assert.Contains(t, stderr, "commands")
-	assert.Contains(t, stderr, multiProcessPrimaryName)
-	assert.Contains(t, stderr, multiProcessSubProcessName)
-	assert.Contains(t, stderr, "are not running")
+	assert.Equal(t, 3, result.exitCode)
+	assert.Contains(t, result.stderr, "commands")
+	assert.Contains(t, result.stderr, multiProcessPrimaryName)
+	assert.Contains(t, result.stderr, multiProcessSubProcessName)
+	assert.Contains(t, result.stderr, "are not running")
+	assert.Contains(t, result.startupLog, "commands")
+	assert.Contains(t, result.startupLog, multiProcessPrimaryName)
+	assert.Contains(t, result.startupLog, multiProcessSubProcessName)
+	assert.Contains(t, result.startupLog, "are not running")
 }
 
 // (2, 1, 0)
@@ -515,13 +509,17 @@ func TestInitStatus_TwoConfiguredOneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99999})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "commands")
-	assert.Contains(t, stderr, multiProcessPrimaryName)
-	assert.Contains(t, stderr, multiProcessSubProcessName)
-	assert.Contains(t, stderr, "are not running")
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.stderr, "commands")
+	assert.Contains(t, result.stderr, multiProcessPrimaryName)
+	assert.Contains(t, result.stderr, multiProcessSubProcessName)
+	assert.Contains(t, result.stderr, "are not running")
+	assert.Contains(t, result.startupLog, "commands")
+	assert.Contains(t, result.startupLog, multiProcessPrimaryName)
+	assert.Contains(t, result.startupLog, multiProcessSubProcessName)
+	assert.Contains(t, result.startupLog, "are not running")
 }
 
 // (2, 1, 1)
@@ -530,10 +528,12 @@ func TestInitStatus_TwoConfiguredOneWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid()})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", multiProcessSubProcessName))
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.stderr, fmt.Sprintf("commands '[%s]' are not running", multiProcessSubProcessName))
+	assert.Contains(t, result.startupLog, fmt.Sprintf("commands '[%s]' are not running",
+		multiProcessSubProcessName))
 }
 
 // (2, 2, 0)
@@ -542,13 +542,17 @@ func TestInitStatus_TwoConfiguredTwoWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, "commands")
-	assert.Contains(t, stderr, multiProcessPrimaryName)
-	assert.Contains(t, stderr, multiProcessSubProcessName)
-	assert.Contains(t, stderr, "are not running")
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.stderr, "commands")
+	assert.Contains(t, result.stderr, multiProcessPrimaryName)
+	assert.Contains(t, result.stderr, multiProcessSubProcessName)
+	assert.Contains(t, result.stderr, "are not running")
+	assert.Contains(t, result.startupLog, "commands")
+	assert.Contains(t, result.startupLog, multiProcessPrimaryName)
+	assert.Contains(t, result.startupLog, multiProcessSubProcessName)
+	assert.Contains(t, result.startupLog, "are not running")
 }
 
 // (2, 2, 1)
@@ -557,10 +561,12 @@ func TestInitStatus_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 1, exitCode)
-	assert.Contains(t, stderr, fmt.Sprintf("commands '[%s]' are not running", multiProcessSubProcessName))
+	assert.Equal(t, 1, result.exitCode)
+	assert.Contains(t, result.stderr, fmt.Sprintf("commands '[%s]' are not running", multiProcessSubProcessName))
+	assert.Contains(t, result.startupLog, fmt.Sprintf("commands '[%s]' are not running",
+		multiProcessSubProcessName))
 }
 
 // (2, 2, 2)
@@ -574,10 +580,10 @@ func TestInitStatus_TwoConfiguredTwoWrittenTwoRunning(t *testing.T) {
 		require.NoError(t, cmd.Process.Signal(syscall.SIGKILL))
 	}()
 	writePids(t, servicePids{multiProcessPrimaryName: os.Getpid(), multiProcessSubProcessName: cmd.Process.Pid})
-	exitCode, stderr := runInit("status")
+	result := runInit(t, "status")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 }
 
 func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
@@ -588,12 +594,9 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
 	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
-	_, _ = runInit("stop")
+	result := runInit(t, "stop")
 
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	startupLog := string(startupLogBytes)
-	assert.Contains(t, startupLog, stringThatShouldRemain)
+	assert.Contains(t, result.startupLog, stringThatShouldRemain)
 }
 
 /*
@@ -610,10 +613,10 @@ func TestInitStop_ZeroWrittenZeroRunning(t *testing.T) {
 	setup(t)
 	defer teardown(t)
 
-	exitCode, stderr := runInit("stop")
+	result := runInit(t, "stop")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
@@ -624,10 +627,10 @@ func TestInitStop_OneWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{singleProcessPrimaryName: 99999})
-	exitCode, stderr := runInit("stop")
+	result := runInit(t, "stop")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
@@ -638,10 +641,10 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 	defer teardown(t)
 
 	writePids(t, servicePids{multiProcessPrimaryName: 99998, multiProcessSubProcessName: 99999})
-	exitCode, stderr := runInit("stop")
+	result := runInit(t, "stop")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
@@ -658,10 +661,10 @@ func TestInitStop_Stoppable_OneWrittenOneRunning(t *testing.T) {
 	pid, killer := forkKillableSleep(t)
 	defer killer()
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
-	exitCode, stderr := runInit("stop")
+	result := runInit(t, "stop")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
@@ -674,10 +677,10 @@ func TestInitStop_Stoppable_TwoWrittenOneRunning(t *testing.T) {
 	pid, killer := forkKillableSleep(t)
 	defer killer()
 	writePids(t, servicePids{multiProcessPrimaryName: pid})
-	exitCode, stderr := runInit("stop")
+	result := runInit(t, "stop")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
@@ -693,10 +696,10 @@ func TestInitStop_Stoppable_TwoWrittenTwoRunning(t *testing.T) {
 	defer killer2()
 
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
-	exitCode, stderr := runInit("stop")
+	result := runInit(t, "stop")
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
 	_, err := ioutil.ReadFile(pidfile)
 	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
 }
@@ -710,15 +713,12 @@ func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
 	defer killer()
 	writePids(t, servicePids{singleProcessPrimaryName: pid})
 
-	exitCode, stderr := runStopAssertTimesOut(t)
+	result := runStopAssertTimesOut(t)
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
-	logBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	log := string(logBytes)
-	assert.Contains(t, log, "processes")
-	assert.Contains(t, log, "did not stop within 240 seconds, so a SIGKILL was sent")
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
+	assert.Contains(t, result.startupLog, "processes")
+	assert.Contains(t, result.startupLog, "did not stop within 240 seconds, so a SIGKILL was sent")
 }
 
 // (2, 1)
@@ -729,15 +729,12 @@ func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
 	pid, killer := forkUnkillableSleep(t)
 	defer killer()
 	writePids(t, servicePids{multiProcessPrimaryName: pid, multiProcessSubProcessName: 99999})
-	exitCode, stderr := runStopAssertTimesOut(t)
+	result := runStopAssertTimesOut(t)
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
-	logBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	log := string(logBytes)
-	assert.Contains(t, log, "processes")
-	assert.Contains(t, log, "did not stop within 240 seconds, so a SIGKILL was sent")
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
+	assert.Contains(t, result.startupLog, "processes")
+	assert.Contains(t, result.startupLog, "did not stop within 240 seconds, so a SIGKILL was sent")
 }
 
 // (2, 2)
@@ -751,15 +748,12 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	defer killer2()
 
 	writePids(t, servicePids{multiProcessPrimaryName: pid1, multiProcessSubProcessName: pid2})
-	exitCode, stderr := runStopAssertTimesOut(t)
+	result := runStopAssertTimesOut(t)
 
-	assert.Equal(t, 0, exitCode)
-	assert.Empty(t, stderr)
-	logBytes, err := ioutil.ReadFile(primaryOutputFile)
-	require.NoError(t, err)
-	log := string(logBytes)
-	assert.Contains(t, log, "processes")
-	assert.Contains(t, log, "did not stop within 240 seconds, so a SIGKILL was sent")
+	assert.Equal(t, 0, result.exitCode)
+	assert.Empty(t, result.stderr)
+	assert.Contains(t, result.startupLog, "processes")
+	assert.Contains(t, result.startupLog, "did not stop within 240 seconds, so a SIGKILL was sent")
 }
 
 func forkKillableSleep(t *testing.T) (pid int, killer func()) {
@@ -788,37 +782,36 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 	}
 }
 
-type RunInitResult struct {
-	exitStatus int
-	startupLog string
+type initResult struct {
+	exitCode   int
 	stderr     string
+	startupLog string
 }
 
-func runInit(args ...string) (int, string) {
-	initResult := <-runInitWithClock(time2.NewRealClock(), args...)
-	return initResult.exitStatus, initResult.stderr
+func runInit(t *testing.T, args ...string) initResult {
+	return <-runInitWithClock(t, time2.NewRealClock(), args...)
 }
 
-func runInitWithClock(clock time2.Clock, args ...string) <-chan RunInitResult {
+func runInitWithClock(t *testing.T, clock time2.Clock, args ...string) <-chan initResult {
 	var errbuf bytes.Buffer
 	cli2.Clock = clock
 	app := cli2.App()
 	app.Stderr = &errbuf
 
-	out := make(chan RunInitResult)
+	out := make(chan initResult)
 	go func() {
 		// Empty string as placeholder for executable path as would be the case in real invocation
-		exitStatus := app.Run(append([]string{""}, args...))
+		exitCode := app.Run(append([]string{""}, args...))
 		stderr := errbuf.String()
-		startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
-		if err != nil {
-			panic(err)
-		}
-		//require.NoError(t, err)
-		startupLog := string(startupLogBytes)
-		out <- RunInitResult{exitStatus, startupLog, stderr}
+		out <- initResult{exitCode: exitCode, stderr: stderr, startupLog: readStartupLog(t)}
 	}()
 	return out
+}
+
+func readStartupLog(t *testing.T) string {
+	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	require.NoError(t, err)
+	return string(startupLogBytes)
 }
 
 func writePids(t *testing.T, pids servicePids) {
@@ -869,7 +862,7 @@ func assertContainSameElements(t *testing.T, a []int, b []int) {
 }
 
 // Returns the read value if it was supplied within the timeout, otherwise nil.
-func readFromChannel(c <-chan RunInitResult, timeout time.Duration) (result *RunInitResult) {
+func readFromChannel(c <-chan initResult, timeout time.Duration) (result *initResult) {
 	select {
 	case <-time.After(timeout):
 		return nil
@@ -879,9 +872,9 @@ func readFromChannel(c <-chan RunInitResult, timeout time.Duration) (result *Run
 }
 
 // Runs init 'stop' and asserts that it will time out after 240 seconds.
-func runStopAssertTimesOut(t *testing.T) (int, string) {
+func runStopAssertTimesOut(t *testing.T) *initResult {
 	clock := time2.NewFakeClock()
-	initChan := runInitWithClock(clock, "stop")
+	initChan := runInitWithClock(t, clock, "stop")
 	clock.BlockUntil(2) // wait for timer and ticker to attach
 	clock.Advance(239 * time.Second)
 	result := readFromChannel(initChan, 1*time.Second)
@@ -891,5 +884,5 @@ func runStopAssertTimesOut(t *testing.T) (int, string) {
 	result2 := readFromChannel(initChan, 1*time.Second)
 	require.NotNil(t, result2, "Expected `stop` to finish after 240 seconds")
 
-	return result2.exitStatus, result2.stderr
+	return result2
 }

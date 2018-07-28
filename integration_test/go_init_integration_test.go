@@ -787,12 +787,13 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd, expectedSignal syscall.Signa
 		// To avoid races, start the process in the same goroutine where we wait for it.
 		require.NoError(t, command.Start())
 		// Close it after start, since we gave it to the command (by passing it to command.ExtraFiles)
-		pw.Close()
+		require.NoError(t, pw.Close())
 
 		// Then, send back the process as soon as it's READY.
 		go func() {
 			// Wait until EOF
-			io.Copy(ioutil.Discard, pr)
+			_, e := io.Copy(ioutil.Discard, pr)
+			require.NoError(t, e)
 			launched <- command.Process
 		}()
 

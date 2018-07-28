@@ -1,6 +1,5 @@
 #!/bin/sh
-trap 'echo "Caught and swallowed SIGTERM"' 15
-echo "Hello, I am unstoppable $$"
+echo "Hello, I am stoppable $$"
 
 # Close fd 3 to signal we're ready
 exec 3>-

@@ -77,7 +77,11 @@ func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (s
 }
 
 func TestMain(m *testing.M) {
-	javaHome, _ := filepath.Abs("jdk")
+	jdkDir := "jdk"
+	javaHome, err := filepath.Abs(jdkDir)
+	if err != nil {
+		log.Fatalf("Failed to calculate absolute path of '%s': %v\n", jdkDir, err)
+	}
 	if err := os.Setenv("JAVA_HOME", javaHome); err != nil {
 		log.Fatalln("Failed to set a mock JAVA_HOME", err)
 	}

@@ -15,8 +15,10 @@
 package integration_test
 
 import (
+	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/palantir/godel/pkg/products/v2/products"
@@ -72,4 +74,12 @@ func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (s
 	cmd := exec.Command(cli, staticConfigFile, customConfigFile)
 	outputBytes, err := cmd.CombinedOutput()
 	return string(outputBytes), err
+}
+
+func TestMain(m *testing.M) {
+	javaHome, _ := filepath.Abs("jdk")
+	if err := os.Setenv("JAVA_HOME", javaHome); err != nil {
+		log.Fatalln("Failed to set a mock JAVA_HOME", err)
+	}
+	os.Exit(m.Run())
 }

@@ -5,6 +5,5 @@ echo "Hello, I am unstoppable $$"
 # Close fd 3 to signal we're ready
 exec 3>-
 
-for i in {0..99}; do
-    sleep 5
-done
+# Close >&1 and >&2 so sleep doesn't inherit them
+sleep 10000 >&- 2>&1

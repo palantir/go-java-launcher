@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -833,7 +832,7 @@ func waitProcess(t *testing.T, command *exec.Cmd) int {
 		}
 	} else {
 		ws := state.Sys().(syscall.WaitStatus)
-		log.Printf("No error, relying on syscall.WaitStatus: %v\n", ws)
+		t.Logf("No error, relying on syscall.WaitStatus: %v\n", ws)
 		return ws.ExitStatus()
 	}
 }

@@ -6,4 +6,4 @@ echo "Hello, I am unstoppable $$"
 exec 3>-
 
 # Close >&1 and >&2 so sleep doesn't inherit them
-sleep 10000 >&- 2>&1
+sleep 10000 >/dev/null 2>&1

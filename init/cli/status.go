@@ -16,29 +16,43 @@ package cli
 
 import (
 	"github.com/palantir/pkg/cli"
-
-	"github.com/palantir/go-java-launcher/init/lib"
+	"github.com/pkg/errors"
 )
 
-func statusCommand() cli.Command {
-	return cli.Command{
-		Name: "status",
-		Usage: `
-Determines the status of the process the PID of which is written to var/run/service.pid.
+var statusCliCommand = cli.Command{
+	Name: "status",
+	Usage: `
+Determines the status of the service defined by the static and custom configurations at service/bin/launcher-static.yml
+and var/conf/launcher-custom.yml.
 Exits:
-- 0 if the pidfile exists and can be read and the process is running
-- 1 if the pidfile exists and can be read but the process is not running
-- 3 if the pidfile does not exist or cannot be read
-If exit code is nonzero, writes an error message to stderr.`,
-		Action: func(_ cli.Context) error {
-			return status()
-		},
-	}
+- 0 if all of its processes are running
+- 1 if at least one process is not running but there is a record of processes having been started
+- 3 if no processes are running and there is no record of processes having been started
+- 4 if the status cannot be determined
+If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
+	Action: executeWithContext(status, appendOutputFileFlag),
 }
 
-func status() error {
-	if _, status, err := lib.GetProcessStatus(); err != nil {
-		return cli.WithExitCode(status, err)
+func status(ctx cli.Context) error {
+	serviceStatus, err := getServiceStatus(ctx)
+	if err != nil {
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 4)
+	}
+	if len(serviceStatus.notRunningCmds) > 0 {
+		notRunningCmdNames := make([]string, 0, len(serviceStatus.notRunningCmds))
+		for name := range serviceStatus.notRunningCmds {
+			notRunningCmdNames = append(notRunningCmdNames, name)
+		}
+		if len(serviceStatus.writtenPids) > 0 {
+			return logErrorAndReturnWithExitCode(
+				ctx,
+				errors.Errorf("commands '%v' are not running but there is a record of commands '%v'"+
+					"having been started", notRunningCmdNames, serviceStatus.writtenPids),
+				1,
+			)
+		}
+		return logErrorAndReturnWithExitCode(ctx, errors.Errorf("commands '%v' are not running",
+			notRunningCmdNames), 3)
 	}
 	return nil
 }

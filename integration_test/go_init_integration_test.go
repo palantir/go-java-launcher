@@ -795,7 +795,8 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 		}()
 
 		// Reap it!
-		exitcode := waitProcess(t, command)
+		waitStatus := waitProcess(t, command)
+		exitcode := waitStatus.ExitStatus()
 		output := b.String()
 		pid := command.Process.Pid
 		t.Logf("Process %d exited with exit code %v and output: '%s'\n", pid, exitcode, output)
@@ -813,7 +814,7 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 	}
 }
 
-func waitProcess(t *testing.T, command *exec.Cmd) int {
+func waitProcess(t *testing.T, command *exec.Cmd) (waitStatus *syscall.WaitStatus) {
 	err := command.Wait()
 	state := command.ProcessState
 	if err != nil {
@@ -821,19 +822,19 @@ func waitProcess(t *testing.T, command *exec.Cmd) int {
 		if exitError, ok := err.(*exec.ExitError); ok {
 			t.Logf("command.Wait() for pid %d yielded ExitError: %v\n", state.Pid(), err)
 			ws := exitError.Sys().(syscall.WaitStatus)
-			return ws.ExitStatus()
+			return &ws
 		} else {
 			// This will happen (in OSX) if `name` is not available in $PATH,
 			// in this situation, exit code could not be get, and stderr will be
 			// empty string very likely, so we use the default fail code, and format err
 			// to string and set to stderr
 			t.Logf("Could not get exit code for failed program: %v. Error: %v\n", command.Args, err)
-			return -1
+			return nil
 		}
 	} else {
 		ws := state.Sys().(syscall.WaitStatus)
-		t.Logf("No error, relying on syscall.WaitStatus: %v\n", ws)
-		return ws.ExitStatus()
+		t.Logf("Process %d exited with WaitStatus: %v\n", state.Pid(), ws)
+		return &ws
 	}
 }
 

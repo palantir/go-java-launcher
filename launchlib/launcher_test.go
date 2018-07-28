@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"testing"
@@ -23,12 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type mockProcessExecutor struct {
-	command string
-	args    []string
-	env     []string
-}
 
 func TestGetJavaHome(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
@@ -131,4 +126,12 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 		err = MkDirs([]string{dir}, os.Stdout)
 		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
 	}
+}
+
+func TestMain(m *testing.M) {
+	if err := os.Setenv("JAVA_HOME", "/mock/jdk"); err != nil {
+		log.Println("Failed to set a mock JAVA_HOME", err)
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
 }

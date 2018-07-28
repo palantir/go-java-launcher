@@ -21,15 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// To prevent accidental changes to parameter default values
 func TestInitStatus_DefaultParameters(t *testing.T) {
-	// Test to prevent accidental changes to parameter default values
-	cmd := statusCommand()
-	assert.Equal(t,
-		cmd.Flags,
-		[]flag.Flag{
-			flag.StringFlag{
-				Name:  pidfileParameter,
-				Usage: "The path to a file containing the PID for which the status is to be determined",
-				Value: defaultPidFile},
-		})
+	assert.Equal(t, []flag.Flag(nil), statusCliCommand.Flags)
 }

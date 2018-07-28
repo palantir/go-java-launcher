@@ -24,12 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockProcessExecutor struct {
-	command string
-	args    []string
-	env     []string
-}
-
 func TestGetJavaHome(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
 	require.NoError(t, os.Setenv("JAVA_HOME", "foo"))
@@ -114,10 +108,10 @@ func TestKeysAreNotExpanded(t *testing.T) {
 }
 
 func TestMkdirChecksDirectorySyntax(t *testing.T) {
-	err := MkDirs([]string{"abc/def1"})
+	err := MkDirs([]string{"abc/def1"}, os.Stdout)
 	assert.NoError(t, err)
 
-	err = MkDirs([]string{"abc"})
+	err = MkDirs([]string{"abc"}, os.Stdout)
 	assert.NoError(t, err)
 
 	require.NoError(t, os.RemoveAll("abc"))
@@ -128,7 +122,7 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 		"abc/../def",
 	}
 	for _, dir := range badCases {
-		err = MkDirs([]string{dir})
+		err = MkDirs([]string{dir}, os.Stdout)
 		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
 	}
 }

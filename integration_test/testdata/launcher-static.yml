@@ -1,12 +1,10 @@
 configType: java
 configVersion: 1
+serviceName: primary
 mainClass: Main
 classpath:
-  - ./test_resources/
+  - ./testdata/
 jvmOpts:
   - '-Xmx4M'
 args:
   - arg1
-dirs:
-  - foo
-  - bar/baz

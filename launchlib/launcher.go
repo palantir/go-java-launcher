@@ -16,11 +16,14 @@ package launchlib
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -30,39 +33,93 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-func CompileCmdFromConfigFiles(staticConfigFile, customConfigFile string) (*exec.Cmd, error) {
-	staticConfig, staticConfigErr := GetStaticConfigFromFile(staticConfigFile)
-	if staticConfigErr != nil {
-		return nil, staticConfigErr
-	}
-
-	customConfig, customConfigErr := GetCustomConfigFromFile(customConfigFile)
-	if customConfigErr != nil {
-		return nil, customConfigErr
-	}
-
-	return CompileCmdFromConfig(&staticConfig, &customConfig)
+type CmdWithContext struct {
+	Cmd            *exec.Cmd
+	OutputFileName string
+	Dirs           []string
 }
 
-func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig) (*exec.Cmd, error) {
-	fmt.Printf("Launching with static configuration %v and custom configuration %v\n", *staticConfig, *customConfig)
+type ServiceCmds struct {
+	Primary  CmdWithContext
+	SubProcs map[string]CmdWithContext
+}
+
+func CompileCmdsFromConfig(
+	staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (
+	serviceCmds *ServiceCmds, rErr error) {
+	serviceCmds = &ServiceCmds{
+		SubProcs: make(map[string]CmdWithContext),
+	}
+
+	primaryCmd, err := compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig,
+		stdout)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to compile command for primary command")
+	}
+	serviceCmds.Primary = CmdWithContext{
+		Cmd:            primaryCmd,
+		OutputFileName: PrimaryOutputFile,
+		Dirs:           staticConfig.StaticLauncherConfig.Dirs,
+	}
+	for name, subProcStatic := range staticConfig.SubProcesses {
+		subProcCmd, err := compileSubProcCmdWithOutputFile(name, &subProcStatic, customConfig.SubProcesses)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to compile command with output file for subProcess %s",
+				name)
+		}
+		serviceCmds.SubProcs[name] = *subProcCmd
+	}
+	return serviceCmds, nil
+}
+
+func compileSubProcCmdWithOutputFile(
+	name string, subProcStatic *StaticLauncherConfig, subProcCustoms map[string]CustomLauncherConfig) (
+	subProcCmd *CmdWithContext, rErr error) {
+	subProcCustom, ok := subProcCustoms[name]
+	if !ok {
+		return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
+	}
+	subProcOutputFileName := fmt.Sprintf(SubProcessOutputFileFormat, name)
+	subProcStdout, err := os.Create(subProcOutputFileName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to create subProcess output file: %s",
+			subProcOutputFileName)
+	}
+	defer func() {
+		if cErr := subProcStdout.Close(); rErr == nil && cErr != nil {
+			rErr = errors.Wrapf(err, "failed to close subProcess output file: %s",
+				subProcOutputFileName)
+		}
+	}()
+	cmd, err := compileCmdFromConfig(subProcStatic, &subProcCustom, subProcStdout)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to compile command for subProcess config '%s'", name)
+	}
+	return &CmdWithContext{Cmd: cmd, OutputFileName: subProcOutputFileName, Dirs: subProcStatic.Dirs}, nil
+}
+
+func compileCmdFromConfig(
+	staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig, stdout io.Writer) (*exec.Cmd, error) {
+	fmt.Fprintf(stdout, "Launching with static configuration %v and custom configuration %v\n",
+		*staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
-	fmt.Println("Working directory:", workingDir)
+	fmt.Fprintln(stdout, "Working directory:", workingDir)
 
 	var args []string
 	var executable string
 	var executableErr error
 
-	if staticConfig.ConfigType == "java" {
+	if staticConfig.Type == "java" {
 		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
 		}
-		fmt.Println("Using JAVA_HOME:", javaHome)
+		fmt.Fprintln(stdout, "Using JAVA_HOME:", javaHome)
 
-		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir, staticConfig.JavaConfig.Classpath))
-		fmt.Println("Classpath:", classpath)
+		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
+			staticConfig.JavaConfig.Classpath))
+		fmt.Fprintln(stdout, "Classpath:", classpath)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
@@ -73,32 +130,33 @@ func CompileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 		args = append(args, customConfig.JvmOpts...)
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
-	} else if staticConfig.ConfigType == "executable" {
+	} else if staticConfig.Type == "executable" {
 		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
 		if executableErr != nil {
 			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
 	} else {
-		return nil, fmt.Errorf("You can't launch type %v, this should have errored in config validation", staticConfig.ConfigType)
+		return nil, fmt.Errorf("can't launch type %v, this should have errored in config validation",
+			staticConfig.Type)
 	}
 
 	args = append(args, staticConfig.Args...)
-	fmt.Printf("Argument list to executable binary: %v\n\n", args)
+	fmt.Fprintf(stdout, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
 	return createCmd(executable, args, env)
 }
 
-func MkDirs(dirs []string) error {
+func MkDirs(dirs []string, stdout io.Writer) error {
 	isDirMatcher := regexp.MustCompile(`^[A-Za-z0-9]+(/[A-Za-z0-9]+)*$`).MatchString
 	for _, dir := range dirs {
 		if !isDirMatcher(dir) {
 			return fmt.Errorf("Cannot create directory with non [A-Za-z0-9] characters: %s", dir)
 		}
 
-		fmt.Printf("Creating directory: %s\n", dir)
+		fmt.Fprintf(stdout, "Creating directory: %s\n", dir)
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}
@@ -106,7 +164,7 @@ func MkDirs(dirs []string) error {
 	return nil
 }
 
-// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file.
+// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file
 func verifyPathIsSafeForExec(execPath string) (string, error) {
 	if unsafe, err := regexp.MatchString(ExecPathBlackListRegex, execPath); err != nil {
 		return "", err

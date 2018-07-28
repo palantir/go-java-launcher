@@ -1,0 +1,18 @@
+configType: java
+configVersion: 1
+mainClass: Main
+serviceName: primary
+classpath:
+  - ./testdata/
+jvmOpts:
+  - '-Xmx4M'
+args:
+  - arg1
+subProcesses:
+  sidecar:
+    configType: java
+    mainClass: Main
+    classpath:
+      - ./testdata/
+    jvmOpts:
+      - '-Xmx4M'

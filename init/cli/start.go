@@ -16,72 +16,89 @@ package cli
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/palantir/pkg/cli"
-	"github.com/palantir/pkg/cli/flag"
+	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 
-	"github.com/palantir/go-java-launcher/init/lib"
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-func startCommand() cli.Command {
-	return cli.Command{
-		Name: "start",
-		Usage: `
-Runs the command defined by the given static and custom configurations and stores the PID of the resulting process in
-the given pid file.
-`,
-		Flags: []flag.Flag{
-			flag.StringFlag{
-				Name:  launcherStaticFileParameter,
-				Value: "service/bin/launcher-static.yml",
-				Usage: "The location of the LauncherStatic file configuration of the started command"},
-			flag.StringFlag{
-				Name:  launcherCustomFileParameter,
-				Value: "var/conf/launcher-custom.yml",
-				Usage: "The location of the LauncherCustom file configuration of the started command"},
-			flag.StringFlag{
-				Name:  pidfileParameter,
-				Value: "var/run/service.pid",
-				Usage: "The location of the file storing the process ID of the started command"},
-			flag.StringFlag{
-				Name:  outFileParameter,
-				Value: "var/log/startup.log",
-				Usage: "The location of the file to which STDOUT and STDERR of the started command are redirected"},
-		},
-		Action: doStart,
-	}
+var startCliCommand = cli.Command{
+	Name: "start",
+	Usage: `
+Ensures the service defined by the static and custom configurations at service/bin/launcher-static.yml and
+var/conf/launcher-custom.yml is running and its outputs are redirecting to var/log/startup.log and other
+var/log/${SUB_PROCESS}-startup.log files. If successful, exits 0, otherwise exits 1 and writes an error message to
+stderr and var/log/startup.log.`,
+	Action: executeWithContext(start, truncOutputFileFlag),
 }
 
-func doStart(ctx cli.Context) error {
-	launcherStaticFile := ctx.String(launcherStaticFileParameter)
-	launcherCustomFile := ctx.String(launcherCustomFileParameter)
-	pidfile := ctx.String(pidfileParameter)
-	stdoutFileName := ctx.String(outFileParameter)
-
-	stdoutFile, err := os.Create(stdoutFileName)
+func start(ctx cli.Context) error {
+	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
-		msg := fmt.Sprintln("Failed to create startup log file", err)
-		return respondError(msg, err, 1)
+		return logErrorAndReturnWithExitCode(ctx,
+			errors.Wrap(err, "failed to determine service status to determine what commands to run"), 1)
 	}
+	servicePids, err := startService(ctx, serviceStatus.notRunningCmds)
+	if err != nil {
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to start service"), 1)
+	}
+	for name, runningProc := range serviceStatus.runningProcs {
+		servicePids[name] = runningProc.Pid
+	}
+	if err := writePids(servicePids); err != nil {
+		return logErrorAndReturnWithExitCode(ctx,
+			errors.Wrap(err, "failed to record pids when starting service"), 1)
+	}
+	return nil
+}
 
-	originalStdout := os.Stdout
-	os.Stdout = stdoutFile // log command assembly output to file instead of stdout
+func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithContext) (servicePids, error) {
+	servicePids := servicePids{}
+	for name, cmd := range notRunningCmds {
+		if err := startCommand(ctx, cmd); err != nil {
+			return nil, errors.Wrapf(err, "failed to start command '%s'", name)
+		}
+		servicePids[name] = cmd.Cmd.Process.Pid
+	}
+	return servicePids, nil
+}
+
+func startCommand(ctx cli.Context, cmd launchlib.CmdWithContext) error {
+	if err := launchlib.MkDirs(cmd.Dirs, ctx.App.Stdout); err != nil {
+		return errors.Wrap(err, "failed to create directories")
+	}
+	stdout, err := os.OpenFile(cmd.OutputFileName, appendOutputFileFlag, outputFileMode)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open output file: %s", cmd.OutputFileName)
+	}
 	defer func() {
-		os.Stdout = originalStdout
+		if cErr := stdout.Close(); cErr != nil {
+			fmt.Fprintf(ctx.App.Stdout, "failed to close output file: %s", cmd.OutputFileName)
+		}
 	}()
-	cmd, err := launchlib.CompileCmdFromConfigFiles(launcherStaticFile, launcherCustomFile)
-	if err != nil {
-		msg := fmt.Sprintln("Failed to assemble Command object from static and custom configuration files", err)
-		return respondError(msg, err, 1)
+	cmd.Cmd.Stdout = stdout
+	cmd.Cmd.Stderr = stdout
+	if err := cmd.Cmd.Start(); err != nil {
+		return errors.Wrap(err, "failed to start command")
 	}
+	return nil
+}
 
-	pid, err := lib.StartCommandWithOutputRedirectionAndPidFile(cmd, stdoutFile, pidfile)
+func writePids(servicePids servicePids) error {
+	servicePidsBytes, err := yaml.Marshal(servicePids)
 	if err != nil {
-		msg := fmt.Sprintln("Failed to start process", err)
-		return respondError(msg, err, 1)
+		return errors.Wrap(err, "failed to serialize pidfile")
 	}
-
-	return respondSuccess(0, fmt.Sprintf("Started (%d)\n", pid))
+	if err := os.MkdirAll(filepath.Dir(pidfile), 0755); err != nil {
+		return cli.WithExitCode(1, errors.Errorf("failed to mkdir for pidfile: %s", pidfile))
+	}
+	if err := ioutil.WriteFile(pidfile, servicePidsBytes, 0644); err != nil {
+		return errors.Wrap(err, "failed to write pidfile")
+	}
+	return nil
 }

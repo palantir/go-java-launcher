@@ -15,47 +15,44 @@
 package cli
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/palantir/pkg/cli"
-	"github.com/palantir/pkg/cli/flag"
-
-	"github.com/palantir/go-java-launcher/init/lib"
+	"github.com/pkg/errors"
 )
 
-func statusCommand() cli.Command {
-	return cli.Command{
-		Name: "status",
-		Usage: `
-Determines the status of the process whose PID is contained in the given pid-file. Returns 0 if the
-process is running, 1 if the pid-file exists but the process is not running, and 3 if the pid-file
-does not exist`,
-		Flags: []flag.Flag{
-			flag.StringFlag{
-				Name:  pidfileParameter,
-				Usage: "The path to a file containing the PID for which the status is to be determined",
-				Value: defaultPidFile},
-		},
-		Action: doStatus,
-	}
+var statusCliCommand = cli.Command{
+	Name: "status",
+	Usage: `
+Determines the status of the service defined by the static and custom configurations at service/bin/launcher-static.yml
+and var/conf/launcher-custom.yml.
+Exits:
+- 0 if all of its processes are running
+- 1 if at least one process is not running but there is a record of processes having been started
+- 3 if no processes are running and there is no record of processes having been started
+- 4 if the status cannot be determined
+If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
+	Action: executeWithContext(status, appendOutputFileFlag),
 }
 
-func doStatus(ctx cli.Context) error {
-	pidFile := ctx.String(pidfileParameter)
-	isRunning, err := lib.IsRunningByPidFile(pidFile)
+func status(ctx cli.Context) error {
+	serviceStatus, err := getServiceStatus(ctx)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to determine whether process is running for pid-file: %s", pidFile)
-		return respondError(msg, err, isRunning)
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 4)
 	}
-
-	switch isRunning {
-	case 0:
-		pid, _ := lib.GetPid(pidFile)
-		return respondSuccess(isRunning, fmt.Sprintf("Running (%d)\n", pid))
-	case 1:
-		return respondSuccess(isRunning, "Process dead but pidfile exists\n")
+	if len(serviceStatus.notRunningCmds) > 0 {
+		notRunningCmdNames := make([]string, 0, len(serviceStatus.notRunningCmds))
+		for name := range serviceStatus.notRunningCmds {
+			notRunningCmdNames = append(notRunningCmdNames, name)
+		}
+		if len(serviceStatus.writtenPids) > 0 {
+			return logErrorAndReturnWithExitCode(
+				ctx,
+				errors.Errorf("commands '%v' are not running but there is a record of commands '%v'"+
+					"having been started", notRunningCmdNames, serviceStatus.writtenPids),
+				1,
+			)
+		}
+		return logErrorAndReturnWithExitCode(ctx, errors.Errorf("commands '%v' are not running",
+			notRunningCmdNames), 3)
 	}
-
-	return errors.New("Internal error, failed to determine status")
+	return nil
 }

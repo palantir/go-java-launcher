@@ -12,15 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cli
+package launchlib
 
-const (
-	pidfileParameter            = "pidFile"
-	outFileParameter            = "outFile"
-	launcherStaticFileParameter = "launcherStaticFile"
-	launcherCustomFileParameter = "launcherCustomFile"
+import (
+	"path/filepath"
 )
 
 const (
-	defaultPidFile = "var/run/service.pid"
+	outputLogFile = "startup.log"
+)
+
+var (
+	logDir                     = "var/log"
+	PrimaryOutputFile          = filepath.Join(logDir, outputLogFile)
+	SubProcessOutputFileFormat = filepath.Join(logDir, "%s-"+outputLogFile)
 )

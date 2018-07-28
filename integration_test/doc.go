@@ -12,5 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package integration contains the integration tests for go-java-launcher.
+// Package integration contains the integration tests for go-java-launcher. This file only exists so that
+// `go install $(./godelw packages)` will succeed, since you can't install a package that contains only test code.
+// https://github.com/palantir/godel/issues/401
 package integration

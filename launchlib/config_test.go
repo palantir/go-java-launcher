@@ -24,7 +24,7 @@ func TestParseStaticConfig(t *testing.T) {
 	for i, currCase := range []struct {
 		name string
 		data string
-		want StaticLauncherConfig
+		want PrimaryStaticLauncherConfig
 	}{
 		{
 			name: "java static config",
@@ -46,27 +46,64 @@ args:
   - arg1
   - arg2
 `,
-			want: StaticLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
-				},
-				Executable: "java",
-				Args:       []string{"arg1", "arg2"},
-				JavaConfig: JavaConfig{
-					MainClass: "mainClass",
-					JavaHome:  "javaHome",
-					Classpath: []string{"classpath1", "classpath2"},
-					JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+				ServiceName: "",
+				StaticLauncherConfig: StaticLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "java",
+					Args:       []string{"arg1", "arg2"},
+					JavaConfig: JavaConfig{
+						MainClass: "mainClass",
+						JavaHome:  "javaHome",
+						Classpath: []string{"classpath1", "classpath2"},
+						JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+					},
 				},
 			},
 		},
 		{
 			name: "executable static config",
+			data: `
+configType: executable
+configVersion: 1
+serviceName: foo
+executable: /usr/bin/postgres
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+args:
+  - arg1
+  - arg2
+`,
+			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				ServiceName: "foo",
+				StaticLauncherConfig: StaticLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "executable",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "/usr/bin/postgres",
+					Args:       []string{"arg1", "arg2"},
+				},
+			},
+		},
+		{
+			name: "with subProcess config",
 			data: `
 configType: executable
 configVersion: 1
@@ -77,22 +114,42 @@ env:
 args:
   - arg1
   - arg2
+subProcesses:
+  envoy:
+    configType: executable
+    executable: /etc/envoy/envoy
+    args:
+      - arg3
 `,
-			want: StaticLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "executable",
-					ConfigVersion: 1,
+			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
+				ServiceName: "",
+				StaticLauncherConfig: StaticLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "executable",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "/usr/bin/postgres",
+					Args:       []string{"arg1", "arg2"},
 				},
-				Executable: "/usr/bin/postgres",
-				Args:       []string{"arg1", "arg2"},
+				SubProcesses: map[string]StaticLauncherConfig{
+					"envoy": {
+						TypedConfig: TypedConfig{
+							Type: "executable",
+						},
+						Executable: "/etc/envoy/envoy",
+						Args:       []string{"arg3"},
+					},
+				},
 			},
 		},
 	} {
-		got, _ := ParseStaticConfig([]byte(currCase.data))
+		got, _ := parseStaticConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
 }
@@ -101,7 +158,7 @@ func TestParseCustomConfig(t *testing.T) {
 	for i, currCase := range []struct {
 		name string
 		data string
-		want CustomLauncherConfig
+		want PrimaryCustomLauncherConfig
 	}{
 		{
 			name: "java custom config",
@@ -115,16 +172,20 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 `,
-			want: CustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 			},
 		},
 		{
@@ -136,12 +197,16 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 `,
-			want: CustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
 			},
 		},
 		{
@@ -155,15 +220,60 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 `,
-			want: CustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "java",
-					ConfigVersion: 1,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},
-				JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+			},
+		},
+		{
+			name: "java custom config with subProcess",
+			data: `
+configType: java
+configVersion: 1
+env:
+  SOME_ENV_VAR: '{{CWD}}/etc/profile'
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+subProcesses:
+  envoy:
+    configType: executable
+    env:
+      LOG_LEVEL: info
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
+					},
+					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+				},
+				SubProcesses: map[string]CustomLauncherConfig{
+					"envoy": {
+						TypedConfig: TypedConfig{
+							Type: "executable",
+						},
+						Env: map[string]string{
+							"LOG_LEVEL": "info",
+						},
+					},
+				},
 			},
 		},
 		{
@@ -175,19 +285,23 @@ env:
   SOME_ENV_VAR: /etc/profile
   OTHER_ENV_VAR: /etc/redhat-release
 `,
-			want: CustomLauncherConfig{
-				LauncherConfig: LauncherConfig{
-					ConfigType:    "executable",
-					ConfigVersion: 1,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
 				},
-				Env: map[string]string{
-					"SOME_ENV_VAR":  "/etc/profile",
-					"OTHER_ENV_VAR": "/etc/redhat-release",
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "executable",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
 				},
 			},
 		},
 	} {
-		got, _ := ParseCustomConfig([]byte(currCase.data))
+		got, _ := parseCustomConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)
 	}
 }
@@ -200,7 +314,8 @@ func TestParseStaticConfigFailures(t *testing.T) {
 	}{
 		{
 			name: "bad YAML",
-			msg:  `Failed to deserialize Static Launcher Config, please check the syntax of your configuration file`,
+			msg: "Failed to deserialize Static Launcher Config, please check the syntax of your " +
+				"configuration file",
 			data: `
 bad: yaml:
 `,
@@ -221,6 +336,32 @@ executable: postgres
 configType: executable
 configVersion: 2
 executable: postgres
+`,
+		},
+		{
+			name: "invalid subProcess config type",
+			msg: "failed to validate subProcess launcher configuration 'incorrect': Can handle " +
+				"configType\\=\\{.+\\} only, found config",
+			data: `
+configType: executable
+configVersion: 1
+executable: postgres
+subProcesses:
+  incorrect:
+    configType: config
+`,
+		},
+		{
+			name: "invalid subProcess name",
+			msg: "invalid subProcess name '../breakout' in static config: subProcess name '../breakout' " +
+				"does not match required pattern '.+'",
+			data: `
+configType: executable
+configVersion: 1
+executable: postgres
+subProcesses:
+  ../breakout:
+    configType: java
 `,
 		},
 		{
@@ -272,7 +413,7 @@ mainClass: hello.world
 `,
 		},
 	} {
-		_, err := ParseStaticConfig([]byte(currCase.data))
+		_, err := parseStaticConfig([]byte(currCase.data))
 		assert.NotEqual(t, err, nil, "Case %d: %s had no errors", i, currCase.name)
 		assert.Regexp(t, currCase.msg, err.Error(), "Case %d: %s had the wrong error message", i, currCase.name)
 	}

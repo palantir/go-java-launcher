@@ -12,35 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package lib
+package cli
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"strconv"
+	"testing"
+
+	"github.com/palantir/pkg/cli/flag"
+	"github.com/stretchr/testify/assert"
 )
 
-func StartCommandWithOutputRedirectionAndPidFile(cmd *exec.Cmd, stdoutFile *os.File, pidFileName string) (int, error) {
-	isRunning, _ := IsRunningByPidFile(pidFileName)
-	if isRunning == 0 {
-		pid, _ := GetPid(pidFileName)
-		return pid, nil
-	}
-
-	cmd.Stdout = stdoutFile
-	cmd.Stderr = stdoutFile
-	err := cmd.Start()
-	if err != nil {
-		return -1, err
-	}
-
-	pid := cmd.Process.Pid
-	err = ioutil.WriteFile(pidFileName, []byte(strconv.Itoa(pid)), 0644)
-	if err != nil {
-		return pid, fmt.Errorf("Failed to write pid file: %s", pidFileName)
-	}
-
-	return pid, nil
+// To prevent accidental changes to parameter default values
+func TestInitStop_DefaultParameters(t *testing.T) {
+	assert.Equal(t, []flag.Flag(nil), stopCliCommand.Flags)
 }

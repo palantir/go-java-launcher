@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -773,18 +774,51 @@ func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
 func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stdout
-	command.Stdin = nil
-	require.NoError(t, command.Start())
-	// Reap it!
+	launched := make(chan *os.Process)
 	go func() {
-		_, err := command.Process.Wait()
-		require.NoError(t, err)
+		// To avoid races, start the process in the same goroutine where we wait for it.
+		// Then, send back the process as soon as it's started.
+		require.NoError(t, command.Start())
+		launched <- command.Process
+		// Reap it!
+		exitcode := waitProcess(t, command)
+		log.Printf("Process exited with exit code %v\n", exitcode)
 	}()
-	return command.Process.Pid, func() {
-		if err := command.Process.Kill(); err != nil && !strings.Contains(err.Error(),
+	process := <-launched
+	return process.Pid, func() {
+		if err := process.Kill(); err != nil && !strings.Contains(err.Error(),
 			"os: process already finished") {
 			t.Fatalf("failed to kill forked process with error %s", err.Error())
 		}
+	}
+}
+
+func waitProcess(t *testing.T, command *exec.Cmd) int {
+	//output, err := command.CombinedOutput()
+	//log.Printf("Command output for pid %d was: %s", command.Process.Pid, string(output))
+	err := command.Wait()
+	state := command.ProcessState
+	if err != nil {
+		// try to get the exit code
+		if exitError, ok := err.(*exec.ExitError); ok {
+			log.Printf("Had ExitError: %v\n", err)
+			ws := exitError.Sys().(syscall.WaitStatus)
+			return ws.ExitStatus()
+		} else {
+			// This will happen (in OSX) if `name` is not available in $PATH,
+			// in this situation, exit code could not be get, and stderr will be
+			// empty string very likely, so we use the default fail code, and format err
+			// to string and set to stderr
+			log.Printf("Could not get exit code for failed program: %v. Error: %e\n", command.Args, err)
+			//if output == "" {
+			//	output = err.Error()
+			//}
+			return -1
+		}
+	} else {
+		ws := state.Sys().(syscall.WaitStatus)
+		log.Printf("No error, relying on syscall.WaitStatus: %v\n", ws)
+		return ws.ExitStatus()
 	}
 }
 

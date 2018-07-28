@@ -17,6 +17,7 @@ package integration_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -764,7 +765,7 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 }
 
 func forkKillableSleep(t *testing.T) (pid int, killer func()) {
-	return forkAndGetPid(t, exec.Command("/bin/sleep", "10000"))
+	return forkAndGetPid(t, exec.Command("testdata/stoppable.sh"))
 }
 
 func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
@@ -772,36 +773,54 @@ func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
 }
 
 func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
-	command.Stderr = os.Stderr
-	command.Stdout = os.Stdout
 	launched := make(chan *os.Process)
+	reaperChan := make(chan bool)
 	go func() {
+		var b bytes.Buffer
+		command.Stdout = &b
+		command.Stderr = &b
+		// Allow the process to signal it's ready by closing fd 3
+		pr, pw, err := os.Pipe()
+		require.NoError(t, err)
+		command.ExtraFiles = append(command.ExtraFiles, pw)
 		// To avoid races, start the process in the same goroutine where we wait for it.
-		// Then, send back the process as soon as it's started.
 		require.NoError(t, command.Start())
-		launched <- command.Process
+		// Close it after start, since we gave it to the command (by passing it to command.ExtraFiles)
+		pw.Close()
+
+		// Then, send back the process as soon as it's READY.
+		go func() {
+			// Wait until EOF
+			io.Copy(ioutil.Discard, pr)
+			launched <- command.Process
+		}()
+
 		// Reap it!
 		exitcode := waitProcess(t, command)
-		log.Printf("Process exited with exit code %v\n", exitcode)
+		output := b.String()
+		pid := command.Process.Pid
+		t.Logf("Process %d exited with exit code %v and output: '%s'\n", pid, exitcode, output)
+		reaperChan <- true
 	}()
 	process := <-launched
 	return process.Pid, func() {
+		t.Logf("Teardown: killing process %v", process.Pid)
 		if err := process.Kill(); err != nil && !strings.Contains(err.Error(),
 			"os: process already finished") {
 			t.Fatalf("failed to kill forked process with error %s", err.Error())
 		}
+		// Wait for the reaper so we get the logs of its output and exit status!
+		<-reaperChan
 	}
 }
 
 func waitProcess(t *testing.T, command *exec.Cmd) int {
-	//output, err := command.CombinedOutput()
-	//log.Printf("Command output for pid %d was: %s", command.Process.Pid, string(output))
 	err := command.Wait()
 	state := command.ProcessState
 	if err != nil {
 		// try to get the exit code
 		if exitError, ok := err.(*exec.ExitError); ok {
-			log.Printf("Had ExitError: %v\n", err)
+			t.Logf("command.Wait() for pid %d yielded ExitError: %v\n", state.Pid(), err)
 			ws := exitError.Sys().(syscall.WaitStatus)
 			return ws.ExitStatus()
 		} else {
@@ -809,10 +828,7 @@ func waitProcess(t *testing.T, command *exec.Cmd) int {
 			// in this situation, exit code could not be get, and stderr will be
 			// empty string very likely, so we use the default fail code, and format err
 			// to string and set to stderr
-			log.Printf("Could not get exit code for failed program: %v. Error: %e\n", command.Args, err)
-			//if output == "" {
-			//	output = err.Error()
-			//}
+			t.Logf("Could not get exit code for failed program: %v. Error: %v\n", command.Args, err)
 			return -1
 		}
 	} else {

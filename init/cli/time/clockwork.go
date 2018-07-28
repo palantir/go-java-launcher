@@ -257,7 +257,6 @@ func advanceTailRec(end time.Time, sleepers []*sleeper, newSleepers []*sleeper) 
 					stop:   s.stop,
 				}
 				periodicSleepers = append(periodicSleepers, s)
-			} else {
 			}
 		} else {
 			newSleepers = append(newSleepers, s)

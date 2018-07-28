@@ -1,5 +1,6 @@
 #!/bin/sh
 
-# Lots of tests expect to see this when running real java
 echo
 echo "main method"
+
+sleep 5

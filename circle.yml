@@ -4,6 +4,8 @@ machine:
     GOPATH: "$HOME/.go_workspace"
     IMPORT_PATH: "github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME"
     GO_PROJECT_SRC_PATH: "$GOPATH/src/$IMPORT_PATH"
+  java:
+    version: oraclejdk8
   post:
     - mkdir -p download
     - test -e "download/$GODIST" || wget -O "download/$GODIST" "https://storage.googleapis.com/golang/$GODIST"

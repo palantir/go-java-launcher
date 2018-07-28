@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package lib
+package launchlib
+
+import (
+	"path/filepath"
+)
 
 const (
-	LauncherStaticFile = "service/bin/launcher-static.yml"
-	LauncherCustomFile = "var/conf/launcher-custom.yml"
-	OutputFile         = "var/log/startup.log"
-	Pidfile            = "var/run/service.pid"
+	outputLogFile = "startup.log"
+)
+
+var (
+	logDir                     = "var/log"
+	PrimaryOutputFile          = filepath.Join(logDir, outputLogFile)
+	SubProcessOutputFileFormat = filepath.Join(logDir, "%s-"+outputLogFile)
 )

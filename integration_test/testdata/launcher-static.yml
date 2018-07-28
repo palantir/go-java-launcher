@@ -1,5 +1,6 @@
 configType: java
 configVersion: 1
+serviceName: primary
 mainClass: Main
 classpath:
   - ./testdata/

@@ -124,7 +124,7 @@ Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typica
 behaviour may depend on the Java distribution.
 
 If any subProcesses are defined, they will be launched as child processes of the main process, with all of these
-processes occupying their own process group.  Additionally, a monitor subProcess will be launched, which terminates
+processes occupying their own process group. Additionally, a monitor subProcess will be launched, which terminates
 the group, should the main process die.
 
 `env` block, both in static and custom configuration, supports restricted set of automatic expansions for values
@@ -135,6 +135,16 @@ for `CUSTOM_PATH`. The following fixed expansions are supported:
 
 Expansions are only performed on the values. No expansions are performed on the keys. Note that the JAVA_HOME
 environment cannot be overwritten with this mechanism; use the `javaHome` mechanism in `StaticLauncherConfig` instead.
+
+# go-init
+
+This repository also publishes a binary called `go-init` that supports the commands `start`, `status`, and `stop`, in
+adherence with the
+[Linux Standard Base](http://refspecs.linuxbase.org/LSB_3.1.1/LSB-Core-generic/LSB-Core-generic/iniscrptact.html)
+specification for init scripts. The binary reads configuration from (relative to its working directory)
+`service/bin/launcher-static.yml` and `var/conf/launcher-custom.yml` in the same vein as `go-java-launcher`, and outputs
+to `var/log/startup.log` and other `var/log/${SUB_PROCESS}-startup.log` files. `go-init` does not launch each
+`subProcess` as a child process of the primary process.
 
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

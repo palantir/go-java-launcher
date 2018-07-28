@@ -15,46 +15,97 @@
 package cli
 
 import (
+	"fmt"
 	"os"
+	"strings"
+	"syscall"
+	"time"
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
-	"github.com/palantir/go-java-launcher/init/lib"
+	time2 "github.com/palantir/go-java-launcher/init/cli/time"
 )
 
-func stopCommand() cli.Command {
-	return cli.Command{
-		Name: "stop",
-		Usage: `
-Stops the process the PID of which is written to var/run/service.pid. Returns 0 if the process is successfully stopped
-or is not running and the pidfile is removed and returns 1 otherwise. Waits 240 seconds for the process to stop before
-considering the execution a failure.`,
-		Action: func(_ cli.Context) error {
-			return stop()
-		},
-	}
+var (
+	// Clock is overridden in the tests to be a fake clock
+	Clock = time2.NewRealClock()
+)
+
+var stopCliCommand = cli.Command{
+	Name: "stop",
+	Usage: `
+Ensures the service defined by the static and custom configurations are service/bin/launcher-static.yml and
+var/conf/launcher-custom.yml is not running. If successful, exits 0, otherwise exits 1 and writes an error message to
+stderr and var/log/startup.log. Waits for at least 240 seconds for any processes to stop before sending a SIGKILL.`,
+	Action: executeWithContext(stop, appendOutputFileFlag),
 }
 
-func stop() error {
-	// The status tells us more than the error
-	switch process, status, _ := lib.GetProcessStatus(); status {
-	case 0:
-		if err := lib.StopProcess(process); err != nil {
-			return cli.WithExitCode(1, err)
+func stop(ctx cli.Context) error {
+	_, runningProcs, err := getPidfileInfo()
+	if err != nil {
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
+	}
+	if err := stopService(ctx, runningProcs); err != nil {
+		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
+	}
+	return nil
+}
+
+func stopService(ctx cli.Context, procs map[string]*os.Process) error {
+	for name, proc := range procs {
+		if err := proc.Signal(syscall.SIGTERM); err != nil && !strings.Contains(err.Error(),
+			"os: process already finished") {
+			return errors.Wrapf(err, "failed to stop '%s' process", name)
 		}
-		if err := os.Remove(lib.Pidfile); err != nil {
-			return cli.WithExitCode(1, err)
+	}
+
+	if err := waitForServiceToStop(ctx, procs); err != nil {
+		return errors.Wrap(err, "failed to stop at least one process")
+	}
+
+	if err := os.Remove(pidfile); err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to remove pidfile")
+	}
+
+	return nil
+}
+
+func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
+	const numSecondsToWait = 240
+	timer := Clock.NewTimer(numSecondsToWait * time.Second)
+	defer timer.Stop()
+
+	ticker := Clock.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.Chan():
+			for name, remainingProc := range procs {
+				if !isProcRunning(remainingProc) {
+					delete(procs, name)
+				}
+			}
+			if len(procs) == 0 {
+				return nil
+			}
+		case <-timer.Chan():
+			killedProcs := make([]string, 0, len(procs))
+			for name, remainingProc := range procs {
+				if isProcRunning(remainingProc) {
+					if err := remainingProc.Kill(); err != nil {
+						// If this actually errors, something is probably seriously wrong.
+						// Just stop immediately.
+						return errors.Wrapf(err, "failed to kill process with pid %d",
+							remainingProc.Pid)
+					}
+					killedProcs = append(killedProcs, name)
+				}
+			}
+			fmt.Fprintf(ctx.App.Stdout, "processes '%v' did not stop within %d seconds, so a SIGKILL was "+
+				"sent", killedProcs, numSecondsToWait)
+			return nil
 		}
-		return nil
-	case 1:
-		if err := os.Remove(lib.Pidfile); err != nil {
-			return cli.WithExitCode(1, err)
-		}
-		return nil
-	case 3:
-		return nil
-	default:
-		return cli.WithExitCode(1, errors.Errorf("internal error, process status code not a known value: %d", status))
 	}
 }

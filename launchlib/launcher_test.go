@@ -24,12 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockProcessExecutor struct {
-	command string
-	args    []string
-	env     []string
-}
-
 func TestGetJavaHome(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
 	require.NoError(t, os.Setenv("JAVA_HOME", "foo"))

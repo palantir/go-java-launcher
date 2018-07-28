@@ -50,6 +50,7 @@ args:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
+				ServiceName: "",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "java",
@@ -74,6 +75,7 @@ args:
 			data: `
 configType: executable
 configVersion: 1
+serviceName: foo
 executable: /usr/bin/postgres
 env:
   SOME_ENV_VAR: /etc/profile
@@ -86,6 +88,7 @@ args:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
+				ServiceName: "foo",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "executable",
@@ -122,6 +125,7 @@ subProcesses:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
+				ServiceName: "",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "executable",
@@ -310,7 +314,8 @@ func TestParseStaticConfigFailures(t *testing.T) {
 	}{
 		{
 			name: "bad YAML",
-			msg:  `Failed to deserialize Static Launcher Config, please StartProcessLivelinessCheck the syntax of your configuration file`,
+			msg: "Failed to deserialize Static Launcher Config, please check the syntax of your " +
+				"configuration file",
 			data: `
 bad: yaml:
 `,
@@ -335,7 +340,8 @@ executable: postgres
 		},
 		{
 			name: "invalid subProcess config type",
-			msg:  `failed to validate subProcess launcher configuration 'incorrect': Can handle configType\=\{.+\} only, found config`,
+			msg: "failed to validate subProcess launcher configuration 'incorrect': Can handle " +
+				"configType\\=\\{.+\\} only, found config",
 			data: `
 configType: executable
 configVersion: 1
@@ -347,7 +353,8 @@ subProcesses:
 		},
 		{
 			name: "invalid subProcess name",
-			msg:  "invalid subProcess name '../breakout' in static config: subProcess name '../breakout' does not match required pattern '.+'",
+			msg: "invalid subProcess name '../breakout' in static config: subProcess name '../breakout' " +
+				"does not match required pattern '.+'",
 			data: `
 configType: executable
 configVersion: 1

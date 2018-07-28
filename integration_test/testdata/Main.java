@@ -14,7 +14,8 @@
  */
 
 public class Main {
-    public static void main(String args[]) {
+    public static void main(String args[]) throws InterruptedException {
         System.out.println("main method");
+        Thread.sleep(5000);
     }
 }

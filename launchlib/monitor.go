@@ -59,8 +59,8 @@ func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
 func (m *ProcessMonitor) verify() error {
 	if syscall.Getpgrp() != m.ProcessGroupPID {
 		return errors.Errorf("ProcessMonitor is part of process group '%s' not service process group '%s'. "+
-			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same process as the"+
-			" service", syscall.Getpgrp(), m.ProcessGroupPID)
+			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same "+
+			"process as the service", syscall.Getpgrp(), m.ProcessGroupPID)
 	}
 
 	if m.ProcessGroupPID == 1 {

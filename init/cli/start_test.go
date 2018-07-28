@@ -23,8 +23,5 @@ import (
 
 // To prevent accidental changes to parameter default values
 func TestInitStart_DefaultParameters(t *testing.T) {
-	cmd := startCommand()
-	assert.Equal(t,
-		cmd.Flags,
-		[]flag.Flag(nil))
+	assert.Equal(t, []flag.Flag(nil), startCliCommand.Flags)
 }

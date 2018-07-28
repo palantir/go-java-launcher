@@ -16,6 +16,7 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -37,11 +38,16 @@ func App() *cli.App {
 func executeWithContext(action func(cli.Context) error, fileFlag int) func(cli.Context) error {
 	return func(ctx cli.Context) (rErr error) {
 		// Fall back to default stdout if error opening log file
-		if err := os.MkdirAll(filepath.Dir(launchlib.PrimaryOutputFile), 0755); err != nil {
+		outputParentDir := filepath.Dir(launchlib.PrimaryOutputFile)
+		if err := os.MkdirAll(outputParentDir, 0755); err != nil {
+			log.Printf("Encountered error during MkdirAll the output dir '%s': %v, falling back to stdout",
+				outputParentDir, err)
 			return action(ctx)
 		}
 		outputFile, err := os.OpenFile(launchlib.PrimaryOutputFile, fileFlag, outputFileMode)
 		if err != nil {
+			log.Printf("Encountered error opening the primary output file '%s': %v, falling back to stdout",
+				launchlib.PrimaryOutputFile, err)
 			return action(ctx)
 		}
 		defer func() {

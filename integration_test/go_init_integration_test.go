@@ -764,14 +764,14 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 }
 
 func forkKillableSleep(t *testing.T) (pid int, killer func()) {
-	return forkAndGetPid(t, exec.Command("testdata/stoppable.sh"))
+	return forkAndGetPid(t, exec.Command("testdata/stoppable.sh"), syscall.SIGTERM)
 }
 
 func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
-	return forkAndGetPid(t, exec.Command("testdata/unstoppable.sh"))
+	return forkAndGetPid(t, exec.Command("testdata/unstoppable.sh"), syscall.SIGKILL)
 }
 
-func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
+func forkAndGetPid(t *testing.T, command *exec.Cmd, expectedSignal syscall.Signal) (pid int, killer func()) {
 	launched := make(chan *os.Process)
 	reaperChan := make(chan bool)
 	go func() {
@@ -796,6 +796,10 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd) (pid int, killer func()) {
 
 		// Reap it!
 		waitStatus := waitProcess(t, command)
+
+		// Check that it exited after receiving the expected signal
+		_ = assert.Equal(t, expectedSignal, waitStatus.Signal())
+
 		exitcode := waitStatus.ExitStatus()
 		output := b.String()
 		pid := command.Process.Pid

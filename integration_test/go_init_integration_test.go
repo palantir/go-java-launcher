@@ -771,9 +771,11 @@ func forkUnkillableSleep(t *testing.T) (pid int, killer func()) {
 	return forkAndGetPid(t, exec.Command("testdata/unstoppable.sh"), syscall.SIGKILL)
 }
 
+// The returned 'killer' waits for the process to end (after killing), and asserts that it was killed by the
+// expectedSignal.
 func forkAndGetPid(t *testing.T, command *exec.Cmd, expectedSignal syscall.Signal) (pid int, killer func()) {
 	launched := make(chan *os.Process)
-	reaperChan := make(chan bool)
+	reaperChan := make(chan *syscall.WaitStatus)
 	go func() {
 		var b bytes.Buffer
 		command.Stdout = &b
@@ -797,14 +799,11 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd, expectedSignal syscall.Signa
 		// Reap it!
 		waitStatus := waitProcess(t, command)
 
-		// Check that it exited after receiving the expected signal
-		_ = assert.Equal(t, expectedSignal, waitStatus.Signal())
-
 		exitcode := waitStatus.ExitStatus()
 		output := b.String()
 		pid := command.Process.Pid
 		t.Logf("Process %d exited with exit code %v and output: '%s'\n", pid, exitcode, output)
-		reaperChan <- true
+		reaperChan <- waitStatus
 	}()
 	process := <-launched
 	return process.Pid, func() {
@@ -814,7 +813,10 @@ func forkAndGetPid(t *testing.T, command *exec.Cmd, expectedSignal syscall.Signa
 			t.Fatalf("failed to kill forked process with error %s", err.Error())
 		}
 		// Wait for the reaper so we get the logs of its output and exit status!
-		<-reaperChan
+		waitStatus := <-reaperChan
+		// Check that it exited after receiving the expected signal
+		require.Equal(t, expectedSignal, waitStatus.Signal(),
+			"Child process %d exited with unexpected signal", process.Pid)
 	}
 }
 

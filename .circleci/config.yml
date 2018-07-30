@@ -98,7 +98,7 @@ jobs:
       # the cache with the original modification dates, but the source's modification date in CI is the time of checkout.
       # Manually touch all of the cache output to mark it as being generated after source was checked out.
       - run: find out -exec touch {} \;
-      - run: ./godelw publish bintray --url https://api.bintray.com --subject palantir --repository releases --username "$BINTRAY_USERNAME" --password "$BINTRAY_PASSWORD" --publish --downloads-list
+      - run: ./godelw publish bintray --url https://api.bintray.com --subject palantir --repository releases --product "$CIRCLE_PROJECT_REPONAME" --username "$BINTRAY_USERNAME" --password "$BINTRAY_PASSWORD" --publish --downloads-list
 
 ### Workflows ###
 requires_products: &requires_products

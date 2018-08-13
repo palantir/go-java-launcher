@@ -33,78 +33,51 @@ const (
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
 )
 
-type CmdWithContext struct {
-	Cmd            *exec.Cmd
-	OutputFileName string
-	Dirs           []string
-}
-
 type ServiceCmds struct {
-	Primary  CmdWithContext
-	SubProcs map[string]CmdWithContext
+	Primary      *exec.Cmd
+	SubProcesses map[string]*exec.Cmd
 }
 
 func CompileCmdsFromConfig(
-	staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, stdout io.Writer) (
-	serviceCmds *ServiceCmds, rErr error) {
+	staticConfig *PrimaryStaticLauncherConfig, customConfig *PrimaryCustomLauncherConfig, loggers ServiceLoggers) (
+	serviceCmds *ServiceCmds, err error) {
 	serviceCmds = &ServiceCmds{
-		SubProcs: make(map[string]CmdWithContext),
+		SubProcesses: make(map[string]*exec.Cmd),
 	}
 
-	primaryCmd, err := compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig,
-		stdout)
+	serviceCmds.Primary, err = compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, loggers.PrimaryLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile command for primary command")
 	}
-	serviceCmds.Primary = CmdWithContext{
-		Cmd:            primaryCmd,
-		OutputFileName: PrimaryOutputFile,
-		Dirs:           staticConfig.StaticLauncherConfig.Dirs,
-	}
 	for name, subProcStatic := range staticConfig.SubProcesses {
-		subProcCmd, err := compileSubProcCmdWithOutputFile(name, &subProcStatic, customConfig.SubProcesses)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to compile command with output file for subProcess %s",
-				name)
+		subProcCustom, ok := customConfig.SubProcesses[name]
+		if !ok {
+			return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
 		}
-		serviceCmds.SubProcs[name] = *subProcCmd
+
+		serviceCmds.SubProcesses[name], err = compileCmdFromConfig(&subProcStatic, &subProcCustom, loggers.SubProcessLogger(name))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to compile command for subProcess %s", name)
+		}
 	}
 	return serviceCmds, nil
 }
 
-func compileSubProcCmdWithOutputFile(
-	name string, subProcStatic *StaticLauncherConfig, subProcCustoms map[string]CustomLauncherConfig) (
-	subProcCmd *CmdWithContext, rErr error) {
-	subProcCustom, ok := subProcCustoms[name]
-	if !ok {
-		return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
-	}
-	subProcOutputFileName := fmt.Sprintf(SubProcessOutputFileFormat, name)
-	subProcStdout, err := os.Create(subProcOutputFileName)
+func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig, createLogger CreateLogger) (cmd *exec.Cmd, err error) {
+	logger, err := createLogger()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create subProcess output file: %s",
-			subProcOutputFileName)
+		return nil, errors.Wrapf(err, "failed to create command compilation logger")
 	}
 	defer func() {
-		if cErr := subProcStdout.Close(); rErr == nil && cErr != nil {
-			rErr = errors.Wrapf(err, "failed to close subProcess output file: %s",
-				subProcOutputFileName)
+		if cErr := logger.Close(); cErr != nil && err == nil {
+			err = errors.Wrapf(err, "unable to close command compilation logger")
 		}
 	}()
-	cmd, err := compileCmdFromConfig(subProcStatic, &subProcCustom, subProcStdout)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to compile command for subProcess config '%s'", name)
-	}
-	return &CmdWithContext{Cmd: cmd, OutputFileName: subProcOutputFileName, Dirs: subProcStatic.Dirs}, nil
-}
-
-func compileCmdFromConfig(
-	staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig, stdout io.Writer) (*exec.Cmd, error) {
-	fmt.Fprintf(stdout, "Launching with static configuration %v and custom configuration %v\n",
+	fmt.Fprintf(logger, "Launching with static configuration %v and custom configuration %v\n",
 		*staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
-	fmt.Fprintln(stdout, "Working directory:", workingDir)
+	fmt.Fprintln(logger, "Working directory:", workingDir)
 
 	var args []string
 	var executable string
@@ -115,11 +88,11 @@ func compileCmdFromConfig(
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
 		}
-		fmt.Fprintln(stdout, "Using JAVA_HOME:", javaHome)
+		fmt.Fprintln(logger, "Using JAVA_HOME:", javaHome)
 
 		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
 			staticConfig.JavaConfig.Classpath))
-		fmt.Fprintln(stdout, "Classpath:", classpath)
+		fmt.Fprintln(logger, "Classpath:", classpath)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
@@ -142,7 +115,7 @@ func compileCmdFromConfig(
 	}
 
 	args = append(args, staticConfig.Args...)
-	fmt.Fprintf(stdout, "Argument list to executable binary: %v\n\n", args)
+	fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 

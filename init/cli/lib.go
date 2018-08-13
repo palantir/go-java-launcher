@@ -17,6 +17,8 @@ package cli
 import (
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"syscall"
 
 	"github.com/palantir/pkg/cli"
@@ -31,24 +33,36 @@ const (
 	truncOutputFileFlag  = outputFileFlag | os.O_TRUNC
 	appendOutputFileFlag = outputFileFlag | os.O_APPEND
 	outputFileMode       = 0644
+
+	outputLogFile = "startup.log"
 )
 
 var (
 	launcherStaticFile = "service/bin/launcher-static.yml"
 	launcherCustomFile = "var/conf/launcher-custom.yml"
 	pidfile            = "var/run/pids.yml"
+
+	logDir                     = "var/log"
+	PrimaryOutputFile          = filepath.Join(logDir, outputLogFile)
+	SubProcessOutputFileFormat = filepath.Join(logDir, "%s-"+outputLogFile)
 )
+
+type CommandContext struct {
+	Command *exec.Cmd
+	Logger  launchlib.CreateLogger
+	Dirs    []string
+}
 
 type servicePids map[string]int
 
 type serviceStatus struct {
-	notRunningCmds map[string]launchlib.CmdWithContext
+	notRunningCmds map[string]CommandContext
 	writtenPids    servicePids
 	runningProcs   map[string]*os.Process
 }
 
-func getServiceStatus(ctx cli.Context) (*serviceStatus, error) {
-	cmds, err := getConfiguredCommands(ctx)
+func getServiceStatus(ctx cli.Context, loggers launchlib.ServiceLoggers) (*serviceStatus, error) {
+	cmds, err := getConfiguredCommands(ctx, loggers)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get commands from static and custom configuration files")
 	}
@@ -56,7 +70,7 @@ func getServiceStatus(ctx cli.Context) (*serviceStatus, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to determine running processes")
 	}
-	notRunningCmds := make(map[string]launchlib.CmdWithContext)
+	notRunningCmds := make(map[string]CommandContext)
 	for name, cmd := range cmds {
 		if _, ok := runningProcs[name]; !ok {
 			notRunningCmds[name] = cmd
@@ -86,20 +100,33 @@ func getPidfileInfo() (servicePids, map[string]*os.Process, error) {
 	return servicePids, runningProcs, nil
 }
 
-func getConfiguredCommands(ctx cli.Context) (map[string]launchlib.CmdWithContext, error) {
+func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (map[string]CommandContext, error) {
 	staticConfig, customConfig, err := launchlib.GetConfigsFromFiles(launcherStaticFile, launcherCustomFile,
 		ctx.App.Stdout)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read static and custom configuration files")
 	}
-	serviceCmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, ctx.App.Stdout)
+	serviceCmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, loggers)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
-	cmds := make(map[string]launchlib.CmdWithContext)
-	cmds[staticConfig.ServiceName] = serviceCmds.Primary
-	for name, subProc := range serviceCmds.SubProcs {
-		cmds[name] = subProc
+	cmds := make(map[string]CommandContext)
+	cmds[staticConfig.ServiceName] = CommandContext{
+		serviceCmds.Primary,
+		loggers.PrimaryLogger,
+		staticConfig.Dirs,
+	}
+	for name, subProc := range serviceCmds.SubProcesses {
+		subStatic, ok := staticConfig.SubProcesses[name]
+		if !ok {
+			return nil, errors.Errorf("command given for non-existent subProcess '%s'", name)
+		}
+
+		cmds[name] = CommandContext{
+			subProc,
+			loggers.SubProcessLogger(name),
+			subStatic.Dirs,
+		}
 	}
 	return cmds, nil
 }

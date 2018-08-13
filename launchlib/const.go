@@ -13,17 +13,3 @@
 // limitations under the License.
 
 package launchlib
-
-import (
-	"path/filepath"
-)
-
-const (
-	outputLogFile = "startup.log"
-)
-
-var (
-	logDir                     = "var/log"
-	PrimaryOutputFile          = filepath.Join(logDir, outputLogFile)
-	SubProcessOutputFileFormat = filepath.Join(logDir, "%s-"+outputLogFile)
-)

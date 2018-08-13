@@ -101,14 +101,14 @@ func main() {
 		}
 	}
 
-	// Compile command
-	cmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, stdout)
+	// Compile commands
+	cmds, err := launchlib.CompileCmdsFromConfig(&staticConfig, &customConfig, launchlib.NewSimpleWriterLogger(os.Stdout))
 	if err != nil {
 		fmt.Println("Failed to assemble executable metadata", cmds, err)
 		panic(err)
 	}
 
-	if len(cmds.SubProcs) != 0 {
+	if len(cmds.SubProcesses) != 0 {
 		// For this process (referenced as 0), set the process group id to our pid (also referenced as 0), to
 		// ensure we are in our own group.
 		if err := syscall.Setpgid(0, 0); err != nil {
@@ -133,34 +133,34 @@ func main() {
 			panic(err)
 		}
 
-		for name, subProcess := range cmds.SubProcs {
+		for name, subProcess := range cmds.SubProcesses {
 			// Create struct if not present, as to not override previously set SysProcAttr properties
-			if subProcess.Cmd.SysProcAttr == nil {
-				subProcess.Cmd.SysProcAttr = &syscall.SysProcAttr{}
+			if subProcess.SysProcAttr == nil {
+				subProcess.SysProcAttr = &syscall.SysProcAttr{}
 			}
 			// Do not set the pgid of the subProcesses, leaving them in the same process group as this one
-			subProcess.Cmd.SysProcAttr.Setpgid = false
-			subProcess.Cmd.Stdout = os.Stdout
-			subProcess.Cmd.Stderr = os.Stderr
+			subProcess.SysProcAttr.Setpgid = false
+			subProcess.Stdout = os.Stdout
+			subProcess.Stderr = os.Stderr
 
-			fmt.Println("Starting subProcesses ", name, subProcess.Cmd.Path)
-			if execErr := subProcess.Cmd.Start(); execErr != nil {
+			fmt.Println("Starting subProcesses ", name, subProcess.Path)
+			if execErr := subProcess.Start(); execErr != nil {
 				if os.IsNotExist(execErr) {
 					fmt.Printf("Executable not found for subProcess %s at: %s\n", name,
-						subProcess.Cmd.Path)
+						subProcess.Path)
 				}
 				panic(execErr)
 			} else {
 				fmt.Printf("Started subProcess %s under process pid %d\n", name,
-					subProcess.Cmd.Process.Pid)
+					subProcess.Process.Pid)
 			}
 		}
 	}
 
-	execErr := syscall.Exec(cmds.Primary.Cmd.Path, cmds.Primary.Cmd.Args, cmds.Primary.Cmd.Env)
+	execErr := syscall.Exec(cmds.Primary.Path, cmds.Primary.Args, cmds.Primary.Env)
 	if execErr != nil {
 		if os.IsNotExist(execErr) {
-			fmt.Println("Executable not found at:", cmds.Primary.Cmd.Path)
+			fmt.Println("Executable not found at:", cmds.Primary.Path)
 		}
 		panic(execErr)
 	}

@@ -34,7 +34,7 @@ func App() *cli.App {
 	return app
 }
 
-func executeWithLoggers(action func(cli.Context, launchlib.ServiceLoggers) error, flags fileFlags) func(cli.Context) error {
+func executeWithLoggers(action func(cli.Context, launchlib.ServiceLoggers) error, flags FileFlags) func(cli.Context) error {
 	return func(ctx cli.Context) (rErr error) {
 		// Fall back to default stdout if error opening log file
 		if err := os.MkdirAll(logDir, 0755); err != nil {

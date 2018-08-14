@@ -24,8 +24,8 @@ import (
 	"github.com/palantir/go-java-launcher/launchlib"
 )
 
-type fileFlags interface {
-	Get(name string) int
+type FileFlags interface {
+	Get(path string) int
 }
 
 type truncatingFirst struct {
@@ -40,35 +40,39 @@ func (t *truncatingFirst) Get(name string) int {
 	return truncOutputFileFlag
 }
 
-func NewTruncatingFirst() fileFlags {
+func NewTruncatingFirst() FileFlags {
 	return &truncatingFirst{
 		make(map[string]struct{}),
 	}
 }
 
-type alwaysAppend struct{}
+type alwaysAppending struct{}
 
-func (a *alwaysAppend) Get(name string) int {
+func (a *alwaysAppending) Get(path string) int {
 	return appendOutputFileFlag
 }
 
+func NewAlwaysAppending() FileFlags {
+	return &alwaysAppending{}
+}
+
 type FileLoggers struct {
-	flags fileFlags
+	flags FileFlags
 	mode  os.FileMode
 }
 
 func (f *FileLoggers) PrimaryLogger() (io.WriteCloser, error) {
-	return f.OpenFile(PrimaryOutputFile, f.flags.Get(""))
+	return f.OpenFile(PrimaryOutputFile)
 }
 
 func (f *FileLoggers) SubProcessLogger(name string) launchlib.CreateLogger {
 	return func() (io.WriteCloser, error) {
-		return f.OpenFile(fmt.Sprintf(SubProcessOutputFileFormat, name), f.flags.Get(name))
+		return f.OpenFile(fmt.Sprintf(SubProcessOutputFileFormat, name))
 	}
 }
 
-func (f *FileLoggers) OpenFile(path string, flags int) (*os.File, error) {
-	file, err := os.OpenFile(path, flags, f.mode)
+func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
+	file, err := os.OpenFile(path, f.flags.Get(path), f.mode)
 	if err != nil {
 		return file, errors.Wrapf(err, "could not open logging file '%s'", path)
 	}

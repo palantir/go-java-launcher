@@ -35,25 +35,31 @@ func Exit1WithMessage(message string) {
 	os.Exit(1)
 }
 
-func ParseMonitorArgs(args []string) (*launchlib.ProcessMonitor, error) {
+func CreateMonitorFromArgs(primaryPID string, subPIDs []string) (*launchlib.ProcessMonitor, error) {
 	monitor := &launchlib.ProcessMonitor{}
 
 	var err error
-	if monitor.PrimaryPID, err = strconv.Atoi(args[0]); err != nil {
+	if monitor.PrimaryPID, err = strconv.Atoi(primaryPID); err != nil {
 		return nil, errors.Wrapf(err, "error parsing service pid")
 	}
-	if monitor.ProcessGroupPID, err = strconv.Atoi(args[1]); err != nil {
-		return nil, errors.Wrapf(err, "error parsing service group id")
+
+	for _, pidStr := range subPIDs {
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			return nil, errors.Wrapf(err, "error parsing sub-process pid")
+		}
+		monitor.SubProcessPIDs = append(monitor.SubProcessPIDs, pid)
 	}
 	return monitor, nil
 }
 
 func GenerateMonitorArgs(monitor *launchlib.ProcessMonitor) []string {
-	return []string{
-		monitorFlag,
-		strconv.Itoa(monitor.PrimaryPID),
-		strconv.Itoa(monitor.ProcessGroupPID),
+	args := make([]string, 0, len(monitor.SubProcessPIDs)+2)
+	args = append(args, monitorFlag, strconv.Itoa(monitor.PrimaryPID))
+	for _, pid := range monitor.SubProcessPIDs {
+		args = append(args, strconv.Itoa(pid))
 	}
+	return args
 }
 
 func main() {
@@ -62,23 +68,27 @@ func main() {
 	stdout := os.Stdout
 
 	switch numArgs := len(os.Args); {
-	case numArgs == 4 && os.Args[1] == monitorFlag:
-		if monitor, err := ParseMonitorArgs(os.Args[2:]); err != nil {
+	case numArgs > 3 && os.Args[1] == monitorFlag:
+		monitor, err := CreateMonitorFromArgs(os.Args[2], os.Args[3:])
+
+		if err != nil {
 			fmt.Println("error parsing monitor args", err)
-			Exit1WithMessage(fmt.Sprintf("Usage: go-java-launcher %s <primary pid> <pgid>", monitorFlag))
-		} else if err = monitor.TermProcessGroupOnDeath(); err != nil {
+			Exit1WithMessage(fmt.Sprintf("Usage: go-java-launcher %s <primary pid> <sub-process pids...>", monitorFlag))
+		}
+
+		if err = monitor.Run(); err != nil {
 			fmt.Println("error running process monitor", err)
 			Exit1WithMessage("process monitor failed")
 		}
 		return
-	case numArgs > 3:
-		Exit1WithMessage("Usage: go-java-launcher <path to PrimaryStaticLauncherConfig> " +
-			"[<path to PrimaryCustomLauncherConfig>]")
 	case numArgs == 2:
 		staticConfigFile = os.Args[1]
 	case numArgs == 3:
 		staticConfigFile = os.Args[1]
 		customConfigFile = os.Args[2]
+	default:
+		Exit1WithMessage("Usage: go-java-launcher <path to PrimaryStaticLauncherConfig> " +
+			"[<path to PrimaryCustomLauncherConfig>]")
 	}
 
 	// Read configuration
@@ -109,51 +119,43 @@ func main() {
 	}
 
 	if len(cmds.SubProcesses) != 0 {
-		// For this process (referenced as 0), set the process group id to our pid (also referenced as 0), to
-		// ensure we are in our own group.
-		if err := syscall.Setpgid(0, 0); err != nil {
-			fmt.Printf("Unable to create process group for primary with subProcesses")
-			panic(err)
-		}
-
-		pgid := syscall.Getpgrp()
 		monitor := &launchlib.ProcessMonitor{
-			PrimaryPID:      os.Getpid(),
-			ProcessGroupPID: pgid,
+			PrimaryPID:     os.Getpid(),
+			SubProcessPIDs: nil,
 		}
-		monitorCmd := exec.Command(os.Args[0], GenerateMonitorArgs(monitor)...)
-		monitorCmd.Stdout = os.Stdout
-		monitorCmd.Stderr = os.Stderr
-
-		// From this point, if the launcher, or subsequent primary process dies, the process group will be
-		// terminated by the process monitor
-		fmt.Println("Starting process monitor for service process group ", pgid)
-		if err := monitorCmd.Start(); err != nil {
-			fmt.Println("Failed to start process monitor for service process group")
-			panic(err)
-		}
+		// From this point, any errors in the launcher will cause all of the created sub-processes to also die,
+		// once the main process is exec'ed, this defer will no longer apply, and the external monitor assumes
+		// responsibility for killing the sub-processes.
+		defer func() {
+			if err := monitor.KillSubProcesses(); err != nil {
+				// Defer only called if failure complete exec of the primary process, so already panicking
+				fmt.Println("error cleaning up sub-processes", err)
+			}
+		}()
 
 		for name, subProcess := range cmds.SubProcesses {
-			// Create struct if not present, as to not override previously set SysProcAttr properties
-			if subProcess.SysProcAttr == nil {
-				subProcess.SysProcAttr = &syscall.SysProcAttr{}
-			}
-			// Do not set the pgid of the subProcesses, leaving them in the same process group as this one
-			subProcess.SysProcAttr.Setpgid = false
 			subProcess.Stdout = os.Stdout
 			subProcess.Stderr = os.Stderr
 
 			fmt.Println("Starting subProcesses ", name, subProcess.Path)
 			if execErr := subProcess.Start(); execErr != nil {
 				if os.IsNotExist(execErr) {
-					fmt.Printf("Executable not found for subProcess %s at: %s\n", name,
-						subProcess.Path)
+					fmt.Printf("Executable not found for subProcess %s at: %s\n", name, subProcess.Path)
 				}
 				panic(execErr)
-			} else {
-				fmt.Printf("Started subProcess %s under process pid %d\n", name,
-					subProcess.Process.Pid)
 			}
+			monitor.SubProcessPIDs = append(monitor.SubProcessPIDs, subProcess.Process.Pid)
+			fmt.Printf("Started subProcess %s under process pid %d\n", name, subProcess.Process.Pid)
+		}
+
+		monitorCmd := exec.Command(os.Args[0], GenerateMonitorArgs(monitor)...)
+		monitorCmd.Stdout = os.Stdout
+		monitorCmd.Stderr = os.Stderr
+
+		fmt.Println("Starting process monitor for service process ", monitor.PrimaryPID)
+		if err := monitorCmd.Start(); err != nil {
+			fmt.Println("Failed to start process monitor for service process")
+			panic(err)
 		}
 	}
 

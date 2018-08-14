@@ -15,10 +15,12 @@
 package integration_test
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -74,33 +76,39 @@ func TestCreatesDirs(t *testing.T) {
 }
 
 func TestSubProcessesStoppedWhenMainDies(t *testing.T) {
-	cmd := mainWithArgs(t, "testdata/launcher-static-multiprocess.yml", "testdata/launcher-custom-multiprocess-long-sleep.yml")
-	require.NoError(t, cmd.Start())
+	cmd := mainWithArgs(t, "testdata/launcher-static-multiprocess.yml", "testdata/launcher-custom-multiprocess-long-sub-process.yml")
+	children := runMultiProcess(t, cmd)
 
-	// give launcher time to spawn sub-processes
-	time.Sleep(200 * time.Millisecond)
-	ppid := cmd.Process.Pid
-	children := childProcesses(t, ppid)
-	assert.Len(t, children, 2, "there should be one sub-process and one monitor")
+	assert.NoError(t, cmd.Wait())
+	time.Sleep(launchlib.CheckPeriod + 500*time.Millisecond)
+	for _, pid := range children {
+		assert.False(t, launchlib.IsPidAlive(pid), "child was not killed")
+	}
+}
+
+func TestSubProcessesParsedMonitorSignals(t *testing.T) {
+	cmd := mainWithArgs(t, "testdata/launcher-static-multiprocess.yml", "testdata/launcher-custom-multiprocess-long-sub-process.yml")
+
+	output := &bytes.Buffer{}
+	cmd.Stdout = output
+
+	children := runMultiProcess(t, cmd)
+	var monitor int
+	for cmdLine, pid := range children {
+		if strings.Contains(cmdLine, "--group-monitor") {
+			monitor = pid
+			break
+		}
+	}
+
+	assert.NotZero(t, monitor, "no monitor pid found")
+	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGPOLL))
 
 	assert.NoError(t, cmd.Wait())
 
-	time.Sleep(launchlib.CheckPeriod + 500*time.Millisecond)
-	for _, pid := range children {
-		// This always succeeds on unix systems as it merely creates a process object
-		process, err := os.FindProcess(pid)
-		if err != nil {
-			continue
-		}
-
-		// Sending a signal of 0 checks the process exists, without actually sending a signal,
-		// see https://linux.die.net/man/2/kill
-		err = process.Signal(syscall.Signal(0))
-		if err != nil {
-			continue
-		}
-		assert.Fail(t, "child process was not killed", pid)
-	}
+	trapped, err := regexp.Compile("Caught SIGPOLL")
+	require.NoError(t, err)
+	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
 }
 
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (string, error) {
@@ -115,8 +123,14 @@ func mainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) *exec
 	return exec.Command(cli, staticConfigFile, customConfigFile)
 }
 
-func childProcesses(t *testing.T, pid int) map[string]int {
-	command := exec.Command("/bin/ps", "-o", "pid,command", "--no-headers", "--ppid", strconv.Itoa(pid))
+func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
+	require.NoError(t, cmd.Start())
+
+	// let the launcher create the sub-processes
+	time.Sleep(500 * time.Millisecond)
+	ppid := cmd.Process.Pid
+
+	command := exec.Command("/bin/ps", "-o", "pid,command", "--no-headers", "--ppid", strconv.Itoa(ppid))
 	output, err := command.CombinedOutput()
 	require.NoError(t, err)
 
@@ -132,6 +146,7 @@ func childProcesses(t *testing.T, pid int) map[string]int {
 		}
 	}
 
+	assert.Len(t, children, 2, "there should be one sub-process and one monitor")
 	return children
 }
 

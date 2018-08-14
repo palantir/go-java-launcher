@@ -110,6 +110,7 @@ func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (m
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
+
 	cmds := make(map[string]CommandContext)
 	cmds[staticConfig.ServiceName] = CommandContext{
 		serviceCmds.Primary,

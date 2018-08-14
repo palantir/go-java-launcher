@@ -15,7 +15,9 @@
 package launchlib
 
 import (
+	"fmt"
 	"os"
+	"os/signal"
 	"syscall"
 	"time"
 
@@ -27,21 +29,42 @@ const (
 )
 
 type ProcessMonitor struct {
-	PrimaryPID      int
-	ProcessGroupPID int
+	PrimaryPID     int
+	SubProcessPIDs []int
 }
 
-func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
+func (m *ProcessMonitor) Run() error {
 	if err := m.verify(); err != nil {
 		return err
 	}
 
+	m.ForwardSignals()
+	return m.TermProcessGroupOnDeath()
+}
+
+func (m *ProcessMonitor) ForwardSignals() {
+	signals := make(chan os.Signal, 35)
+	signal.Notify(signals)
+
+	go func() {
+		for {
+			select {
+			case sign := <-signals:
+				// Errors are already printed and there is no where else relevant to return them to.
+				_ = SignalPid(m.PrimaryPID, sign)
+				_ = m.SignalSubProcesses(sign)
+			}
+		}
+	}()
+}
+
+func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
 	tick := time.NewTicker(CheckPeriod)
 	alive := true
 	for {
 		select {
 		case <-tick.C:
-			alive = m.isAlive()
+			alive = IsPidAlive(m.PrimaryPID)
 		}
 		if !alive {
 			tick.Stop()
@@ -49,39 +72,68 @@ func (m *ProcessMonitor) TermProcessGroupOnDeath() error {
 		}
 	}
 
-	// Service process has died, terminating process group
-	if err := syscall.Kill(-m.ProcessGroupPID, syscall.SIGTERM); err != nil {
-		return errors.Wrapf(err, "unable to send term signal to process group, beware of orphaned subProcesses")
+	return m.KillSubProcesses()
+}
+
+func (m *ProcessMonitor) KillSubProcesses() error {
+	return m.SignalSubProcesses(syscall.SIGTERM)
+}
+
+func (m *ProcessMonitor) SignalSubProcesses(sign os.Signal) error {
+	// Service process has died, terminating sub-processes
+	var errPids []int
+	for _, pid := range m.SubProcessPIDs {
+		if err := SignalPid(pid, sign); err != nil {
+			errPids = append(errPids, pid)
+		}
+	}
+
+	if len(errPids) > 0 {
+		return errors.Errorf("unable to kill sub-processes for pids %s", errPids)
 	}
 	return nil
 }
 
 func (m *ProcessMonitor) verify() error {
-	if syscall.Getpgrp() != m.ProcessGroupPID {
-		return errors.Errorf("ProcessMonitor is part of process group '%s' not service process group '%s'. "+
-			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same "+
-			"process as the service", syscall.Getpgrp(), m.ProcessGroupPID)
+	if os.Getppid() != m.PrimaryPID {
+		return errors.Errorf("ProcessMonitor is a sub-process of '%s' not service primary process '%s'. "+
+			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same process as the"+
+			" service", os.Getppid(), m.PrimaryPID)
 	}
 
-	if m.ProcessGroupPID == 1 {
-		return errors.New("ProcessMonitor service group given is '1', refusing to monitor services under " +
-			"init process group")
-	}
 	return nil
 }
 
-func (m *ProcessMonitor) isAlive() bool {
+func IsPidAlive(pid int) bool {
 	// This always succeeds on unix systems as it merely creates a process object
-	process, err := os.FindProcess(m.PrimaryPID)
+	process, err := os.FindProcess(pid)
 	if err != nil {
 		return false
 	}
 
+	return IsProcessAlive(process)
+}
+
+func IsProcessAlive(process *os.Process) bool {
 	// Sending a signal of 0 checks the process exists, without actually sending a signal,
 	// see https://linux.die.net/man/2/kill
-	err = process.Signal(syscall.Signal(0))
+	err := process.Signal(syscall.Signal(0))
 	if err != nil {
 		return false
 	}
 	return true
+}
+
+func SignalPid(pid int, sign os.Signal) error {
+	process, err := os.FindProcess(pid)
+	if err != nil || !IsProcessAlive(process) {
+		fmt.Printf("Sub-process %d is dead\n", pid)
+		return nil
+	}
+
+	if err := process.Signal(sign); err != nil {
+		fmt.Println("error signalling sub-process", pid, err, sign)
+		return err
+	}
+	return nil
 }

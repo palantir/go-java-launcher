@@ -3,4 +3,8 @@
 echo
 echo "main method"
 
-sleep 5
+if [ -z $SLEEP_TIME ]; then
+    sleep 5
+else
+    sleep $SLEEP_TIME
+fi

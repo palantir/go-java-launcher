@@ -16,7 +16,6 @@ package cli
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/palantir/pkg/cli"
@@ -38,9 +37,8 @@ func executeWithLoggers(action func(cli.Context, launchlib.ServiceLoggers) error
 	return func(ctx cli.Context) (rErr error) {
 		// Fall back to default stdout if error opening log file
 		if err := os.MkdirAll(logDir, 0755); err != nil {
-			log.Printf("Encountered error during MkdirAll the output dir '%s': %v, falling back to stdout",
-				logDir, err)
-			return action(ctx, launchlib.NewSimpleWriterLogger(os.Stdout))
+			return logErrorAndReturnWithExitCode(
+				ctx, errors.Wrapf(err, "Error trying to make log directory '%s'", logDir), 4)
 		}
 
 		loggers := &FileLoggers{
@@ -50,8 +48,7 @@ func executeWithLoggers(action func(cli.Context, launchlib.ServiceLoggers) error
 
 		outputFile, err := loggers.PrimaryLogger()
 		if err != nil {
-			log.Printf("Encountered error opening the primary output file: %v, falling back to stdout", err)
-			return action(ctx, launchlib.NewSimpleWriterLogger(os.Stdout))
+			return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "Error opening startup log file"), 4)
 		}
 		defer func() {
 			if cErr := outputFile.Close(); rErr == nil && cErr != nil {

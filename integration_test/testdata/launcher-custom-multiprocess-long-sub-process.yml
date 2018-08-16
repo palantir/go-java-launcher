@@ -1,0 +1,11 @@
+configType: java
+configVersion: 1
+jvmOpts:
+  - '-Xmx1g'
+subProcesses:
+  sidecar:
+    configType: java
+    env:
+      SLEEP_TIME: "200"
+    jvmOpts:
+      - '-Xmx1g'

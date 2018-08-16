@@ -34,11 +34,11 @@ Ensures the service defined by the static and custom configurations at service/b
 var/conf/launcher-custom.yml is running and its outputs are redirecting to var/log/startup.log and other
 var/log/${SUB_PROCESS}-startup.log files. If successful, exits 0, otherwise exits 1 and writes an error message to
 stderr and var/log/startup.log.`,
-	Action: executeWithContext(start, truncOutputFileFlag),
+	Action: executeWithLoggers(start, NewTruncatingFirst()),
 }
 
-func start(ctx cli.Context) error {
-	serviceStatus, err := getServiceStatus(ctx)
+func start(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
+	serviceStatus, err := getServiceStatus(ctx, loggers)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx,
 			errors.Wrap(err, "failed to determine service status to determine what commands to run"), 1)
@@ -57,33 +57,34 @@ func start(ctx cli.Context) error {
 	return nil
 }
 
-func startService(ctx cli.Context, notRunningCmds map[string]launchlib.CmdWithContext) (servicePids, error) {
+func startService(ctx cli.Context, notRunningCmds map[string]CommandContext) (servicePids, error) {
 	servicePids := servicePids{}
 	for name, cmd := range notRunningCmds {
 		if err := startCommand(ctx, cmd); err != nil {
 			return nil, errors.Wrapf(err, "failed to start command '%s'", name)
 		}
-		servicePids[name] = cmd.Cmd.Process.Pid
+		servicePids[name] = cmd.Command.Process.Pid
 	}
 	return servicePids, nil
 }
 
-func startCommand(ctx cli.Context, cmd launchlib.CmdWithContext) error {
-	if err := launchlib.MkDirs(cmd.Dirs, ctx.App.Stdout); err != nil {
+func startCommand(ctx cli.Context, cmdCtx CommandContext) error {
+	if err := launchlib.MkDirs(cmdCtx.Dirs, ctx.App.Stdout); err != nil {
 		return errors.Wrap(err, "failed to create directories")
 	}
-	stdout, err := os.OpenFile(cmd.OutputFileName, appendOutputFileFlag, outputFileMode)
+
+	logger, err := cmdCtx.Logger()
 	if err != nil {
-		return errors.Wrapf(err, "failed to open output file: %s", cmd.OutputFileName)
+		return err
 	}
 	defer func() {
-		if cErr := stdout.Close(); cErr != nil {
-			fmt.Fprintf(ctx.App.Stdout, "failed to close output file: %s", cmd.OutputFileName)
+		if cErr := logger.Close(); cErr != nil {
+			fmt.Fprintf(ctx.App.Stdout, "failed to close logger for command")
 		}
 	}()
-	cmd.Cmd.Stdout = stdout
-	cmd.Cmd.Stderr = stdout
-	if err := cmd.Cmd.Start(); err != nil {
+	cmdCtx.Command.Stdout = logger
+	cmdCtx.Command.Stderr = logger
+	if err := cmdCtx.Command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}
 	return nil

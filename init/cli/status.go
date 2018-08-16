@@ -17,6 +17,8 @@ package cli
 import (
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
+
+	"github.com/palantir/go-java-launcher/launchlib"
 )
 
 var statusCliCommand = cli.Command{
@@ -30,11 +32,11 @@ Exits:
 - 3 if no processes are running and there is no record of processes having been started
 - 4 if the status cannot be determined
 If exit code is nonzero, writes an error message to stderr and var/log/startup.log.`,
-	Action: executeWithContext(status, appendOutputFileFlag),
+	Action: executeWithLoggers(status, NewAlwaysAppending()),
 }
 
-func status(ctx cli.Context) error {
-	serviceStatus, err := getServiceStatus(ctx)
+func status(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
+	serviceStatus, err := getServiceStatus(ctx, loggers)
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 4)
 	}

@@ -106,8 +106,7 @@ The launcher is invoked as:
 go-java-launcher [<path to StaticLauncherConfig> [<path to CustomLauncherConfig>]]
 ```
 
-where the
-static configuration file defaults to `./launcher-static.yml` and the custom configuration file defaults to
+where the static configuration file defaults to `./launcher-static.yml` and the custom configuration file defaults to
 `./launcher-custom.yml`. It assembles the configuration options and executes the following command (where `<static.xyz>`
 and `<custom.xyz>` refer to the options from the two configuration files, respectively):
 
@@ -136,15 +135,19 @@ for `CUSTOM_PATH`. The following fixed expansions are supported:
 Expansions are only performed on the values. No expansions are performed on the keys. Note that the JAVA_HOME
 environment cannot be overwritten with this mechanism; use the `javaHome` mechanism in `StaticLauncherConfig` instead.
 
+All output from `go-java-launcher` itself, and from the launch of all processes themselves is directed to stdout.
+
 # go-init
 
 This repository also publishes a binary called `go-init` that supports the commands `start`, `status`, and `stop`, in
 adherence with the
 [Linux Standard Base](http://refspecs.linuxbase.org/LSB_3.1.1/LSB-Core-generic/LSB-Core-generic/iniscrptact.html)
 specification for init scripts. The binary reads configuration from (relative to its working directory)
-`service/bin/launcher-static.yml` and `var/conf/launcher-custom.yml` in the same vein as `go-java-launcher`, and outputs
-to `var/log/startup.log` and other `var/log/${SUB_PROCESS}-startup.log` files. `go-init` does not launch each
-`subProcess` as a child process of the primary process.
+`service/bin/launcher-static.yml` and `var/conf/launcher-custom.yml` in the same vein as `go-java-launcher`, but instead
+outputs its own logging and that of the primary process to `var/log/startup.log`.  Logs on the compilation of a
+command used to launch a specific subProcesses, and its subsequent stdout and stderr streams are directed to
+`var/log/${SUB_PROCESS}-startup.log` files. `go-init` does not launch each `subProcess` as a child process of the
+primary process.
 
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

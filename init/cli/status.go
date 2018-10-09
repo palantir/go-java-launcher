@@ -36,7 +36,8 @@ If exit code is nonzero, writes an error message to stderr and var/log/startup.l
 }
 
 func status(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
-	serviceStatus, err := getServiceStatus(ctx, loggers)
+	// Executed with logging for errors, however we discard the verbose logging of getServiceStatus
+	serviceStatus, err := getServiceStatus(ctx, &DevNullLoggers{})
 	if err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine service status"), 4)
 	}

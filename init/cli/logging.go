@@ -17,6 +17,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/pkg/errors"
@@ -77,4 +78,16 @@ func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
 		return file, errors.Wrapf(err, "could not open logging file '%s'", path)
 	}
 	return file, nil
+}
+
+var devNull = launchlib.NoopClosingWriter{Writer: ioutil.Discard}
+
+type DevNullLoggers struct{}
+
+func (d *DevNullLoggers) PrimaryLogger() (io.WriteCloser, error) {
+	return &devNull, nil
+}
+
+func (d *DevNullLoggers) SubProcessLogger(name string) launchlib.CreateLogger {
+	return d.PrimaryLogger
 }

@@ -149,5 +149,8 @@ command used to launch a specific subProcesses, and its subsequent stdout and st
 `var/log/${SUB_PROCESS}-startup.log` files. `go-init` does not launch each `subProcess` as a child process of the
 primary process.
 
+Note that while the specification states that the `status` command prints the status of the service, the exact wording
+used to denote that status is not defined and subsequently subject to change without warning.
+
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

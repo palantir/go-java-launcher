@@ -15,15 +15,16 @@
 package cli
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 )
@@ -40,7 +41,7 @@ const (
 var (
 	launcherStaticFile = "service/bin/launcher-static.yml"
 	launcherCustomFile = "var/conf/launcher-custom.yml"
-	pidfile            = "var/run/pids.yml"
+	pidfileFormat      = "var/run/%s.pid"
 
 	logDir                     = "var/log"
 	PrimaryOutputFile          = filepath.Join(logDir, outputLogFile)
@@ -66,38 +67,50 @@ func getServiceStatus(ctx cli.Context, loggers launchlib.ServiceLoggers) (*servi
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get commands from static and custom configuration files")
 	}
-	writtenPids, runningProcs, err := getPidfileInfo()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to determine running processes")
+
+	currentStatus := &serviceStatus{
+		notRunningCmds: map[string]CommandContext{},
+		runningProcs:   map[string]*os.Process{},
+		writtenPids:    servicePids{},
 	}
-	notRunningCmds := make(map[string]CommandContext)
+
 	for name, cmd := range cmds {
-		if _, ok := runningProcs[name]; !ok {
-			notRunningCmds[name] = cmd
+		pid, process, err := getCmdProcess(name)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to determine running processes")
+		}
+
+		if pid != nil {
+			currentStatus.writtenPids[name] = *pid
+		}
+
+		if process != nil {
+			currentStatus.runningProcs[name] = process
+		} else {
+			currentStatus.notRunningCmds[name] = cmd
 		}
 	}
-	return &serviceStatus{notRunningCmds, writtenPids, runningProcs}, nil
+	return currentStatus, nil
 }
 
-func getPidfileInfo() (servicePids, map[string]*os.Process, error) {
-	pidfileBytes, err := ioutil.ReadFile(pidfile)
-	pidfileExists := !os.IsNotExist(err)
-	if err != nil && pidfileExists {
-		return nil, nil, errors.Wrap(err, "failed to read pidfile")
-	} else if !pidfileExists {
-		return servicePids{}, map[string]*os.Process{}, nil
-	}
-	var servicePids servicePids
-	if err := yaml.Unmarshal(pidfileBytes, &servicePids); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to deserialize pidfile")
-	}
-	runningProcs := make(map[string]*os.Process)
-	for name, pid := range servicePids {
-		if running, proc := isPidRunning(pid); running {
-			runningProcs[name] = proc
+func getCmdProcess(name string) (*int, *os.Process, error) {
+	pidBytes, err := ioutil.ReadFile(fmt.Sprintf(pidfileFormat, name))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, nil
 		}
+		return nil, nil, errors.Wrap(err, "failed to read pidfile")
 	}
-	return servicePids, runningProcs, nil
+
+	pid, err := strconv.Atoi(string(pidBytes))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "pid file did not contain an integer")
+	}
+
+	if running, proc := isPidRunning(pid); running {
+		return &pid, proc, nil
+	}
+	return &pid, nil, nil
 }
 
 func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (map[string]CommandContext, error) {

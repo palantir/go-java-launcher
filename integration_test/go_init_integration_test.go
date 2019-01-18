@@ -32,7 +32,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 
 	cli2 "github.com/palantir/go-java-launcher/init/cli"
 	time2 "github.com/palantir/go-java-launcher/init/cli/time"
@@ -44,7 +43,8 @@ const (
 	launcherCustomFile = "var/conf/launcher-custom.yml"
 	logDir             = "var/log"
 	outputLogFile      = "startup.log"
-	pidfile            = "var/run/pids.yml"
+	pidfolder          = "var/run"
+	pidfileFormat      = pidfolder + "/%s.pid"
 )
 
 var staticSingle, _, _ = launchlib.GetConfigsFromFiles("testdata/launcher-static.yml", "testdata/launcher-custom.yml",
@@ -117,7 +117,7 @@ func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
 
 /*
  * Each test tests what happens given a prior state. Prior states for 'start' and 'status' are defined by a triple
- * denoting the number of the following items: (number of commands configured, number of pids written to the pidfile,
+ * denoting the number of the following items: (number of commands configured, number of pids written to pidfiles,
  * number of processes running). For (a, b, c), only a >= b >= c is a valid input.
  */
 
@@ -221,8 +221,8 @@ func TestInitStart_CreatesDirs(t *testing.T) {
 	pids := readPids(t)
 	require.Len(t, pids, 1)
 	// grep for testdata since it will be on the classpath
-	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids[""])
-	proc, _ := os.FindProcess(pids[""])
+	assert.Equal(t, pgrepSinglePid(t, "testdata", os.Getpid()), pids["primary"])
+	proc, _ := os.FindProcess(pids["primary"])
 	require.NoError(t, proc.Signal(syscall.SIGKILL))
 }
 
@@ -601,7 +601,7 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 }
 
 /*
- * Prior states for stop are defined by pairs of the following: (number of processes written to the pidfile, number of
+ * Prior states for stop are defined by pairs of the following: (number of processes written to pidfiles, number of
  * processes running). As above, for (a, b), only a >= b is a valid input.
  */
 
@@ -611,15 +611,14 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 
 // (0, 0)
 func TestInitStop_ZeroWrittenZeroRunning(t *testing.T) {
-	setup(t)
+	setupSingleProcess(t)
 	defer teardown(t)
 
 	result := runInit(t, "stop")
 
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
-	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+	assert.Empty(t, readPids(t))
 }
 
 // (1, 0)
@@ -632,8 +631,7 @@ func TestInitStop_OneWrittenZeroRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
-	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+	assert.Empty(t, readPids(t))
 }
 
 // (2, 0)
@@ -646,8 +644,7 @@ func TestInitStop_TwoWrittenZeroRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
-	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+	assert.Empty(t, readPids(t))
 }
 
 /*
@@ -666,8 +663,7 @@ func TestInitStop_Stoppable_OneWrittenOneRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
-	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+	assert.Empty(t, readPids(t))
 }
 
 // (2, 1)
@@ -682,8 +678,7 @@ func TestInitStop_Stoppable_TwoWrittenOneRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
-	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+	assert.Empty(t, readPids(t))
 }
 
 // (2, 2)
@@ -701,8 +696,7 @@ func TestInitStop_Stoppable_TwoWrittenTwoRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
-	_, err := ioutil.ReadFile(pidfile)
-	assert.EqualError(t, err, fmt.Sprintf("open %s: no such file or directory", pidfile))
+	assert.Empty(t, readPids(t))
 }
 
 // (1, 1)
@@ -872,28 +866,41 @@ func readStartupLog(t *testing.T) string {
 }
 
 func writePids(t *testing.T, pids servicePids) {
-	servicePids := servicePids{}
+	require.NoError(t, os.MkdirAll(pidfolder, 0755))
 	for name, pid := range pids {
-		servicePids[name] = pid
+		require.NoError(t, ioutil.WriteFile(fmt.Sprintf(pidfileFormat, name), []byte(strconv.Itoa(pid)), 0644))
 	}
-	servicePidsBytes, err := yaml.Marshal(servicePids)
-	require.NoError(t, err)
-	require.NoError(t, os.MkdirAll(filepath.Dir(pidfile), 0755))
-	require.NoError(t, ioutil.WriteFile(pidfile, servicePidsBytes, 0644))
 }
 
 func readPids(t *testing.T) servicePids {
-	pidfileBytes, err := ioutil.ReadFile(pidfile)
-	require.NoError(t, err)
-	pidfileExists := !os.IsNotExist(err)
-	if err != nil && pidfileExists {
-		require.Fail(t, "failed to read pidfile")
-	} else if !pidfileExists {
-		return servicePids{}
+	pids := servicePids{}
+
+	err := filepath.Walk(pidfolder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == pidfolder {
+			return nil
+		}
+
+		parts := strings.Split(filepath.Base(path), ".")
+		require.Len(t, parts, 2, "invalid pidfile format, does not have only a name and extension")
+		require.Equal(t, parts[1], "pid", "invalid pidfile format, does not end with .pid")
+
+		pidBytes, err := ioutil.ReadFile(path)
+		require.NoError(t, err, "failed to read pidfile %s", path)
+		pid, err := strconv.Atoi(string(pidBytes))
+		require.NoError(t, err, "pidfile '%s', did not contain an integer", path)
+
+		pids[parts[0]] = pid
+		return nil
+	})
+
+	if !os.IsNotExist(err) {
+		require.NoError(t, err)
 	}
-	var servicePids servicePids
-	require.NoError(t, yaml.Unmarshal(pidfileBytes, &servicePids))
-	return servicePids
+	return pids
 }
 
 func pgrepSinglePid(t *testing.T, key string, ppid int) int {

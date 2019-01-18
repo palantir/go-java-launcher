@@ -31,6 +31,7 @@ func TestParseStaticConfig(t *testing.T) {
 			data: `
 configType: java
 configVersion: 1
+serviceName: primary
 mainClass: mainClass
 javaHome: javaHome
 env:
@@ -50,7 +51,7 @@ args:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
-				ServiceName: "",
+				ServiceName: "primary",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "java",
@@ -107,6 +108,7 @@ args:
 			data: `
 configType: executable
 configVersion: 1
+serviceName: primary
 executable: /usr/bin/postgres
 env:
   SOME_ENV_VAR: /etc/profile
@@ -125,7 +127,7 @@ subProcesses:
 				VersionedConfig: VersionedConfig{
 					Version: 1,
 				},
-				ServiceName: "",
+				ServiceName: "primary",
 				StaticLauncherConfig: StaticLauncherConfig{
 					TypedConfig: TypedConfig{
 						Type: "executable",
@@ -326,6 +328,7 @@ bad: yaml:
 			data: `
 configType: config
 configVersion: 1
+serviceName: primary
 executable: postgres
 `,
 		},
@@ -335,6 +338,7 @@ executable: postgres
 			data: `
 configType: executable
 configVersion: 2
+serviceName: primary
 executable: postgres
 `,
 		},
@@ -346,6 +350,7 @@ executable: postgres
 configType: executable
 configVersion: 1
 executable: postgres
+serviceName: primary
 subProcesses:
   incorrect:
     configType: config
@@ -353,12 +358,13 @@ subProcesses:
 		},
 		{
 			name: "invalid subProcess name",
-			msg: "invalid subProcess name '../breakout' in static config: subProcess name '../breakout' " +
+			msg: "invalid subProcess name '../breakout' in static config: process name '../breakout' " +
 				"does not match required pattern '.+'",
 			data: `
 configType: executable
 configVersion: 1
 executable: postgres
+serviceName: primary
 subProcesses:
   ../breakout:
     configType: java
@@ -371,6 +377,7 @@ subProcesses:
 configType: executable
 configVersion: 1
 executable: /bin/rm
+serviceName: primary
 args:
   - "-rf"
   - "/"
@@ -381,6 +388,7 @@ args:
 			msg:  `Config type \"executable\" requires top-level \"executable:\" value`,
 			data: `
 configType: executable
+serviceName: primary
 configVersion: 1
 `,
 		},
@@ -390,6 +398,7 @@ configVersion: 1
 			data: `
 configType: java
 configVersion: 1
+serviceName: primary
 `,
 		},
 		{
@@ -398,6 +407,7 @@ configVersion: 1
 			data: `
 configType: java
 configVersion: 1
+serviceName: primary
 classpath:
   - thing1
   - thing2
@@ -409,7 +419,50 @@ classpath:
 			data: `
 configType: java
 configVersion: 1
+serviceName: primary
 mainClass: hello.world
+`,
+		},
+		{
+			name: "missing service name",
+			msg:  "invalid service name '' in static config: process name '' does not match required pattern '.+'",
+			data: `
+configType: java
+configVersion: 1
+mainClass: hello.world
+classpath:
+  - thing1
+  - thing2
+`,
+		},
+		{
+			name: "invalid service name",
+			msg: "invalid service name 'tidle~seps' in static config: process name 'tidle~seps' " +
+				"does not match required pattern '.+'",
+			data: `
+configType: java
+configVersion: 1
+serviceName: tidle~seps
+mainClass: hello.world
+classpath:
+  - thing1
+  - thing2
+`,
+		},
+		{
+			name: "subProcess with same service name",
+			msg:  "subProcess name 'foo' cannot be the same as ServiceName",
+			data: `
+configType: java
+configVersion: 1
+serviceName: foo
+mainClass: hello.world
+classpath:
+  - thing1
+  - thing2
+subProcesses:
+  foo:
+    configType: java
 `,
 		},
 	} {
@@ -417,4 +470,5 @@ mainClass: hello.world
 		assert.NotEqual(t, err, nil, "Case %d: %s had no errors", i, currCase.name)
 		assert.Regexp(t, currCase.msg, err.Error(), "Case %d: %s had the wrong error message", i, currCase.name)
 	}
+
 }

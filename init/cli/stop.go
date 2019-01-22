@@ -43,12 +43,38 @@ stderr and var/log/startup.log. Waits for at least 240 seconds for any processes
 }
 
 func stop(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
-	_, runningProcs, err := getPidfileInfo()
+	cmds, err := getConfiguredCommands(ctx, loggers)
 	if err != nil {
-		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
+		return logErrorAndReturnWithExitCode(ctx,
+			errors.Wrap(err, "failed to get commands from static and custom configuration files"), 1)
 	}
+
+	runningProcs := map[string]*os.Process{}
+	for name := range cmds {
+		_, proc, err := getCmdProcess(name)
+		if err != nil {
+			return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to determine process status"), 1)
+		}
+
+		if proc != nil {
+			runningProcs[name] = proc
+		}
+	}
+
 	if err := stopService(ctx, runningProcs); err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to stop service"), 1)
+	}
+
+	var errs bool
+	for name := range cmds {
+		if err := os.Remove(fmt.Sprintf(pidfileFormat, name)); err != nil && !os.IsNotExist(err) {
+			fmt.Fprintf(ctx.App.Stderr, "failed to remove stopped process pidfile for '%s'\n", name)
+			errs = true
+		}
+	}
+
+	if errs {
+		return logErrorAndReturnWithExitCode(ctx, errors.New("error removing stopped service pidfiles"), 1)
 	}
 	return nil
 }
@@ -63,10 +89,6 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 
 	if err := waitForServiceToStop(ctx, procs); err != nil {
 		return errors.Wrap(err, "failed to stop at least one process")
-	}
-
-	if err := os.Remove(pidfile); err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, "failed to remove pidfile")
 	}
 
 	return nil

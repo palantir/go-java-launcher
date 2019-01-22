@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	subProcessNamePattern = regexp.MustCompile("^[a-z-]+$")
+	processNamePattern = regexp.MustCompile("^[a-z-]+$")
 )
 
 type VersionedConfig struct {
@@ -130,12 +130,9 @@ func validateSubProcessLimit(numberSubProcesses int) error {
 	return nil
 }
 
-func validateSubProcessName(name string) error {
-	if !subProcessNamePattern.MatchString(name) {
-		return errors.Errorf(
-			"subProcess name '%s' does not match required pattern '%s'",
-			name,
-			subProcessNamePattern)
+func validateProcessName(name string) error {
+	if !processNamePattern.MatchString(name) {
+		return errors.Errorf("process name '%s' does not match required pattern '%s'", name, processNamePattern)
 	}
 	return nil
 }
@@ -152,6 +149,11 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 		return PrimaryStaticLauncherConfig{}, err
 	}
 
+	if err := validateProcessName(config.ServiceName); err != nil {
+		return PrimaryStaticLauncherConfig{},
+			errors.Wrapf(err, "invalid service name '%s' in static config", config.ServiceName)
+	}
+
 	if err := validateStaticConfig(&config.StaticLauncherConfig); err != nil {
 		return PrimaryStaticLauncherConfig{}, err
 	}
@@ -161,7 +163,7 @@ func parseStaticConfig(yamlString []byte) (PrimaryStaticLauncherConfig, error) {
 	}
 
 	for name, subProcess := range config.SubProcesses {
-		if err := validateSubProcessName(name); err != nil {
+		if err := validateProcessName(name); err != nil {
 			return PrimaryStaticLauncherConfig{},
 				errors.Wrapf(err, "invalid subProcess name '%s' in static config", name)
 		}
@@ -248,7 +250,7 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 	}
 
 	for name, subProcess := range config.SubProcesses {
-		if err := validateSubProcessName(name); err != nil {
+		if err := validateProcessName(name); err != nil {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid subProcess name '%s' in "+
 				"custom config", name)
 		}

@@ -19,10 +19,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 )
@@ -43,29 +43,28 @@ func start(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
 		return logErrorAndReturnWithExitCode(ctx,
 			errors.Wrap(err, "failed to determine service status to determine what commands to run"), 1)
 	}
-	servicePids, err := startService(ctx, serviceStatus.notRunningCmds)
-	if err != nil {
+	if err := startService(ctx, serviceStatus.notRunningCmds); err != nil {
 		return logErrorAndReturnWithExitCode(ctx, errors.Wrap(err, "failed to start service"), 1)
-	}
-	for name, runningProc := range serviceStatus.runningProcs {
-		servicePids[name] = runningProc.Pid
-	}
-	if err := writePids(servicePids); err != nil {
-		return logErrorAndReturnWithExitCode(ctx,
-			errors.Wrap(err, "failed to record pids when starting service"), 1)
 	}
 	return nil
 }
 
-func startService(ctx cli.Context, notRunningCmds map[string]CommandContext) (servicePids, error) {
-	servicePids := servicePids{}
+func startService(ctx cli.Context, notRunningCmds map[string]CommandContext) error {
 	for name, cmd := range notRunningCmds {
 		if err := startCommand(ctx, cmd); err != nil {
-			return nil, errors.Wrapf(err, "failed to start command '%s'", name)
+			return errors.Wrapf(err, "failed to start command '%s'", name)
 		}
-		servicePids[name] = cmd.Command.Process.Pid
+
+		pidfile := fmt.Sprintf(pidfileFormat, name)
+		if err := os.MkdirAll(filepath.Dir(pidfile), 0755); err != nil {
+			return errors.Wrapf(err, "unable to create pidfile directory.")
+		}
+
+		if err := ioutil.WriteFile(pidfile, []byte(strconv.Itoa(cmd.Command.Process.Pid)), 0644); err != nil {
+			return errors.Wrapf(err, "failed to save pid to file for command '%s'", name)
+		}
 	}
-	return servicePids, nil
+	return nil
 }
 
 func startCommand(ctx cli.Context, cmdCtx CommandContext) error {
@@ -86,20 +85,6 @@ func startCommand(ctx cli.Context, cmdCtx CommandContext) error {
 	cmdCtx.Command.Stderr = logger
 	if err := cmdCtx.Command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
-	}
-	return nil
-}
-
-func writePids(servicePids servicePids) error {
-	servicePidsBytes, err := yaml.Marshal(servicePids)
-	if err != nil {
-		return errors.Wrap(err, "failed to serialize pidfile")
-	}
-	if err := os.MkdirAll(filepath.Dir(pidfile), 0755); err != nil {
-		return cli.WithExitCode(1, errors.Errorf("failed to mkdir for pidfile: %s", pidfile))
-	}
-	if err := ioutil.WriteFile(pidfile, servicePidsBytes, 0644); err != nil {
-		return errors.Wrap(err, "failed to write pidfile")
 	}
 	return nil
 }

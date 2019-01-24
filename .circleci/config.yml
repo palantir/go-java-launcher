@@ -2,127 +2,47 @@
 # To request a modification to the general template, file an issue on Excavator.
 # To manually manage the CircleCI configuration for this project, remove the .circleci/template.sh file.
 
-working_dir: &working_dir
-  working_directory: /go/src/github.com/palantir/go-java-launcher
+version: 2.1
 
-darwin-linux-no-cgo: &darwin-linux-no-cgo
-  <<: *working_dir
-  docker:
-    - image: nmiyake/go:go-darwin-linux-no-cgo-1.10.3-t130
-      environment:
-        CGO_ENABLED: 0
+orbs:
+  go: palantir/go@0.0.5
+  godel: palantir/godel@0.0.2
 
-go-version: &go-version
-  run: go version
-
-godel-cache-restore: &godel-cache-restore
-  restore_cache:
-    keys:
-      - godel-cache-{{ checksum "godelw" }}-v1
-
-godel-version: &godel-version
-  run: ./godelw version
-
-godel-cache-save: &godel-cache-save
-  save_cache:
-    key: godel-cache-{{ checksum "godelw" }}-v1
-    paths:
-      - ~/.godel
-
-define-tests-dir: &define-tests-dir
-  run: echo 'export TESTS_DIR=/tmp/test-results' >> $BASH_ENV
-
-mkdir-tests-dir: &mkdir-tests-dir
-  run: mkdir -p "${TESTS_DIR}"
-
-godelw-verify: &godelw-verify
-  run: ./godelw verify --apply=false --junit-output="$TESTS_DIR/$CIRCLE_PROJECT_REPONAME-tests.xml"
-
-store-test-results: &store-test-results
-  type: test-results-store
-  path: /tmp/test-results
-
-store-artifacts: &store-artifacts
-  type: artifacts-store
-  path: /tmp/test-results
-  destination: test-results
-
-version: 2
-jobs:
-  verify:
-    <<: *darwin-linux-no-cgo
-    steps:
-      - checkout
-      - *go-version
-      - *godel-cache-restore
-      - *godel-version
-      - *godel-cache-save
-      - run: ./godelw verify --apply=false --skip-test
-  test:
-    <<: *darwin-linux-no-cgo
-    steps:
-      - checkout
-      - *go-version
-      - *godel-cache-restore
-      - *godel-version
-      - *godel-cache-save
-      - *define-tests-dir
-      - *mkdir-tests-dir
-      - run: ./godelw test --junit-output="$TESTS_DIR/$CIRCLE_PROJECT_REPONAME-tests.xml"
-      - *store-test-results
-      - *store-artifacts
-  dist:
-    <<: *darwin-linux-no-cgo
-    steps:
-      - checkout
-      - *go-version
-      - *godel-cache-restore
-      - *godel-version
-      - *godel-cache-save
-      - run: ./godelw dist
-      - save_cache:
-          key: dist-{{ .Environment.CIRCLE_WORKFLOW_ID }}-{{ .Environment.CIRCLE_SHA1 }}-v1
-          paths:
-            - out
-  publish:
-    <<: *darwin-linux-no-cgo
-    steps:
-      - checkout
-      - *go-version
-      - *godel-cache-restore
-      - *godel-version
-      - restore_cache:
-          keys:
-            - dist-{{ .Environment.CIRCLE_WORKFLOW_ID }}-{{ .Environment.CIRCLE_SHA1 }}-v1
-      # gödel cache only works if cached outputs are newer than source that generates it. CircleCI restore_cache restores
-      # the cache with the original modification dates, but the source's modification date in CI is the time of checkout.
-      # Manually touch all of the cache output to mark it as being generated after source was checked out.
-      - run: find out -exec touch {} \;
-      - run: ./godelw publish bintray --url https://api.bintray.com --subject palantir --repository releases --product "$CIRCLE_PROJECT_REPONAME" --username "$BINTRAY_USERNAME" --password "$BINTRAY_PASSWORD" --publish --downloads-list
-
-### Workflows ###
-requires_products: &requires_products
-  - verify
-  - test
-  - dist
+executor-param: &executor-param
+  executor:
+    name: go/darwin-linux-no-cgo
+    owner-repo: palantir/go-java-launcher
+    version: 1.11.5-t5
 
 all-tags-filter: &all-tags-filter
-  filters: { tags: { only: /.*/ } }
+  filters:
+    tags:
+      only: /.*/
 
 workflows:
   version: 2
-  build-publish:
+  dist-publish:
     jobs:
-      - verify:
+      - godel/verify:
           <<: *all-tags-filter
-      - test:
+          <<: *executor-param
+      - godel/test:
           <<: *all-tags-filter
-      - dist:
+          <<: *executor-param
+      - godel/dist:
           <<: *all-tags-filter
-      - publish:
-          requires: *requires_products
+          <<: *executor-param
+      - godel/bintray-publish:
+          requires:
+            - godel/verify
+            - godel/test
+            - godel/dist
           filters:
             tags:
               only: /^v?[0-9]+(\.[0-9]+)+(-rc[0-9]+)?(-alpha[0-9]+)?$/
             branches:
               ignore: /.*/
+          <<: *executor-param
+          bintray-subject: palantir
+          bintray-repo: releases
+          bintray-product: go-java-launcher

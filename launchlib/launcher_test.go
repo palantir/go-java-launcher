@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetJavaHome(t *testing.T) {
+func TestGetJavaHome_usesJAVA_HOMEbydefault(t *testing.T) {
 	originalJavaHome := os.Getenv("JAVA_HOME")
 	require.NoError(t, os.Setenv("JAVA_HOME", "foo"))
 
@@ -36,6 +36,17 @@ func TestGetJavaHome(t *testing.T) {
 	assert.NoError(t, javaHomeErr, "getJavaHome correctly returns nil")
 
 	require.NoError(t, os.Setenv("JAVA_HOME", originalJavaHome))
+}
+
+func TestGetJavaHome_allowsReadingOtherEnvVar(t *testing.T) {
+	original := os.Getenv("SOME_VAR")
+	defer func() { require.NoError(t, os.Setenv("SOME_VAR", original)) }()
+
+	require.NoError(t, os.Setenv("SOME_VAR", "foo"))
+
+	javaHome, javaHomeErr := getJavaHome("$SOME_VAR")
+	assert.NoError(t, javaHomeErr)
+	assert.Equal(t, "foo", javaHome)
 }
 
 func TestSetCustomEnvironment(t *testing.T) {

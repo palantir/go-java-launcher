@@ -89,14 +89,14 @@ func (m *ProcessMonitor) SignalSubProcesses(sign os.Signal) error {
 	}
 
 	if len(errPids) > 0 {
-		return errors.Errorf("unable to kill sub-processes for pids %s", errPids)
+		return errors.Errorf("unable to kill sub-processes for pids %v", errPids)
 	}
 	return nil
 }
 
 func (m *ProcessMonitor) verify() error {
 	if os.Getppid() != m.PrimaryPID {
-		return errors.Errorf("ProcessMonitor is a sub-process of '%s' not service primary process '%s'. "+
+		return errors.Errorf("ProcessMonitor is a sub-process of '%d' not service primary process '%d'. "+
 			"ProcessMonitor is expected to only be used by the go-java-launcher itself, under the same process as the"+
 			" service", os.Getppid(), m.PrimaryPID)
 	}

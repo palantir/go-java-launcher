@@ -153,13 +153,25 @@ func verifyPathIsSafeForExec(execPath string) (string, error) {
 // Returns explicitJavaHome if it is not the empty string, or the value of the JAVA_HOME environment variable otherwise.
 // Panics if neither of them is set.
 func getJavaHome(explicitJavaHome string) (string, error) {
-	if explicitJavaHome != "" {
-		return explicitJavaHome, nil
+	if explicitJavaHome == "" {
+		return loadEnvVar("JAVA_HOME")
 	}
 
-	javaHome := os.Getenv("JAVA_HOME")
+	if explicitJavaHome[0] == '$' {
+		if len(explicitJavaHome) == 1 {
+			return "", fmt.Errorf("javaHome set to just '$' is not allowed, please use a path or an env var name like $JAVA_11_HOME")
+		}
+
+		return loadEnvVar(explicitJavaHome[1:])
+	}
+
+	return explicitJavaHome, nil
+}
+
+func loadEnvVar(envVar string) (string, error) {
+	javaHome := os.Getenv(envVar)
 	if len(javaHome) == 0 {
-		return "", fmt.Errorf("JAVA_HOME environment variable not set")
+		return "", fmt.Errorf("%s environment variable not set", envVar)
 	}
 	return javaHome, nil
 }

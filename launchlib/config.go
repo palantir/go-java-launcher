@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	processNamePattern = regexp.MustCompile("^[a-z-]+$")
+	processNamePattern = regexp.MustCompile("^[a-z0-9-]+$")
 )
 
 type VersionedConfig struct {

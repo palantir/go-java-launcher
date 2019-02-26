@@ -14,6 +14,16 @@
   revision = "ad45545899c7b13c020ea92b2072220eefad42b8"
 
 [[projects]]
+  name = "github.com/palantir/go-java-launcher"
+  packages = [
+    "init/cli",
+    "init/cli/time",
+    "launchlib",
+  ]
+  revision = "f81a5cdf3c5555671524f65ac9aa11ed394dff97"
+  version = "1.6.1"
+
+[[projects]]
   name = "github.com/palantir/godel"
   packages = ["pkg/products/v2/products"]
   revision = "c916c66e63f61a496e86087c820896aad763abb2"
@@ -70,6 +80,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f5acf16fae9932555264d1e8a827ed3a8484d71ccb4e16b1dc86df885e5ac063"
+  inputs-digest = "46c63d8c686bcc4d9cd00163cbde9d903aeada40afc30ad3e53ebee93e460211"
   solver-name = "gps-cdcl"
   solver-version = 1

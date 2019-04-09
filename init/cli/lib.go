@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/palantir/pkg/cli"
@@ -102,7 +103,7 @@ func getCmdProcess(name string) (*int, *os.Process, error) {
 		return nil, nil, errors.Wrap(err, "failed to read pidfile")
 	}
 
-	pid, err := strconv.Atoi(string(pidBytes))
+	pid, err := strconv.Atoi(strings.TrimSpace(string(pidBytes)))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "pid file did not contain an integer")
 	}

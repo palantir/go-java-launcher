@@ -1,29 +1,29 @@
 policy:
   approval:
     - or:
-      - infra team approval
-      - infra team co-approval
-      - excavator only touched gradle files or versions.props
+      - repo owner approval
+      - repo owner co-approval
+      - excavator only touched baseline, gradle files or versions.props
       - excavator only touched package.json and lock files
+  disapproval:
+    requires:
+      organizations: [ "palantir" ]
 
 approval_rules:
-
-  - name: infra team approval
+  - name: repo owner approval
     requires:
       count: 1
-      teams:
-        - "palantir/infrastructure"
+      admins: true
 
-  # Require two *contributing* infra maintainers to approve changes
-  - name: infra team co-approval
+  # Require two *contributing* maintainers to approve changes
+  - name: repo owner co-approval
     options:
       allow_contributor: true
     requires:
       count: 2
-      teams:
-        - "palantir/infrastructure"
+      admins: true
 
-  - name: excavator only touched gradle files or versions.props
+  - name: excavator only touched baseline, gradle files or versions.props
     requires:
       count: 0
     if:
@@ -31,10 +31,13 @@ approval_rules:
         users: [ "svc-excavator-bot" ]
       only_changed_files:
         paths:
+          - "^\\.baseline/.*$"
           - "^.*gradle$"
           - "^gradle/wrapper/.*"
           - "^gradlew$"
           - "^gradlew.bat$"
+          - "^gradle.properties$"
+          - "^settings.gradle$"
           - "^versions.props$"
           - "^versions.lock$"
 

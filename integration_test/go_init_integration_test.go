@@ -713,7 +713,7 @@ func TestInitStop_Unstoppable_OneWrittenOneRunning(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
 	assert.Contains(t, result.startupLog, "processes")
-	assert.Contains(t, result.startupLog, "did not stop within 240 seconds, so a SIGKILL was sent")
+	assert.Contains(t, result.startupLog, "did not stop within 120 seconds, so a SIGKILL was sent")
 }
 
 // (2, 1)
@@ -729,7 +729,7 @@ func TestInitStop_Unstoppable_TwoWrittenOneRunning(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
 	assert.Contains(t, result.startupLog, "processes")
-	assert.Contains(t, result.startupLog, "did not stop within 240 seconds, so a SIGKILL was sent")
+	assert.Contains(t, result.startupLog, "did not stop within 120 seconds, so a SIGKILL was sent")
 }
 
 // (2, 2)
@@ -748,7 +748,7 @@ func TestInitStop_Unstoppable_TwoWrittenTwoRunning(t *testing.T) {
 	assert.Equal(t, 0, result.exitCode)
 	assert.Empty(t, result.stderr)
 	assert.Contains(t, result.startupLog, "processes")
-	assert.Contains(t, result.startupLog, "did not stop within 240 seconds, so a SIGKILL was sent")
+	assert.Contains(t, result.startupLog, "did not stop within 120 seconds, so a SIGKILL was sent")
 }
 
 func forkKillableSleep(t *testing.T) (pid int, killer func()) {
@@ -935,18 +935,18 @@ func readFromChannel(c <-chan initResult, timeout time.Duration) (result *initRe
 	}
 }
 
-// Runs init 'stop' and asserts that it will time out after 240 seconds.
+// Runs init 'stop' and asserts that it will time out after 120 seconds.
 func runStopAssertTimesOut(t *testing.T) *initResult {
 	clock := time2.NewFakeClock()
 	initChan := runInitWithClock(t, clock, "stop")
 	clock.BlockUntil(2) // wait for timer and ticker to attach
-	clock.Advance(239 * time.Second)
+	clock.Advance(119 * time.Second)
 	result := readFromChannel(initChan, 1*time.Second)
-	require.Nil(t, result, "Expected `stop` to still wait after 239 seconds")
+	require.Nil(t, result, "Expected `stop` to still wait after 119 seconds")
 
 	clock.Advance(1 * time.Second)
 	result2 := readFromChannel(initChan, 1*time.Second)
-	require.NotNil(t, result2, "Expected `stop` to finish after 240 seconds")
+	require.NotNil(t, result2, "Expected `stop` to finish after 120 seconds")
 
 	return result2
 }

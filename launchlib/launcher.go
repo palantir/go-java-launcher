@@ -162,9 +162,8 @@ func getJavaHome(explicitJavaHome string) (string, error) {
                 jh, err := loadEnvVar(explicitJavaHome[1:])
                 if err != nil {
                         return loadEnvVar("JAVA_HOME")
-                } else {
-                        return jh, nil
                 }
+                return jh, nil
 	} else {
                 return explicitJavaHome, nil
         }

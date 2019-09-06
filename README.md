@@ -17,7 +17,8 @@ configType: java
 configVersion: 1
 # REQUIRED - The main class to be run
 mainClass: my.package.Main
-# OPTIONAL - Path to the JRE or environment variable name (e.g. $JAVA_11_HOME). Defaults to the JAVA_HOME environment variable if unset
+# OPTIONAL - Path to the JRE or environment variable name (e.g. $JAVA_11_HOME). Defaults to the JAVA_HOME environment variable if unset,
+#  or if the specified environment variable is not set at runtime.
 javaHome: /opt/palantir/jdk8/Contents/Home
 # REQUIRED - The classpath entries; the final classpath is the ':'-concatenated list in the given order
 classpath:

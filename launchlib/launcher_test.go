@@ -49,6 +49,17 @@ func TestGetJavaHome_allowsReadingOtherEnvVar(t *testing.T) {
 	assert.Equal(t, "foo", javaHome)
 }
 
+func TestGetJavaHome_defaultsToJavaHomeWhenUndefined(t *testing.T) {
+	originalJavaHome := os.Getenv("JAVA_HOME")
+	require.NoError(t, os.Setenv("JAVA_HOME", "foo"))
+
+	javaHome, javaHomeErr := getJavaHome("$SOME_VAR")
+	assert.NoError(t, javaHomeErr)
+	assert.Equal(t, "foo", javaHome)
+
+	require.NoError(t, os.Setenv("JAVA_HOME", originalJavaHome))
+}
+
 func TestSetCustomEnvironment(t *testing.T) {
 	originalEnv := make(map[string]string)
 	customEnv := map[string]string{

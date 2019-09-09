@@ -1,0 +1,7 @@
+type: improvement
+improvement:
+  description: The javaHome option, when set to a variable, now
+    checks to see if the variable is set at runtime. If it is
+    not set, it falls back on $JAVA_HOME.
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/109

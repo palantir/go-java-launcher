@@ -155,17 +155,18 @@ func verifyPathIsSafeForExec(execPath string) (string, error) {
 func getJavaHome(explicitJavaHome string) (string, error) {
 	if explicitJavaHome == "" {
 		return loadEnvVar("JAVA_HOME")
-	}
-
-	if explicitJavaHome[0] == '$' {
+	} else if explicitJavaHome[0] == '$' {
 		if len(explicitJavaHome) == 1 {
 			return "", fmt.Errorf("javaHome set to just '$' is not allowed, please use a path or an env var name like $JAVA_11_HOME")
 		}
-
-		return loadEnvVar(explicitJavaHome[1:])
+		jh, err := loadEnvVar(explicitJavaHome[1:])
+		if err != nil {
+			return loadEnvVar("JAVA_HOME")
+		}
+		return jh, nil
+	} else {
+		return explicitJavaHome, nil
 	}
-
-	return explicitJavaHome, nil
 }
 
 func loadEnvVar(envVar string) (string, error) {

@@ -159,14 +159,14 @@ func getJavaHome(explicitJavaHome string) (string, error) {
 		if len(explicitJavaHome) == 1 {
 			return "", fmt.Errorf("javaHome set to just '$' is not allowed, please use a path or an env var name like $JAVA_11_HOME")
 		}
-                jh, err := loadEnvVar(explicitJavaHome[1:])
-                if err != nil {
-                        return loadEnvVar("JAVA_HOME")
-                }
-                return jh, nil
+		jh, err := loadEnvVar(explicitJavaHome[1:])
+		if err != nil {
+			return loadEnvVar("JAVA_HOME")
+		}
+		return jh, nil
 	} else {
-                return explicitJavaHome, nil
-        }
+		return explicitJavaHome, nil
+	}
 }
 
 func loadEnvVar(envVar string) (string, error) {

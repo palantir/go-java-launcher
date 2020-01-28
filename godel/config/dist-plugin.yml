@@ -7,6 +7,8 @@ products:
         arch: amd64
       - os: linux
         arch: amd64
+      - os: linux
+        arch: arm64
     dist:
       disters:
         bin:
@@ -25,6 +27,8 @@ products:
         arch: amd64
       - os: linux
         arch: amd64
+      - os: linux
+        arch: arm64
     dist:
       disters:
         bin:

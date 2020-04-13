@@ -45,7 +45,7 @@ func CompileCmdsFromConfig(
 		SubProcesses: make(map[string]*exec.Cmd),
 	}
 
-	serviceCmds.Primary, err = compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, loggers.PrimaryLogger)
+	serviceCmds.Primary, err = compileCmdFromConfig(&staticConfig.StaticLauncherConfig, &customConfig.CustomLauncherConfig, &customConfig.CgroupsV1, loggers.PrimaryLogger)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to compile command for primary command")
 	}
@@ -55,7 +55,7 @@ func CompileCmdsFromConfig(
 			return nil, errors.Errorf("no custom launcher config exists for subProcess config '%s'", name)
 		}
 
-		serviceCmds.SubProcesses[name], err = compileCmdFromConfig(&subProcStatic, &subProcCustom, loggers.SubProcessLogger(name))
+		serviceCmds.SubProcesses[name], err = compileCmdFromConfig(&subProcStatic, &subProcCustom, &customConfig.CgroupsV1, loggers.SubProcessLogger(name))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to compile command for subProcess %s", name)
 		}
@@ -63,7 +63,8 @@ func CompileCmdsFromConfig(
 	return serviceCmds, nil
 }
 
-func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig, createLogger CreateLogger) (cmd *exec.Cmd, err error) {
+func compileCmdFromConfig(
+	staticConfig *StaticLauncherConfig, customConfig *CustomLauncherConfig, cgroupsV1 *map[string]string, createLogger CreateLogger) (cmd *exec.Cmd, err error) {
 	logger, err := createLogger()
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to create command compilation logger")
@@ -115,6 +116,18 @@ func compileCmdFromConfig(staticConfig *StaticLauncherConfig, customConfig *Cust
 	}
 
 	args = append(args, staticConfig.Args...)
+	if len(*cgroupsV1) > 0 {
+		var cgexecArgs []string
+		executable = "/bin/cgexec"
+
+		cgexecArgs = append(cgexecArgs, executable)
+		for controller, cgroup := range *cgroupsV1 {
+			cgexecArgs = append(cgexecArgs, "-g", fmt.Sprintf("%s:%s", controller, cgroup))
+		}
+		cgexecArgs = append(cgexecArgs, args...)
+		args = cgexecArgs
+	}
+
 	fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))

@@ -247,6 +247,9 @@ env:
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
+cgroupsV1:
+  memory: groupA
+  cpuset: groupB
 subProcesses:
   envoy:
     configType: executable
@@ -256,6 +259,10 @@ subProcesses:
 			want: PrimaryCustomLauncherConfig{
 				VersionedConfig: VersionedConfig{
 					Version: 1,
+				},
+				CgroupsV1: map[string]string{
+					"memory": "groupA",
+					"cpuset": "groupB",
 				},
 				CustomLauncherConfig: CustomLauncherConfig{
 					TypedConfig: TypedConfig{

@@ -1,0 +1,5 @@
+type: feature
+feature:
+  description: Allow launching processes into cgroupsv1 cgroups via cgexec
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/129

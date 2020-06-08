@@ -24,6 +24,7 @@ import (
 	"strings"
 	"syscall"
 
+	ps "github.com/mitchellh/go-ps"
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
 
@@ -108,7 +109,11 @@ func getCmdProcess(name string) (*int, *os.Process, error) {
 		return nil, nil, errors.Wrap(err, "pid file did not contain an integer")
 	}
 
-	if running, proc := isPidRunning(pid); running {
+	running, proc, err := isPidRunning(pid)
+	if err != nil {
+		return nil, nil, err
+	}
+	if running {
 		return &pid, proc, nil
 	}
 	return &pid, nil, nil
@@ -146,16 +151,37 @@ func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (m
 	return cmds, nil
 }
 
-func isPidRunning(pid int) (bool, *os.Process) {
+func isPidRunning(pid int) (bool, *os.Process, error) {
 	// Docs say FindProcess always succeeds on Unix.
 	proc, _ := os.FindProcess(pid)
-	if isProcRunning(proc) {
-		return true, proc
+	running, err := isProcRunning(proc)
+	if err != nil {
+		return false, nil, err
 	}
-	return false, nil
+	if running {
+		return true, proc, nil
+	}
+	return false, nil, nil
 }
 
-func isProcRunning(proc *os.Process) bool {
+func isProcRunning(proc *os.Process) (bool, error) {
 	// This is the way to check if a process exists: https://linux.die.net/man/2/kill.
-	return proc.Signal(syscall.Signal(0)) == nil
+	// On linux, this may respond true if there is a thread running with the same id.
+	running := proc.Signal(syscall.Signal(0)) == nil
+	if !running {
+		return false, nil
+	}
+
+	// On linux, iterating over processes will only return running processes. Unfortunately,
+	// getting exactly the one pid will also return a thread of the same id.
+	procs, err := ps.Processes()
+	if err != nil {
+		return false, err
+	}
+	for _, p := range procs {
+		if p.Pid() == proc.Pid {
+			return true, nil
+		}
+	}
+	return false, nil
 }

@@ -8,6 +8,12 @@
   version = "v1.1.0"
 
 [[projects]]
+  name = "github.com/mitchellh/go-ps"
+  packages = ["."]
+  revision = "147ff83818ae939913b2e20b91ae3cd6c391771c"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/mitchellh/go-wordwrap"
   packages = ["."]
@@ -70,6 +76,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f5acf16fae9932555264d1e8a827ed3a8484d71ccb4e16b1dc86df885e5ac063"
+  inputs-digest = "04cb028c8bb597646fb5c39d30a5d686a6a513923f502866aa65d68f138946f6"
   solver-name = "gps-cdcl"
   solver-version = 1

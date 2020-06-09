@@ -106,7 +106,11 @@ func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 		select {
 		case <-ticker.Chan():
 			for name, remainingProc := range procs {
-				if !isProcRunning(remainingProc) {
+				running, err := isProcRunning(remainingProc)
+				if err != nil {
+					return err
+				}
+				if !running {
 					delete(procs, name)
 				}
 			}
@@ -116,7 +120,11 @@ func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 		case <-timer.Chan():
 			killedProcs := make([]string, 0, len(procs))
 			for name, remainingProc := range procs {
-				if isProcRunning(remainingProc) {
+				running, err := isProcRunning(remainingProc)
+				if err != nil {
+					return err
+				}
+				if running {
 					if err := remainingProc.Kill(); err != nil {
 						// If this actually errors, something is probably seriously wrong.
 						// Just stop immediately.

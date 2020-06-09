@@ -1,0 +1,5 @@
+type: fix
+fix:
+  description: Fix false positive process detection when an unrelated thread's id matches the old process id.
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/130

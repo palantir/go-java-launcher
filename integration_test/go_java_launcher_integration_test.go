@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/palantir/go-java-launcher/launchlib"
-	"github.com/palantir/godel/pkg/products/v2/products"
+	"github.com/palantir/godel/pkg/products/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -1,10 +1,11 @@
-// Copyright 2016 Palantir Technologies, Inc. All rights reserved.
+// Copyright (c) 2016 Palantir Technologies. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package cli
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -13,18 +14,22 @@ import (
 
 type App struct {
 	Command
-	Before       func(ctx Context) error
-	ErrorHandler func(ctx Context, err error) int
-	Version      string
-	Stdout       io.Writer
-	Stderr       io.Writer
-	Completion   map[string]completion.Provider
-	Manpage      *Manpage
-	Backcompat   []Backcompat
-	OnExit       OnExit
+	Before         func(ctx Context) error
+	ErrorHandler   func(ctx Context, err error) int
+	Version        string
+	Stdout         io.Writer
+	Stderr         io.Writer
+	Completion     map[string]completion.Provider
+	Manpage        *Manpage
+	Backcompat     []Backcompat
+	OnExit         OnExit
+	ContextConfig  func(Context, context.Context) context.Context
+	ContextOptions []ContextOption
 }
 
 type Option func(*App)
+
+type ContextOption func(*Context)
 
 func NewApp(opts ...Option) *App {
 	app := &App{

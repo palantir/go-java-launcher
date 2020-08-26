@@ -78,7 +78,7 @@ func compileCmdFromConfig(
 		*staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
-	fmt.Fprintln(logger, "Working directory:", workingDir)
+	_, _ = fmt.Fprintf(logger, "Working directory:", workingDir)
 
 	var args []string
 	var executable string
@@ -89,11 +89,11 @@ func compileCmdFromConfig(
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
 		}
-		fmt.Fprintln(logger, "Using JAVA_HOME:", javaHome)
+		_, _ = fmt.Fprintf(logger, "Using JAVA_HOME:", javaHome)
 
 		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
 			staticConfig.JavaConfig.Classpath))
-		fmt.Fprintln(logger, "Classpath:", classpath)
+		_, _ = fmt.Fprintf(logger, "Classpath:", classpath)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {

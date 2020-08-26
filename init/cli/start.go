@@ -78,7 +78,7 @@ func startCommand(ctx cli.Context, cmdCtx CommandContext) error {
 	}
 	defer func() {
 		if cErr := logger.Close(); cErr != nil {
-			fmt.Fprintf(ctx.App.Stdout, "failed to close logger for command")
+			_, _ = fmt.Fprintf(ctx.App.Stdout, "failed to close logger for command")
 		}
 	}()
 	cmdCtx.Command.Stdout = logger

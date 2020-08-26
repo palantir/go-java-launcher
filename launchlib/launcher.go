@@ -74,7 +74,7 @@ func compileCmdFromConfig(
 			err = errors.Wrapf(err, "unable to close command compilation logger")
 		}
 	}()
-	fmt.Fprintf(logger, "Launching with static configuration %v and custom configuration %v\n",
+	_, _ = fmt.Fprintf(logger, "Launching with static configuration %v and custom configuration %v\n",
 		*staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
@@ -128,7 +128,7 @@ func compileCmdFromConfig(
 		args = cgexecArgs
 	}
 
-	fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
+	_, _ = fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
@@ -142,7 +142,7 @@ func MkDirs(dirs []string, stdout io.Writer) error {
 			return fmt.Errorf("Cannot create directory with non [A-Za-z0-9] characters: %s", dir)
 		}
 
-		fmt.Fprintf(stdout, "Creating directory: %s\n", dir)
+		_, _ = fmt.Fprintf(stdout, "Creating directory: %s\n", dir)
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}

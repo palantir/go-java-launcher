@@ -68,7 +68,7 @@ func stop(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
 	var errs bool
 	for name := range cmds {
 		if err := os.Remove(fmt.Sprintf(pidfileFormat, name)); err != nil && !os.IsNotExist(err) {
-			fmt.Fprintf(ctx.App.Stderr, "failed to remove stopped process pidfile for '%s'\n", name)
+			_, _ = fmt.Fprintf(ctx.App.Stderr, "failed to remove stopped process pidfile for '%s'\n", name)
 			errs = true
 		}
 	}
@@ -134,7 +134,7 @@ func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 					killedProcs = append(killedProcs, name)
 				}
 			}
-			fmt.Fprintf(ctx.App.Stdout, "processes '%v' did not stop within %d seconds, so a SIGKILL was "+
+			_, _ = fmt.Fprintf(ctx.App.Stdout, "processes '%v' did not stop within %d seconds, so a SIGKILL was "+
 				"sent", killedProcs, numSecondsToWait)
 			return nil
 		}

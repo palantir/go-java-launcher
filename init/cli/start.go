@@ -21,10 +21,9 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/palantir/go-java-launcher/launchlib"
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
-
-	"github.com/palantir/go-java-launcher/launchlib"
 )
 
 var startCliCommand = cli.Command{

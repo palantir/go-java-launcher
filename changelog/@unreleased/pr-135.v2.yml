@@ -1,0 +1,5 @@
+type: improvement
+improvement:
+  description: Upgrade go to 1.15 and godel to 2.25
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/135

@@ -74,11 +74,11 @@ func compileCmdFromConfig(
 			err = errors.Wrapf(err, "unable to close command compilation logger")
 		}
 	}()
-	fmt.Fprintf(logger, "Launching with static configuration %v and custom configuration %v\n",
+	_, _ = fmt.Fprintf(logger, "Launching with static configuration %v and custom configuration %v\n",
 		*staticConfig, *customConfig)
 
 	workingDir := getWorkingDir()
-	fmt.Fprintln(logger, "Working directory:", workingDir)
+	_, _ = fmt.Fprintf(logger, "Working directory: %s\n", workingDir)
 
 	var args []string
 	var executable string
@@ -89,11 +89,11 @@ func compileCmdFromConfig(
 		if javaHomeErr != nil {
 			return nil, javaHomeErr
 		}
-		fmt.Fprintln(logger, "Using JAVA_HOME:", javaHome)
+		_, _ = fmt.Fprintf(logger, "Using JAVA_HOME: %s\n", javaHome)
 
 		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
 			staticConfig.JavaConfig.Classpath))
-		fmt.Fprintln(logger, "Classpath:", classpath)
+		_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
@@ -128,7 +128,7 @@ func compileCmdFromConfig(
 		args = cgexecArgs
 	}
 
-	fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
+	_, _ = fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
 
@@ -142,7 +142,7 @@ func MkDirs(dirs []string, stdout io.Writer) error {
 			return fmt.Errorf("Cannot create directory with non [A-Za-z0-9] characters: %s", dir)
 		}
 
-		fmt.Fprintf(stdout, "Creating directory: %s\n", dir)
+		_, _ = fmt.Fprintf(stdout, "Creating directory: %s\n", dir)
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			return err
 		}

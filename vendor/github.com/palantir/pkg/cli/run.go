@@ -1,19 +1,19 @@
-// Copyright 2016 Palantir Technologies, Inc. All rights reserved.
+// Copyright (c) 2016 Palantir Technologies. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	"github.com/palantir/pkg/cli/flag"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -36,6 +36,16 @@ func (app *App) Run(args []string) (exitStatus int) {
 		printVersion(ctx)
 		return 0
 	}
+
+	baseContext := context.Background()
+	if app.ContextConfig != nil {
+		baseContext = app.ContextConfig(ctx, baseContext)
+	}
+	if baseContext == nil {
+		baseContext = context.Background()
+	}
+	ctx.context, ctx.cancel = context.WithCancel(baseContext)
+
 	if ctx.Bool(helpFlag.MainName()) {
 		ctx.PrintHelp(app.Stdout)
 		return 0
@@ -136,6 +146,9 @@ func runAction(ctx Context) error {
 	go func() {
 		if _, ok := <-signals; ok {
 			once.Do(onExit)
+			if ctx.cancel != nil {
+				ctx.cancel()
+			}
 			os.Exit(1)
 		}
 	}()
@@ -146,5 +159,8 @@ func runAction(ctx Context) error {
 		once.Do(onExit)
 	}()
 
+	for _, cfg := range ctx.App.ContextOptions {
+		cfg(&ctx)
+	}
 	return ctx.Command.Action(ctx)
 }

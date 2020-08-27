@@ -1,4 +1,4 @@
-// Copyright 2016 Palantir Technologies, Inc. All rights reserved.
+// Copyright (c) 2016 Palantir Technologies. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -9,9 +9,8 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	"github.com/palantir/pkg/cli/flag"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func (app *App) parse(args []string) (Context, error) {
@@ -23,7 +22,9 @@ func (app *App) parse(args []string) (Context, error) {
 		},
 		defaults:  map[string]interface{}{},
 		specified: map[string]interface{}{},
+		allVals:   map[string][]interface{}{},
 	}
+
 	args = args[1:] // skip name of binary
 	fillDefaults(&ctx)
 	for {
@@ -132,6 +133,7 @@ func parseNextFlag(ctx *Context, args *[]string) (more bool, err error) {
 			if err != nil {
 				return false, fmt.Errorf("%v: %v", name, err)
 			}
+			ctx.allVals[f.MainName()] = append(ctx.allVals[f.MainName()], ctx.specified[f.MainName()])
 			return true, nil
 		}
 	}

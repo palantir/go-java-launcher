@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"unicode/utf8"
 )
 
 // nonzero tests whether a variable value non-zero
@@ -29,7 +30,7 @@ func nonzero(v interface{}, param string) error {
 	valid := true
 	switch st.Kind() {
 	case reflect.String:
-		valid = len(st.String()) != 0
+		valid = utf8.RuneCountInString(st.String()) != 0
 	case reflect.Ptr, reflect.Interface:
 		valid = !st.IsNil()
 	case reflect.Slice, reflect.Map, reflect.Array:
@@ -62,13 +63,19 @@ func nonzero(v interface{}, param string) error {
 func length(v interface{}, param string) error {
 	st := reflect.ValueOf(v)
 	valid := true
+	if st.Kind() == reflect.Ptr {
+		if st.IsNil() {
+			return nil
+		}
+		st = st.Elem()
+	}
 	switch st.Kind() {
 	case reflect.String:
 		p, err := asInt(param)
 		if err != nil {
 			return ErrBadParameter
 		}
-		valid = int64(len(st.String())) == p
+		valid = int64(utf8.RuneCountInString(st.String())) == p
 	case reflect.Slice, reflect.Map, reflect.Array:
 		p, err := asInt(param)
 		if err != nil {
@@ -109,13 +116,19 @@ func length(v interface{}, param string) error {
 func min(v interface{}, param string) error {
 	st := reflect.ValueOf(v)
 	invalid := false
+	if st.Kind() == reflect.Ptr {
+		if st.IsNil() {
+			return nil
+		}
+		st = st.Elem()
+	}
 	switch st.Kind() {
 	case reflect.String:
 		p, err := asInt(param)
 		if err != nil {
 			return ErrBadParameter
 		}
-		invalid = int64(len(st.String())) < p
+		invalid = int64(utf8.RuneCountInString(st.String())) < p
 	case reflect.Slice, reflect.Map, reflect.Array:
 		p, err := asInt(param)
 		if err != nil {
@@ -156,13 +169,19 @@ func min(v interface{}, param string) error {
 func max(v interface{}, param string) error {
 	st := reflect.ValueOf(v)
 	var invalid bool
+	if st.Kind() == reflect.Ptr {
+		if st.IsNil() {
+			return nil
+		}
+		st = st.Elem()
+	}
 	switch st.Kind() {
 	case reflect.String:
 		p, err := asInt(param)
 		if err != nil {
 			return ErrBadParameter
 		}
-		invalid = int64(len(st.String())) > p
+		invalid = int64(utf8.RuneCountInString(st.String())) > p
 	case reflect.Slice, reflect.Map, reflect.Array:
 		p, err := asInt(param)
 		if err != nil {
@@ -201,7 +220,14 @@ func max(v interface{}, param string) error {
 func regex(v interface{}, param string) error {
 	s, ok := v.(string)
 	if !ok {
-		return ErrUnsupported
+		sptr, ok := v.(*string)
+		if !ok {
+			return ErrUnsupported
+		}
+		if sptr == nil {
+			return nil
+		}
+		s = *sptr
 	}
 
 	re, err := regexp.Compile(param)
@@ -243,4 +269,22 @@ func asFloat(param string) (float64, error) {
 		return 0.0, ErrBadParameter
 	}
 	return i, nil
+}
+
+// nonnil validates that the given pointer is not nil
+func nonnil(v interface{}, param string) error {
+	st := reflect.ValueOf(v)
+	// if we got a non-pointer then we most likely got
+	// the value for a pointer field, either way, its not
+	// nil
+	switch st.Kind() {
+	case reflect.Ptr, reflect.Interface:
+		if st.IsNil() {
+			return ErrZeroValue
+		}
+	case reflect.Invalid:
+		// the only way its invalid is if its an interface that's nil
+		return ErrZeroValue
+	}
+	return nil
 }

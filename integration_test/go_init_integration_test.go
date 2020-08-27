@@ -30,12 +30,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	cli2 "github.com/palantir/go-java-launcher/init/cli"
 	time2 "github.com/palantir/go-java-launcher/init/cli/time"
 	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (

@@ -1,10 +1,11 @@
-// Copyright 2016 Palantir Technologies, Inc. All rights reserved.
+// Copyright (c) 2016 Palantir Technologies. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package flag
 
 import (
+	"os"
 	"strconv"
 	"time"
 	"unicode"
@@ -19,6 +20,7 @@ type DurationFlag struct {
 	// however makes sense, like 120s instead of 2m0s
 	Value      string
 	Usage      string
+	EnvVar     string
 	Required   bool
 	Deprecated string
 }
@@ -47,7 +49,7 @@ func (f DurationFlag) HasLeader() bool {
 }
 
 func (f DurationFlag) Default() interface{} {
-	dur, err := f.Parse(f.Value)
+	dur, err := f.Parse(f.DefaultStr())
 	if err != nil {
 		panic(err)
 	}
@@ -68,11 +70,18 @@ func (f DurationFlag) PlaceholderStr() string {
 }
 
 func (f DurationFlag) DefaultStr() string {
-	return f.Value
+	if f.EnvVar == "" {
+		return f.Value
+	}
+	v := os.Getenv(f.EnvVar)
+	if v == "" {
+		return f.Value
+	}
+	return v
 }
 
 func (f DurationFlag) EnvVarStr() string {
-	return ""
+	return f.EnvVar
 }
 
 func (f DurationFlag) UsageStr() string {

@@ -1,4 +1,4 @@
-// Copyright 2016 Palantir Technologies, Inc. All rights reserved.
+// Copyright (c) 2016 Palantir Technologies. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -21,7 +21,7 @@ func (app *App) doCompletion(args []string) (exitCode int) {
 	if hasCompletionFlag(args) {
 		completions, exitCode := doCompletion(app, args[1:])
 		for _, completion := range completions {
-			fmt.Fprintln(app.Stdout, completion)
+			_, _ = fmt.Fprintln(app.Stdout, completion)
 		}
 		return int(exitCode)
 	}

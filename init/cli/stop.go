@@ -21,11 +21,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/palantir/pkg/cli"
-	"github.com/pkg/errors"
-
 	time2 "github.com/palantir/go-java-launcher/init/cli/time"
 	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/palantir/pkg/cli"
+	"github.com/pkg/errors"
 )
 
 var (

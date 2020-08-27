@@ -1,0 +1,37 @@
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/mitchellh/go-ps v1.0.0
+## explicit
+github.com/mitchellh/go-ps
+# github.com/mitchellh/go-wordwrap v1.0.0
+github.com/mitchellh/go-wordwrap
+# github.com/palantir/godel/pkg/products/v2 v2.0.0
+## explicit
+github.com/palantir/godel/pkg/products/v2
+# github.com/palantir/pkg v1.0.1
+github.com/palantir/pkg
+# github.com/palantir/pkg/cli v1.0.1
+## explicit
+github.com/palantir/pkg/cli
+github.com/palantir/pkg/cli/completion
+github.com/palantir/pkg/cli/flag
+# github.com/pkg/errors v0.9.1
+## explicit
+github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
+# github.com/stretchr/testify v1.4.0
+## explicit
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
+# golang.org/x/crypto v0.0.0-20191117063200-497ca9f6d64f
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/sys v0.0.0-20190412213103-97732733099d
+golang.org/x/sys/unix
+golang.org/x/sys/windows
+# gopkg.in/validator.v2 v2.0.0-20200605151824-2b28d334fa05
+## explicit
+gopkg.in/validator.v2
+# gopkg.in/yaml.v2 v2.3.0
+## explicit
+gopkg.in/yaml.v2

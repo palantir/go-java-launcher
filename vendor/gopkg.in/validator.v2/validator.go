@@ -17,11 +17,12 @@
 package validator
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
-	"unicode"
 )
 
 // TextErr is an error that also implements the TextMarshaller interface for
@@ -43,8 +44,8 @@ func (t TextErr) MarshalText() ([]byte, error) {
 }
 
 var (
-	// ErrZeroValue is the error returned when variable has zero valud
-	// and nonzero was specified
+	// ErrZeroValue is the error returned when variable has zero value
+	// and nonzero or nonnil was specified
 	ErrZeroValue = TextErr{errors.New("zero value")}
 	// ErrMin is the error returned when variable is less than mininum
 	// value specified
@@ -70,33 +71,41 @@ var (
 	// ErrInvalid is the error returned when variable is invalid
 	// (normally a nil pointer)
 	ErrInvalid = TextErr{errors.New("invalid value")}
+	// ErrCannotValidate is the error returned when a struct is unexported
+	ErrCannotValidate = TextErr{errors.New("cannot validate unexported struct")}
 )
 
 // ErrorMap is a map which contains all errors from validating a struct.
 type ErrorMap map[string]ErrorArray
 
 // ErrorMap implements the Error interface so we can check error against nil.
-// The returned error is if existent the first error which was added to the map.
+// The returned error is all existing errors with the map.
 func (err ErrorMap) Error() string {
+	var b bytes.Buffer
+
 	for k, errs := range err {
 		if len(errs) > 0 {
-			return fmt.Sprintf("%s: %s", k, errs.Error())
+			b.WriteString(fmt.Sprintf("%s: %s, ", k, errs.Error()))
 		}
 	}
 
-	return ""
+	return strings.TrimSuffix(b.String(), ", ")
 }
 
 // ErrorArray is a slice of errors returned by the Validate function.
 type ErrorArray []error
 
-// ErrorArray implements the Error interface and returns the first error as
-// string if existent.
+// ErrorArray implements the Error interface and returns all the errors comma seprated
+// if errors exist.
 func (err ErrorArray) Error() string {
-	if len(err) > 0 {
-		return err[0].Error()
+	var b bytes.Buffer
+
+	for _, errs := range err {
+		b.WriteString(fmt.Sprintf("%s, ", errs.Error()))
 	}
-	return ""
+
+	errs := b.String()
+	return strings.TrimSuffix(errs, ", ")
 }
 
 // ValidationFunc is a function that receives the value of a
@@ -110,6 +119,10 @@ type Validator struct {
 	// validationFuncs is a map of ValidationFuncs indexed
 	// by their name.
 	validationFuncs map[string]ValidationFunc
+	// printJSON set to true will make errors print with the
+	// name of their json field instead of their struct tag.
+	// If no json tag is present the name of the struct field is used.
+	printJSON bool
 }
 
 // Helper validator so users can use the
@@ -126,7 +139,9 @@ func NewValidator() *Validator {
 			"min":     min,
 			"max":     max,
 			"regexp":  regex,
+			"nonnil":  nonnil,
 		},
+		printJSON: false,
 	}
 }
 
@@ -156,6 +171,32 @@ func (mv *Validator) WithTag(tag string) *Validator {
 	return v
 }
 
+// SetPrintJSON allows you to print errors with json tag names present in struct tags
+func SetPrintJSON(printJSON bool) {
+	defaultValidator.SetPrintJSON(printJSON)
+}
+
+// SetPrintJSON allows you to print errors with json tag names present in struct tags
+func (mv *Validator) SetPrintJSON(printJSON bool) {
+	mv.printJSON = printJSON
+}
+
+// WithPrintJSON creates a new Validator with printJSON set to new value. It is
+// useful to chain-call with Validate so we don't change the print option
+// permanently: validator.WithPrintJSON(true).Validate(t)
+func WithPrintJSON(printJSON bool) *Validator {
+	return defaultValidator.WithPrintJSON(printJSON)
+}
+
+// WithPrintJSON creates a new Validator with printJSON set to new value. It is
+// useful to chain-call with Validate so we don't change the print option
+// permanently: validator.WithTag("foo").WithPrintJSON(true).Validate(t)
+func (mv *Validator) WithPrintJSON(printJSON bool) *Validator {
+	v := mv.copy()
+	v.SetPrintJSON(printJSON)
+	return v
+}
+
 // Copy a validator
 func (mv *Validator) copy() *Validator {
 	newFuncs := map[string]ValidationFunc{}
@@ -165,6 +206,7 @@ func (mv *Validator) copy() *Validator {
 	return &Validator{
 		tagName:         mv.tagName,
 		validationFuncs: newFuncs,
+		printJSON:       mv.printJSON,
 	}
 }
 
@@ -190,70 +232,138 @@ func (mv *Validator) SetValidationFunc(name string, vf ValidationFunc) error {
 	return nil
 }
 
-// Validate validates the fields of a struct based
-// on 'validator' tags and returns errors found indexed
-// by the field name.
+// Validate calls the Validate method on the default validator.
 func Validate(v interface{}) error {
 	return defaultValidator.Validate(v)
 }
 
-// Validate validates the fields of a struct based
-// on 'validator' tags and returns errors found indexed
-// by the field name.
+// Validate validates the fields of structs (included embedded structs) based on
+// 'validator' tags and returns errors found indexed by the field name.
 func (mv *Validator) Validate(v interface{}) error {
-	sv := reflect.ValueOf(v)
-	st := reflect.TypeOf(v)
-	if sv.Kind() == reflect.Ptr && !sv.IsNil() {
-		return mv.Validate(sv.Elem().Interface())
-	}
-	if sv.Kind() != reflect.Struct && sv.Kind() != reflect.Interface {
-		return ErrUnsupported
-	}
-
-	nfields := sv.NumField()
 	m := make(ErrorMap)
-	for i := 0; i < nfields; i++ {
-		f := sv.Field(i)
-		// deal with pointers
-		for f.Kind() == reflect.Ptr && !f.IsNil() {
-			f = f.Elem()
-		}
-		tag := st.Field(i).Tag.Get(mv.tagName)
-		if tag == "-" {
-			continue
-		}
-		fname := st.Field(i).Name
-		var errs ErrorArray
-
-		if tag != "" {
-			err := mv.Valid(f.Interface(), tag)
-			if errors, ok := err.(ErrorArray); ok {
-				errs = errors
-			} else {
-				if err != nil {
-					errs = ErrorArray{err}
-				}
-			}
-		}
-		if f.Kind() == reflect.Struct || f.Kind() == reflect.Interface {
-			if !unicode.IsUpper(rune(fname[0])) {
-				continue
-			}
-			e := mv.Validate(f.Interface())
-			if e, ok := e.(ErrorMap); ok && len(e) > 0 {
-				for j, k := range e {
-					m[fname+"."+j] = k
-				}
-			}
-		}
-		if len(errs) > 0 {
-			m[st.Field(i).Name] = errs
-		}
-	}
+	mv.deepValidateCollection(reflect.ValueOf(v), m, func() string {
+		return ""
+	})
 	if len(m) > 0 {
 		return m
 	}
 	return nil
+}
+
+func (mv *Validator) validateStruct(sv reflect.Value, m ErrorMap) error {
+	kind := sv.Kind()
+	if (kind == reflect.Ptr || kind == reflect.Interface) && !sv.IsNil() {
+		return mv.validateStruct(sv.Elem(), m)
+	}
+	if kind != reflect.Struct && kind != reflect.Interface {
+		return ErrUnsupported
+	}
+
+	st := sv.Type()
+	nfields := st.NumField()
+	for i := 0; i < nfields; i++ {
+		if err := mv.validateField(st.Field(i), sv.Field(i), m); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateField validates the field of fieldVal referred to by fieldDef.
+// If fieldDef refers to an anonymous/embedded field,
+// validateField will walk all of the embedded type's fields and validate them on sv.
+func (mv *Validator) validateField(fieldDef reflect.StructField, fieldVal reflect.Value, m ErrorMap) error {
+	tag := fieldDef.Tag.Get(mv.tagName)
+	if tag == "-" {
+		return nil
+	}
+	// deal with pointers
+	for (fieldVal.Kind() == reflect.Ptr || fieldVal.Kind() == reflect.Interface) && !fieldVal.IsNil() {
+		fieldVal = fieldVal.Elem()
+	}
+
+	// ignore private structs unless Anonymous
+	if !fieldDef.Anonymous && fieldDef.PkgPath != "" {
+		return nil
+	}
+
+	var errs ErrorArray
+	if tag != "" {
+		var err error
+		if fieldDef.PkgPath != "" {
+			err = ErrCannotValidate
+		} else {
+			err = mv.validValue(fieldVal, tag)
+		}
+		if errarr, ok := err.(ErrorArray); ok {
+			errs = errarr
+		} else if err != nil {
+			errs = ErrorArray{err}
+		}
+	}
+
+	// no-op if field is not a struct, interface, array, slice or map
+	mv.deepValidateCollection(fieldVal, m, func() string {
+		return fieldDef.Name
+	})
+
+	if len(errs) > 0 {
+		n := fieldDef.Name
+
+		if mv.printJSON {
+			if jn := parseName(fieldDef.Tag.Get("json")); jn != "" {
+				n = jn
+			}
+		}
+		m[n] = errs
+	}
+	return nil
+}
+
+func (mv *Validator) deepValidateCollection(f reflect.Value, m ErrorMap, fnameFn func() string) {
+	switch f.Kind() {
+	case reflect.Interface, reflect.Ptr:
+		if f.IsNil() {
+			return
+		}
+		mv.deepValidateCollection(f.Elem(), m, fnameFn)
+	case reflect.Struct:
+		subm := make(ErrorMap)
+		err := mv.validateStruct(f, subm)
+		parentName := fnameFn()
+		if err != nil {
+			m[parentName] = ErrorArray{err}
+		}
+		for j, k := range subm {
+			keyName := j
+			if parentName != "" {
+				keyName = parentName + "." + keyName
+			}
+			m[keyName] = k
+		}
+	case reflect.Array, reflect.Slice:
+		// we don't need to loop over every byte in a byte slice so we only end up
+		// looping when the kind is something we care about
+		switch f.Type().Elem().Kind() {
+		case reflect.Struct, reflect.Interface, reflect.Ptr, reflect.Map, reflect.Array, reflect.Slice:
+			for i := 0; i < f.Len(); i++ {
+				mv.deepValidateCollection(f.Index(i), m, func() string {
+					return fmt.Sprintf("%s[%d]", fnameFn(), i)
+				})
+			}
+		}
+	case reflect.Map:
+		for _, key := range f.MapKeys() {
+			mv.deepValidateCollection(key, m, func() string {
+				return fmt.Sprintf("%s[%+v](key)", fnameFn(), key.Interface())
+			}) // validate the map key
+			value := f.MapIndex(key)
+			mv.deepValidateCollection(value, m, func() string {
+				return fmt.Sprintf("%s[%+v](value)", fnameFn(), key.Interface())
+			})
+		}
+	}
 }
 
 // Valid validates a value based on the provided
@@ -269,17 +379,21 @@ func (mv *Validator) Valid(val interface{}, tags string) error {
 		return nil
 	}
 	v := reflect.ValueOf(val)
-	if v.Kind() == reflect.Ptr && !v.IsNil() {
-		return mv.Valid(v.Elem().Interface(), tags)
+	if (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) && !v.IsNil() {
+		return mv.validValue(v.Elem(), tags)
 	}
-	var err error
-	switch v.Kind() {
-	case reflect.Invalid:
-		err = mv.validateVar(nil, tags)
-	default:
-		err = mv.validateVar(val, tags)
+	if v.Kind() == reflect.Invalid {
+		return mv.validateVar(nil, tags)
 	}
-	return err
+	return mv.validateVar(val, tags)
+}
+
+// validValue is like Valid but takes a Value instead of an interface
+func (mv *Validator) validValue(v reflect.Value, tags string) error {
+	if v.Kind() == reflect.Invalid {
+		return mv.validateVar(nil, tags)
+	}
+	return mv.validateVar(v.Interface(), tags)
 }
 
 // validateVar validates one single variable
@@ -308,11 +422,27 @@ type tag struct {
 	Param string         // parameter to send to the validation function
 }
 
+// separate by no escaped commas
+var sepPattern *regexp.Regexp = regexp.MustCompile(`((?:^|[^\\])(?:\\\\)*),`)
+
+func splitUnescapedComma(str string) []string {
+	ret := []string{}
+	indexes := sepPattern.FindAllStringIndex(str, -1)
+	last := 0
+	for _, is := range indexes {
+		ret = append(ret, str[last:is[1]-1])
+		last = is[1]
+	}
+	ret = append(ret, str[last:])
+	return ret
+}
+
 // parseTags parses all individual tags found within a struct tag.
 func (mv *Validator) parseTags(t string) ([]tag, error) {
-	tl := strings.Split(t, ",")
+	tl := splitUnescapedComma(t)
 	tags := make([]tag, 0, len(tl))
 	for _, i := range tl {
+		i = strings.Replace(i, `\,`, ",", -1)
 		tg := tag{}
 		v := strings.SplitN(i, "=", 2)
 		tg.Name = strings.Trim(v[0], " ")
@@ -330,4 +460,18 @@ func (mv *Validator) parseTags(t string) ([]tag, error) {
 
 	}
 	return tags, nil
+}
+
+func parseName(tag string) string {
+	if tag == "" {
+		return ""
+	}
+
+	name := strings.SplitN(tag, ",", 2)[0]
+
+	// if the field as be skipped in json, just return an empty string
+	if name == "-" {
+		return ""
+	}
+	return name
 }

@@ -20,9 +20,8 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/pkg/errors"
-
 	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/pkg/errors"
 )
 
 type FileFlags interface {

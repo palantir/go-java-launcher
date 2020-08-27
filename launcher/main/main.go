@@ -21,9 +21,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/pkg/errors"
-
 	"github.com/palantir/go-java-launcher/launchlib"
+	"github.com/pkg/errors"
 )
 
 const (

@@ -41,8 +41,9 @@ func executeWithLoggers(action func(cli.Context, launchlib.ServiceLoggers) error
 		}
 
 		loggers := &FileLoggers{
-			flags: flags,
-			mode:  outputFileMode,
+			flags:     flags,
+			mode:      outputFileMode,
+			openFiles: make(map[string]*os.File),
 		}
 
 		outputFile, err := loggers.PrimaryLogger()

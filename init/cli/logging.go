@@ -19,6 +19,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strconv"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 	"github.com/pkg/errors"
@@ -57,8 +58,9 @@ func NewAlwaysAppending() FileFlags {
 }
 
 type FileLoggers struct {
-	flags FileFlags
-	mode  os.FileMode
+	flags     FileFlags
+	mode      os.FileMode
+	openFiles map[string]*os.File
 }
 
 func (f *FileLoggers) PrimaryLogger() (io.WriteCloser, error) {
@@ -71,12 +73,39 @@ func (f *FileLoggers) SubProcessLogger(name string) launchlib.CreateLogger {
 	}
 }
 
-func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
+func (f *FileLoggers) OpenFile(path string) (io.WriteCloser, error) {
+	if file, ok := f.openFiles[path]; ok {
+		return &launchlib.NoopClosingWriter{Writer: file}, nil
+	}
+	if _, ok := f.flags.(*truncatingFirst); ok {
+		backup(path)
+	}
 	file, err := os.OpenFile(path, f.flags.Get(path), f.mode)
 	if err != nil {
 		return file, errors.Wrapf(err, "could not open logging file '%s'", path)
 	}
-	return file, nil
+	f.openFiles[path] = file
+	return &ClosingWriter{WriteCloser: file, openFiles: f.openFiles, path: path}, nil
+}
+
+func backup(path string) {
+	limit := 5
+	os.Remove(path + "." + strconv.Itoa(limit))
+	for i := limit; i > 0; i-- {
+		os.Rename(path+"."+strconv.Itoa(i-1), path+"."+strconv.Itoa(i))
+	}
+	os.Rename(path, path+".0")
+}
+
+type ClosingWriter struct {
+	io.WriteCloser
+	openFiles map[string]*os.File
+	path      string
+}
+
+func (c *ClosingWriter) Close() error {
+	delete(c.openFiles, c.path)
+	return c.WriteCloser.Close()
 }
 
 var devNull = launchlib.NoopClosingWriter{Writer: ioutil.Discard}

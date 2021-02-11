@@ -97,11 +97,11 @@ func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
 
 func rotate(path string) {
 	limit := 5
-	os.Remove(path + "." + strconv.Itoa(limit))
+	_ = os.Remove(path + "." + strconv.Itoa(limit))
 	for i := limit; i > 0; i-- {
-		os.Rename(path+"."+strconv.Itoa(i-1), path+"."+strconv.Itoa(i))
+		_ = os.Rename(path+"."+strconv.Itoa(i-1), path+"."+strconv.Itoa(i))
 	}
-	os.Rename(path, path+".0")
+	_ = os.Rename(path, path+".0")
 }
 
 var devNull = launchlib.NoopClosingWriter{Writer: ioutil.Discard}

@@ -58,9 +58,17 @@ func NewAlwaysAppending() FileFlags {
 }
 
 type FileLoggers struct {
-	flags     FileFlags
-	mode      os.FileMode
-	openFiles map[string]*os.File
+	flags   FileFlags
+	mode    os.FileMode
+	rotated map[string]bool
+}
+
+func NewFileLoggers(flags FileFlags, mode os.FileMode) *FileLoggers {
+	return &FileLoggers{
+		flags:   flags,
+		mode:    mode,
+		rotated: make(map[string]bool),
+	}
 }
 
 func (f *FileLoggers) PrimaryLogger() (io.WriteCloser, error) {
@@ -73,39 +81,27 @@ func (f *FileLoggers) SubProcessLogger(name string) launchlib.CreateLogger {
 	}
 }
 
-func (f *FileLoggers) OpenFile(path string) (io.WriteCloser, error) {
-	if file, ok := f.openFiles[path]; ok {
-		return &launchlib.NoopClosingWriter{Writer: file}, nil
-	}
-	if _, ok := f.flags.(*truncatingFirst); ok {
-		backup(path)
+func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
+	if _, ok := f.rotated[path]; !ok {
+		if _, ok := f.flags.(*truncatingFirst); ok {
+			rotate(path)
+			f.rotated[path] = true
+		}
 	}
 	file, err := os.OpenFile(path, f.flags.Get(path), f.mode)
 	if err != nil {
 		return file, errors.Wrapf(err, "could not open logging file '%s'", path)
 	}
-	f.openFiles[path] = file
-	return &ClosingWriter{WriteCloser: file, openFiles: f.openFiles, path: path}, nil
+	return file, nil
 }
 
-func backup(path string) {
+func rotate(path string) {
 	limit := 5
 	os.Remove(path + "." + strconv.Itoa(limit))
 	for i := limit; i > 0; i-- {
 		os.Rename(path+"."+strconv.Itoa(i-1), path+"."+strconv.Itoa(i))
 	}
 	os.Rename(path, path+".0")
-}
-
-type ClosingWriter struct {
-	io.WriteCloser
-	openFiles map[string]*os.File
-	path      string
-}
-
-func (c *ClosingWriter) Close() error {
-	delete(c.openFiles, c.path)
-	return c.WriteCloser.Close()
 }
 
 var devNull = launchlib.NoopClosingWriter{Writer: ioutil.Discard}

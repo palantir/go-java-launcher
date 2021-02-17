@@ -25,6 +25,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const limit = 5
+
 type FileFlags interface {
 	Get(path string) int
 }
@@ -60,14 +62,14 @@ func NewAlwaysAppending() FileFlags {
 type FileLoggers struct {
 	flags   FileFlags
 	mode    os.FileMode
-	rotated map[string]bool
+	rotated map[string]struct{}
 }
 
 func NewFileLoggers(flags FileFlags, mode os.FileMode) *FileLoggers {
 	return &FileLoggers{
 		flags:   flags,
 		mode:    mode,
-		rotated: make(map[string]bool),
+		rotated: make(map[string]struct{}),
 	}
 }
 
@@ -85,7 +87,7 @@ func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
 	if _, ok := f.rotated[path]; !ok {
 		if _, ok := f.flags.(*truncatingFirst); ok {
 			rotate(path)
-			f.rotated[path] = true
+			f.rotated[path] = struct{}{}
 		}
 	}
 	file, err := os.OpenFile(path, f.flags.Get(path), f.mode)
@@ -96,7 +98,6 @@ func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
 }
 
 func rotate(path string) {
-	limit := 5
 	_ = os.Remove(path + "." + strconv.Itoa(limit))
 	for i := limit; i > 0; i-- {
 		_ = os.Rename(path+"."+strconv.Itoa(i-1), path+"."+strconv.Itoa(i))

@@ -19,10 +19,13 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strconv"
 
 	"github.com/palantir/go-java-launcher/launchlib"
 	"github.com/pkg/errors"
 )
+
+const limit = 5
 
 type FileFlags interface {
 	Get(path string) int
@@ -57,8 +60,17 @@ func NewAlwaysAppending() FileFlags {
 }
 
 type FileLoggers struct {
-	flags FileFlags
-	mode  os.FileMode
+	flags   FileFlags
+	mode    os.FileMode
+	rotated map[string]struct{}
+}
+
+func NewFileLoggers(flags FileFlags, mode os.FileMode) *FileLoggers {
+	return &FileLoggers{
+		flags:   flags,
+		mode:    mode,
+		rotated: make(map[string]struct{}),
+	}
 }
 
 func (f *FileLoggers) PrimaryLogger() (io.WriteCloser, error) {
@@ -72,11 +84,25 @@ func (f *FileLoggers) SubProcessLogger(name string) launchlib.CreateLogger {
 }
 
 func (f *FileLoggers) OpenFile(path string) (*os.File, error) {
+	if _, ok := f.rotated[path]; !ok {
+		if _, ok := f.flags.(*truncatingFirst); ok {
+			rotate(path)
+			f.rotated[path] = struct{}{}
+		}
+	}
 	file, err := os.OpenFile(path, f.flags.Get(path), f.mode)
 	if err != nil {
 		return file, errors.Wrapf(err, "could not open logging file '%s'", path)
 	}
 	return file, nil
+}
+
+func rotate(path string) {
+	_ = os.Remove(path + "." + strconv.Itoa(limit))
+	for i := limit; i > 0; i-- {
+		_ = os.Rename(path+"."+strconv.Itoa(i-1), path+"."+strconv.Itoa(i))
+	}
+	_ = os.Rename(path, path+".0")
 }
 
 var devNull = launchlib.NoopClosingWriter{Writer: ioutil.Discard}

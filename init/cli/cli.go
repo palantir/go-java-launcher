@@ -40,10 +40,7 @@ func executeWithLoggers(action func(cli.Context, launchlib.ServiceLoggers) error
 				ctx, errors.Wrapf(err, "Error trying to make log directory '%s'", logDir), 4)
 		}
 
-		loggers := &FileLoggers{
-			flags: flags,
-			mode:  outputFileMode,
-		}
+		loggers := NewFileLoggers(flags, outputFileMode)
 
 		outputFile, err := loggers.PrimaryLogger()
 		if err != nil {

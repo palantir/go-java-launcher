@@ -5,7 +5,7 @@
 owner-repo: &owner-repo
   owner-repo: palantir/go-java-launcher
 
-excutor: &executor
+executor: &executor
   executor:
     name: go/golang-docker
     go-docker-version: 1.16-java-11-t71
@@ -38,18 +38,3 @@ workflows:
           name: dist
           <<: *executor
           <<: *all-tags-filter
-      - godel/bintray-publish:
-          name: publish
-          <<: *executor
-          bintray-subject: palantir
-          bintray-repo: releases
-          bintray-product: go-java-launcher
-          requires:
-            - verify
-            - test
-            - dist
-          filters:
-            tags:
-              only: /^v?[0-9]+(\.[0-9]+)+(-rc[0-9]+)?(-alpha[0-9]+)?$/
-            branches:
-              ignore: /.*/

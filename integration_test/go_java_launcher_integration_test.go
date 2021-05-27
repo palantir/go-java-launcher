@@ -43,6 +43,20 @@ func TestMainMethod(t *testing.T) {
 	assert.Regexp(t, `\nmain method\n`, output)
 }
 
+func TestMainMethodJavaContainerSupport(t *testing.T) {
+	_ = os.Setenv("CONTAINER", "true")
+
+	output, err := runMainWithArgs(t, "testdata/launcher-static-container-support.yml", "testdata/launcher-custom.yml")
+	require.NoError(t, err, "failed: %s", output)
+
+	// part of expected output from launcher
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	// container support detected and running inside container
+	assert.Regexp(t, `Running inside container and container support enabled`, output)
+	// expected output of Java program
+	assert.Regexp(t, `\nmain method\n`, output)
+}
+
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
 	_, err := runMainWithArgs(t, "testdata/launcher-static-bad-java-home.yml", "foo")
 	require.Error(t, err, "error: Failed to determine is path is safe to execute: /foo/bar/bin/java")

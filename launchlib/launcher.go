@@ -101,10 +101,10 @@ func compileCmdFromConfig(
 			_, _ = fmt.Fprintln(logger, "Container support enabled")
 			jvmOpts = append(jvmOpts, filterHeapArgs(staticConfig.JavaConfig.JvmOpts)...)
 			jvmOpts = append(jvmOpts, filterHeapArgs(customConfig.JvmOpts)...)
+			jvmOpts = append(jvmOpts, []string{"-XX:+UseContainerSupport", "-XX:InitialRAMPercentage=80.0", "-XX:MaxRAMPercentage=80.0"}...)
 		} else {
 			jvmOpts = append(jvmOpts, staticConfig.JavaConfig.JvmOpts...)
 			jvmOpts = append(jvmOpts, customConfig.JvmOpts...)
-			jvmOpts = append(jvmOpts, []string{"-XX:+UseContainerSupport", "-XX:InitialRAMPercentage=80.0", "-XX:MaxRAMPercentage=80.0"}...)
 		}
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))

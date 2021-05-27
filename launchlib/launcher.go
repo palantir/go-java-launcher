@@ -293,6 +293,5 @@ func filterHeapArgs(args []string) []string {
 }
 
 func isHeapArg(arg string) bool {
-	var lowerCase = strings.ToLower(arg)
-	return strings.HasPrefix(lowerCase, "-xmx") || strings.HasPrefix(lowerCase, "-xms")
+	return strings.HasPrefix(arg, "-Xmx") || strings.HasPrefix(arg, "-Xms")
 }

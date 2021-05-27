@@ -95,11 +95,16 @@ func compileCmdFromConfig(
 			staticConfig.JavaConfig.Classpath))
 		_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
-		var staticConfigJvmOpts []string = staticConfig.JavaConfig.JvmOpts
-		var customConfigJvmOpts []string = customConfig.JvmOpts
+		var jvmOpts []string
 
 		if isEnvVarSet("CONTAINER") && staticConfig.ContainerSupport {
-			_, _ = fmt.Fprintln(logger, "Running inside container and container support enabled")
+			_, _ = fmt.Fprintln(logger, "Container support enabled")
+			jvmOpts = append(jvmOpts, filterHeapArgs(staticConfig.JavaConfig.JvmOpts)...)
+			jvmOpts = append(jvmOpts, filterHeapArgs(customConfig.JvmOpts)...)
+		} else {
+			jvmOpts = append(jvmOpts, staticConfig.JavaConfig.JvmOpts...)
+			jvmOpts = append(jvmOpts, customConfig.JvmOpts...)
+			jvmOpts = append(jvmOpts, []string{"-XX:+UseContainerSupport", "-XX:InitialRAMPercentage=80.0", "-XX:MaxRAMPercentage=80.0"}...)
 		}
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
@@ -107,8 +112,7 @@ func compileCmdFromConfig(
 			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
-		args = append(args, staticConfigJvmOpts...)
-		args = append(args, customConfigJvmOpts...)
+		args = append(args, jvmOpts...)
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.Type == "executable" {
@@ -276,4 +280,19 @@ func createReplacer() *strings.Replacer {
 
 func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
+}
+
+func filterHeapArgs(args []string) []string {
+	var filtered []string
+	for _, arg := range args {
+		if !isHeapArg(arg) {
+			filtered = append(filtered, arg)
+		}
+	}
+	return filtered
+}
+
+func isHeapArg(arg string) bool {
+	var lowerCase = strings.ToLower(arg)
+	return strings.HasPrefix(lowerCase, "-xmx") || strings.HasPrefix(lowerCase, "-xms")
 }

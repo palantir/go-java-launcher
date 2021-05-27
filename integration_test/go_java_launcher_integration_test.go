@@ -50,9 +50,9 @@ func TestMainMethodJavaContainerSupport(t *testing.T) {
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -XX:+UseContainerSupport -XX:InitialRAMPercentage=80.0 -XX:MaxRAMPercentage=80.0 -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// container support detected and running inside container
-	assert.Regexp(t, `Running inside container and container support enabled`, output)
+	assert.Regexp(t, `Container support enabled`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }

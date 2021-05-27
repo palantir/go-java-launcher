@@ -41,10 +41,11 @@ type TypedConfig struct {
 }
 
 type JavaConfig struct {
-	JavaHome  string   `yaml:"javaHome"`
-	MainClass string   `yaml:"mainClass" validate:"nonzero"`
-	JvmOpts   []string `yaml:"jvmOpts"`
-	Classpath []string `yaml:"classpath" validate:"nonzero"`
+	JavaHome         string   `yaml:"javaHome"`
+	MainClass        string   `yaml:"mainClass" validate:"nonzero"`
+	JvmOpts          []string `yaml:"jvmOpts"`
+	Classpath        []string `yaml:"classpath" validate:"nonzero"`
+	ContainerSupport bool     `yaml:"containerSupport"`
 }
 
 type StaticLauncherConfig struct {

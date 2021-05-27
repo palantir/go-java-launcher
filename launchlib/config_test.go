@@ -63,10 +63,58 @@ args:
 					Executable: "java",
 					Args:       []string{"arg1", "arg2"},
 					JavaConfig: JavaConfig{
-						MainClass: "mainClass",
-						JavaHome:  "javaHome",
-						Classpath: []string{"classpath1", "classpath2"},
-						JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
+						MainClass:        "mainClass",
+						JavaHome:         "javaHome",
+						Classpath:        []string{"classpath1", "classpath2"},
+						JvmOpts:          []string{"jvmOpt1", "jvmOpt2"},
+						ContainerSupport: false,
+					},
+				},
+			},
+		},
+		{
+			name: "java static config",
+			data: `
+configType: java
+configVersion: 1
+serviceName: primary
+mainClass: mainClass
+javaHome: javaHome
+containerSupport: true
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+classpath:
+  - classpath1
+  - classpath2
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+args:
+  - arg1
+  - arg2
+`,
+			want: PrimaryStaticLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				ServiceName: "primary",
+				StaticLauncherConfig: StaticLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Executable: "java",
+					Args:       []string{"arg1", "arg2"},
+					JavaConfig: JavaConfig{
+						MainClass:        "mainClass",
+						JavaHome:         "javaHome",
+						Classpath:        []string{"classpath1", "classpath2"},
+						JvmOpts:          []string{"jvmOpt1", "jvmOpt2"},
+						ContainerSupport: true,
 					},
 				},
 			},

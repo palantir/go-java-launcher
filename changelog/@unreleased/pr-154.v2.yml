@@ -1,0 +1,6 @@
+type: improvement
+improvement:
+  description: 'If `containerSupport: true` AND running inside container, java heap
+    is configured automatically.'
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/154

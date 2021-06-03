@@ -99,9 +99,10 @@ func compileCmdFromConfig(
 
 		if isEnvVarSet("CONTAINER") && staticConfig.ContainerSupport {
 			_, _ = fmt.Fprintln(logger, "Container support enabled")
-			jvmOpts = append(jvmOpts, filterHeapArgs(staticConfig.JavaConfig.JvmOpts)...)
-			jvmOpts = append(jvmOpts, filterHeapArgs(customConfig.JvmOpts)...)
-			jvmOpts = append(jvmOpts, []string{"-XX:+UseContainerSupport", "-XX:InitialRAMPercentage=80.0", "-XX:MaxRAMPercentage=80.0"}...)
+			var combinedJvmOpts []string
+			combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
+			combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
+			jvmOpts = append(jvmOpts, filterHeapSizeArgs(combinedJvmOpts)...)
 		} else {
 			jvmOpts = append(jvmOpts, staticConfig.JavaConfig.JvmOpts...)
 			jvmOpts = append(jvmOpts, customConfig.JvmOpts...)
@@ -282,16 +283,36 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func filterHeapArgs(args []string) []string {
+func filterHeapSizeArgs(args []string) []string {
 	var filtered []string
+	var hasMaxRamPercentage, hasInitialRamPercentage bool
 	for _, arg := range args {
-		if !isHeapArg(arg) {
+		if !isHeapSizeArg(arg) {
 			filtered = append(filtered, arg)
 		}
+
+		if isMaxRamPercentage(arg) {
+			hasMaxRamPercentage = true
+		} else if isInitialRamPercentage(arg) {
+			hasInitialRamPercentage = true
+		}
+	}
+
+	if !hasInitialRamPercentage && !hasMaxRamPercentage {
+		filtered = append(filtered, "-XX:InitialRAMPercentage=80.0")
+		filtered = append(filtered, "-XX:MaxRAMPercentage=80.0")
 	}
 	return filtered
 }
 
-func isHeapArg(arg string) bool {
+func isHeapSizeArg(arg string) bool {
 	return strings.HasPrefix(arg, "-Xmx") || strings.HasPrefix(arg, "-Xms")
+}
+
+func isMaxRamPercentage(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:MaxRAMPercentage")
+}
+
+func isInitialRamPercentage(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage")
 }

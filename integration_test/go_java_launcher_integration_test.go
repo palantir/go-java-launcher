@@ -43,18 +43,20 @@ func TestMainMethod(t *testing.T) {
 	assert.Regexp(t, `\nmain method\n`, output)
 }
 
-func TestMainMethodJavaContainerSupport(t *testing.T) {
-	_ = os.Setenv("CONTAINER", "true")
+func TestMainMethodJavaContainerSetsDefaults(t *testing.T) {
+	testContainerSupport(t, "testdata/launcher-custom.yml", "-XX\\:InitialRAMPercentage=80.0 -XX\\:MaxRAMPercentage=80.0")
+}
 
-	output, err := runMainWithArgs(t, "testdata/launcher-static-container-support.yml", "testdata/launcher-custom.yml")
-	require.NoError(t, err, "failed: %s", output)
+func TestMainMethodJavaContainerSupportLauncherCustomInitialRamPercentageOverride(t *testing.T) {
+	testContainerSupport(t, "testdata/launcher-custom-initial-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9")
+}
 
-	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -XX\:\+UseContainerSupport -XX\:InitialRAMPercentage=80.0 -XX\:MaxRAMPercentage=80.0 -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
-	// container support detected and running inside container
-	assert.Regexp(t, `Container support enabled`, output)
-	// expected output of Java program
-	assert.Regexp(t, `\nmain method\n`, output)
+func TestMainMethodJavaContainerSupportLauncherCustomMaxRamPercentageOverride(t *testing.T) {
+	testContainerSupport(t, "testdata/launcher-custom-max-ram-percentage-override.yml", "-XX\\:MaxRAMPercentage=79.9")
+}
+
+func TestMainMethodJavaContainerSupportLauncherCustomInitialAndMaxRamPercentageOverride(t *testing.T) {
+	testContainerSupport(t, "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9")
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
@@ -177,4 +179,18 @@ func TestMain(m *testing.M) {
 		log.Fatalln("Failed to set a mock JAVA_HOME", err)
 	}
 	os.Exit(m.Run())
+}
+
+func testContainerSupport(t *testing.T, launcherCustom string, jvmArgs string) {
+	_ = os.Setenv("CONTAINER", "true")
+
+	output, err := runMainWithArgs(t, "testdata/launcher-static-container-support.yml", launcherCustom)
+	require.NoError(t, err, "failed: %s", output)
+
+	// part of expected output from launcher
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/integration_test/testdata Main arg1\]`, output)
+	// container support detected and running inside container
+	assert.Regexp(t, `Container support enabled`, output)
+	// expected output of Java program
+	assert.Regexp(t, `\nmain method\n`, output)
 }

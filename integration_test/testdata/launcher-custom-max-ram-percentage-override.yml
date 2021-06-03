@@ -1,0 +1,5 @@
+configType: java
+configVersion: 1
+jvmOpts:
+  - '-Xmx1g'
+  - '-XX:MaxRAMPercentage=79.9'

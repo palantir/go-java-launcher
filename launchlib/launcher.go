@@ -285,20 +285,20 @@ func delim(str string) string {
 
 func filterHeapSizeArgs(args []string) []string {
 	var filtered []string
-	var hasMaxRamPercentage, hasInitialRamPercentage bool
+	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
 		if !isHeapSizeArg(arg) {
 			filtered = append(filtered, arg)
 		}
 
-		if isMaxRamPercentage(arg) {
-			hasMaxRamPercentage = true
-		} else if isInitialRamPercentage(arg) {
-			hasInitialRamPercentage = true
+		if isMaxRAMPercentage(arg) {
+			hasMaxRAMPercentage = true
+		} else if isInitialRAMPercentage(arg) {
+			hasInitialRAMPercentage = true
 		}
 	}
 
-	if !hasInitialRamPercentage && !hasMaxRamPercentage {
+	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
 		filtered = append(filtered, "-XX:InitialRAMPercentage=80.0")
 		filtered = append(filtered, "-XX:MaxRAMPercentage=80.0")
 	}
@@ -309,10 +309,10 @@ func isHeapSizeArg(arg string) bool {
 	return strings.HasPrefix(arg, "-Xmx") || strings.HasPrefix(arg, "-Xms")
 }
 
-func isMaxRamPercentage(arg string) bool {
+func isMaxRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:MaxRAMPercentage")
 }
 
-func isInitialRamPercentage(arg string) bool {
+func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage")
 }

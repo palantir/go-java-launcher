@@ -15,12 +15,15 @@
 package integration_test
 
 import (
+	"bytes"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -40,16 +43,28 @@ func TestMainMethod(t *testing.T) {
 	assert.Regexp(t, `\nmain method\n`, output)
 }
 
-func TestMainMethodJavaContainerJvmOpts(t *testing.T) {
+func TestMainMethodJavaInContainerContainerJvmOptsSet(t *testing.T) {
 	_ = os.Setenv("CONTAINER", "true")
 
-	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", "testdata/launcher-custom.yml")
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", "testdata/launcher-custom-container-jvm-opts.yml")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -XX\:InitialRAMPercentage=79.9 -XX\:MaxRAMPercentage=80.9 -classpath .+/integration_test/testdata Main arg1\]`, output)
 	// container support detected and running inside container
 	assert.Regexp(t, `Container support enabled`, output)
+	// expected output of Java program
+	assert.Regexp(t, `\nmain method\n`, output)
+}
+
+func TestMainMethodJavaInContainerContainerJvmOptsNotSet(t *testing.T) {
+	_ = os.Setenv("CONTAINER", "true")
+
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", "testdata/launcher-custom.yml")
+	require.NoError(t, err, "failed: %s", output)
+
+	// part of expected output from launcher
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }
@@ -100,30 +115,30 @@ func TestSubProcessesStoppedWhenMainDies(t *testing.T) {
 	}
 }
 
-//func TestSubProcessesParsedMonitorSignals(t *testing.T) {
-//	cmd := mainWithArgs(t, "testdata/launcher-static-multiprocess.yml", "testdata/launcher-custom-multiprocess-long-sub-process.yml")
-//
-//	output := &bytes.Buffer{}
-//	cmd.Stdout = output
-//
-//	children := runMultiProcess(t, cmd)
-//	var monitor int
-//	for cmdLine, pid := range children {
-//		if strings.Contains(cmdLine, "--group-monitor") {
-//			monitor = pid
-//			break
-//		}
-//	}
-//
-//	assert.NotZero(t, monitor, "no monitor pid found")
-//	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGPOLL))
-//
-//	assert.NoError(t, cmd.Wait())
-//
-//	trapped, err := regexp.Compile("Caught SIGPOLL")
-//	require.NoError(t, err)
-//	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
-//}
+func TestSubProcessesParsedMonitorSignals(t *testing.T) {
+	cmd := mainWithArgs(t, "testdata/launcher-static-multiprocess.yml", "testdata/launcher-custom-multiprocess-long-sub-process.yml")
+
+	output := &bytes.Buffer{}
+	cmd.Stdout = output
+
+	children := runMultiProcess(t, cmd)
+	var monitor int
+	for cmdLine, pid := range children {
+		if strings.Contains(cmdLine, "--group-monitor") {
+			monitor = pid
+			break
+		}
+	}
+
+	assert.NotZero(t, monitor, "no monitor pid found")
+	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGPOLL))
+
+	assert.NoError(t, cmd.Wait())
+
+	trapped, err := regexp.Compile("Caught SIGPOLL")
+	require.NoError(t, err)
+	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
+}
 
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (string, error) {
 	output, err := mainWithArgs(t, staticConfigFile, customConfigFile).CombinedOutput()
@@ -174,18 +189,4 @@ func TestMain(m *testing.M) {
 		log.Fatalln("Failed to set a mock JAVA_HOME", err)
 	}
 	os.Exit(m.Run())
-}
-
-func testContainerSupport(t *testing.T, launcherCustom string, jvmArgs string) {
-	_ = os.Setenv("CONTAINER", "true")
-
-	output, err := runMainWithArgs(t, "testdata/launcher-static-container-support.yml", launcherCustom)
-	require.NoError(t, err, "failed: %s", output)
-
-	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/integration_test/testdata Main arg1\]`, output)
-	// container support detected and running inside container
-	assert.Regexp(t, `Container support enabled`, output)
-	// expected output of Java program
-	assert.Regexp(t, `\nmain method\n`, output)
 }

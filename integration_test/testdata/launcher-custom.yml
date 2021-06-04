@@ -2,6 +2,3 @@ configType: java
 configVersion: 1
 jvmOpts:
   - '-Xmx1g'
-containerJvmOpts:
-  - '-XX:InitialRAMPercentage=79.9'
-  - '-XX:MaxRAMPercentage=80.9'

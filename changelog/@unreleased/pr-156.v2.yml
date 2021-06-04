@@ -1,0 +1,5 @@
+type: improvement
+improvement:
+  description: '`containerJvmArgs` are used when running inside a container.'
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/156

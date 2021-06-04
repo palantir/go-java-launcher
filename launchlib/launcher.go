@@ -95,13 +95,23 @@ func compileCmdFromConfig(
 			staticConfig.JavaConfig.Classpath))
 		_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
+		var jvmOpts []string
+
+		if isEnvVarSet("CONTAINER") && customConfig.ContainerJvmOpts != nil {
+			_, _ = fmt.Fprintln(logger, "Container support enabled")
+			jvmOpts = append(jvmOpts, staticConfig.JavaConfig.JvmOpts...)
+			jvmOpts = append(jvmOpts, customConfig.ContainerJvmOpts...)
+		} else {
+			jvmOpts = append(jvmOpts, staticConfig.JavaConfig.JvmOpts...)
+			jvmOpts = append(jvmOpts, customConfig.JvmOpts...)
+		}
+
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
 			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
-		args = append(args, staticConfig.JavaConfig.JvmOpts...)
-		args = append(args, customConfig.JvmOpts...)
+		args = append(args, jvmOpts...)
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.Type == "executable" {
@@ -188,6 +198,11 @@ func loadEnvVar(envVar string) (string, error) {
 		return "", fmt.Errorf("%s environment variable not set", envVar)
 	}
 	return javaHome, nil
+}
+
+func isEnvVarSet(envVar string) bool {
+	_, set := os.LookupEnv(envVar)
+	return set
 }
 
 func getWorkingDir() string {

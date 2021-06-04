@@ -64,9 +64,10 @@ type PrimaryStaticLauncherConfig struct {
 }
 
 type CustomLauncherConfig struct {
-	TypedConfig `yaml:",inline"`
-	JvmOpts     []string          `yaml:"jvmOpts"`
-	Env         map[string]string `yaml:"env"`
+	TypedConfig      `yaml:",inline"`
+	JvmOpts          []string          `yaml:"jvmOpts"`
+	ContainerJvmOpts []string          `yaml:"containerJvmOpts"`
+	Env              map[string]string `yaml:"env"`
 }
 
 type PrimaryCustomLauncherConfig struct {

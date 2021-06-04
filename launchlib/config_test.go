@@ -173,6 +173,9 @@ env:
 jvmOpts:
   - jvmOpt1
   - jvmOpt2
+containerJvmOpts:
+  - containerJvmOpt1
+  - containerJvmOpt2
 `,
 			want: PrimaryCustomLauncherConfig{
 				VersionedConfig: VersionedConfig{
@@ -185,6 +188,28 @@ jvmOpts:
 					Env: map[string]string{
 						"SOME_ENV_VAR":  "/etc/profile",
 						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					JvmOpts:          []string{"jvmOpt1", "jvmOpt2"},
+					ContainerJvmOpts: []string{"containerJvmOpt1", "containerJvmOpt2"},
+				},
+			},
+		},
+		{
+			name: "java custom config without containerJvmArgs",
+			data: `
+configType: java
+configVersion: 1
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
 					},
 					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
 				},

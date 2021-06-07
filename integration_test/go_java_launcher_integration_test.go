@@ -150,6 +150,7 @@ func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, en
 		log.Fatalf("Failed to calculate absolute path of '%s': %v\n", jdkDir, err)
 	}
 
+	// Override existing environment when running subprocess.
 	var customEnv []string
 	customEnv = append(customEnv, "JAVA_HOME="+javaHome)
 	customEnv = append(customEnv, env...)
@@ -209,4 +210,16 @@ func testInContainer(t *testing.T, launcherCustom string, containerSupportMessag
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 	return output
+}
+
+func TestMain(m *testing.M) {
+	jdkDir := "jdk"
+	javaHome, err := filepath.Abs(jdkDir)
+	if err != nil {
+		log.Fatalf("Failed to calculate absolute path of '%s': %v\n", jdkDir, err)
+	}
+	if err := os.Setenv("JAVA_HOME", javaHome); err != nil {
+		log.Fatalln("Failed to set a mock JAVA_HOME", err)
+	}
+	os.Exit(m.Run())
 }

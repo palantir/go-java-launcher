@@ -277,7 +277,7 @@ func delim(str string) string {
 }
 
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
-	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRamOverride(combinedJvmOpts) {
+	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		return filterHeapSizeArgs(combinedJvmOpts)
 	}
@@ -285,7 +285,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	if isEnvVarSet("CONTAINER") {
 		if customConfig.DisableContainerSupport {
 			_, _ = fmt.Fprintln(logger, "Container support disabled in launcher-custom.yml")
-		} else if hasMaxRamOverride(combinedJvmOpts) {
+		} else if hasMaxRAMOverride(combinedJvmOpts) {
 			_, _ = fmt.Fprintln(logger, "Container support disabled: -XX:MaxRAM override present")
 		}
 	}
@@ -315,16 +315,16 @@ func filterHeapSizeArgs(args []string) []string {
 	return filtered
 }
 
-func hasMaxRamOverride(args []string) bool {
+func hasMaxRAMOverride(args []string) bool {
 	for _, arg := range args {
-		if isMaxRam(arg) {
+		if isMaxRAM(arg) {
 			return true
 		}
 	}
 	return false
 }
 
-func isMaxRam(arg string) bool {
+func isMaxRAM(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:MaxRAM=")
 }
 

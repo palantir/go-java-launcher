@@ -63,58 +63,10 @@ args:
 					Executable: "java",
 					Args:       []string{"arg1", "arg2"},
 					JavaConfig: JavaConfig{
-						MainClass:        "mainClass",
-						JavaHome:         "javaHome",
-						Classpath:        []string{"classpath1", "classpath2"},
-						JvmOpts:          []string{"jvmOpt1", "jvmOpt2"},
-						ContainerSupport: false,
-					},
-				},
-			},
-		},
-		{
-			name: "java static config",
-			data: `
-configType: java
-configVersion: 1
-serviceName: primary
-mainClass: mainClass
-javaHome: javaHome
-containerSupport: true
-env:
-  SOME_ENV_VAR: /etc/profile
-  OTHER_ENV_VAR: /etc/redhat-release
-classpath:
-  - classpath1
-  - classpath2
-jvmOpts:
-  - jvmOpt1
-  - jvmOpt2
-args:
-  - arg1
-  - arg2
-`,
-			want: PrimaryStaticLauncherConfig{
-				VersionedConfig: VersionedConfig{
-					Version: 1,
-				},
-				ServiceName: "primary",
-				StaticLauncherConfig: StaticLauncherConfig{
-					TypedConfig: TypedConfig{
-						Type: "java",
-					},
-					Env: map[string]string{
-						"SOME_ENV_VAR":  "/etc/profile",
-						"OTHER_ENV_VAR": "/etc/redhat-release",
-					},
-					Executable: "java",
-					Args:       []string{"arg1", "arg2"},
-					JavaConfig: JavaConfig{
-						MainClass:        "mainClass",
-						JavaHome:         "javaHome",
-						Classpath:        []string{"classpath1", "classpath2"},
-						JvmOpts:          []string{"jvmOpt1", "jvmOpt2"},
-						ContainerSupport: true,
+						MainClass: "mainClass",
+						JavaHome:  "javaHome",
+						Classpath: []string{"classpath1", "classpath2"},
+						JvmOpts:   []string{"jvmOpt1", "jvmOpt2"},
 					},
 				},
 			},
@@ -234,7 +186,8 @@ jvmOpts:
 						"SOME_ENV_VAR":  "/etc/profile",
 						"OTHER_ENV_VAR": "/etc/redhat-release",
 					},
-					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
+					DisableContainerSupport: false,
 				},
 			},
 		},
@@ -330,6 +283,29 @@ subProcesses:
 							"LOG_LEVEL": "info",
 						},
 					},
+				},
+			},
+		},
+		{
+			name: "java custom config with container support disabled",
+			data: `
+configType: java
+configVersion: 1
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+dangerousDisableContainerSupport: true
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
+					DisableContainerSupport: true,
 				},
 			},
 		},

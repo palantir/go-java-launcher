@@ -41,11 +41,10 @@ type TypedConfig struct {
 }
 
 type JavaConfig struct {
-	JavaHome         string   `yaml:"javaHome"`
-	MainClass        string   `yaml:"mainClass" validate:"nonzero"`
-	JvmOpts          []string `yaml:"jvmOpts"`
-	Classpath        []string `yaml:"classpath" validate:"nonzero"`
-	ContainerSupport bool     `yaml:"containerSupport"`
+	JavaHome  string   `yaml:"javaHome"`
+	MainClass string   `yaml:"mainClass" validate:"nonzero"`
+	JvmOpts   []string `yaml:"jvmOpts"`
+	Classpath []string `yaml:"classpath" validate:"nonzero"`
 }
 
 type StaticLauncherConfig struct {
@@ -65,9 +64,10 @@ type PrimaryStaticLauncherConfig struct {
 }
 
 type CustomLauncherConfig struct {
-	TypedConfig `yaml:",inline"`
-	JvmOpts     []string          `yaml:"jvmOpts"`
-	Env         map[string]string `yaml:"env"`
+	TypedConfig             `yaml:",inline"`
+	JvmOpts                 []string          `yaml:"jvmOpts"`
+	Env                     map[string]string `yaml:"env"`
+	DisableContainerSupport bool              `yaml:"dangerousDisableContainerSupport"`
 }
 
 type PrimaryCustomLauncherConfig struct {

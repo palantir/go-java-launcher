@@ -38,25 +38,33 @@ func TestMainMethod(t *testing.T) {
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }
 
 func TestMainMethodJavaContainerSetsDefaults(t *testing.T) {
-	testContainerSupport(t, "testdata/launcher-custom.yml", "-XX\\:InitialRAMPercentage=80.0 -XX\\:MaxRAMPercentage=80.0")
+	testContainerSupportEnabled(t, "testdata/launcher-custom.yml", "-XX\\:InitialRAMPercentage=80.0 -XX\\:MaxRAMPercentage=80.0")
 }
 
 func TestMainMethodJavaContainerSupportLauncherCustomInitialRamPercentageOverride(t *testing.T) {
-	testContainerSupport(t, "testdata/launcher-custom-initial-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9")
+	testContainerSupportEnabled(t, "testdata/launcher-custom-initial-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9")
 }
 
 func TestMainMethodJavaContainerSupportLauncherCustomMaxRamPercentageOverride(t *testing.T) {
-	testContainerSupport(t, "testdata/launcher-custom-max-ram-percentage-override.yml", "-XX\\:MaxRAMPercentage=79.9")
+	testContainerSupportEnabled(t, "testdata/launcher-custom-max-ram-percentage-override.yml", "-XX\\:MaxRAMPercentage=79.9")
 }
 
 func TestMainMethodJavaContainerSupportLauncherCustomInitialAndMaxRamPercentageOverride(t *testing.T) {
-	testContainerSupport(t, "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9")
+	testContainerSupportEnabled(t, "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9")
+}
+
+func TestMainMethodJavaDangerousDisableContainerSupport(t *testing.T) {
+	testContainerSupport(t, "testdata/launcher-custom-dangerous-disable-container-support.yml", "Container support disabled in launcher-custom.yml", "-Xmx4M -Xmx1g")
+}
+
+func TestMainMethodJavaMaxRAMOverride(t *testing.T) {
+	testContainerSupport(t, "testdata/launcher-custom-max-ram-override.yml", "Container support disabled: -XX:MaxRAM override present", "-Xmx4M -XX:MaxRAM=1001")
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
@@ -181,16 +189,20 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func testContainerSupport(t *testing.T, launcherCustom string, jvmArgs string) {
+func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string) {
+	testContainerSupport(t, launcherCustom, "Container support enabled", expectedJvmArgs)
+}
+
+func testContainerSupport(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string) {
 	_ = os.Setenv("CONTAINER", "true")
 
-	output, err := runMainWithArgs(t, "testdata/launcher-static-container-support.yml", launcherCustom)
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", launcherCustom)
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/integration_test/testdata Main arg1\]`, output)
 	// container support detected and running inside container
-	assert.Regexp(t, `Container support enabled`, output)
+	assert.Regexp(t, containerSupportMessage, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }

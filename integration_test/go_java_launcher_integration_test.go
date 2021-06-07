@@ -78,7 +78,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }

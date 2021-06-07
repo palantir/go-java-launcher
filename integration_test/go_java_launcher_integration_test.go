@@ -60,11 +60,11 @@ func TestMainMethodJavaContainerSupportLauncherCustomInitialAndMaxRamPercentageO
 }
 
 func TestMainMethodJavaDangerousDisableContainerSupport(t *testing.T) {
-	testContainerSupport(t, "testdata/launcher-custom-dangerous-disable-container-support.yml", "Container support disabled in launcher-custom.yml", "-Xmx4M -Xmx1g")
+	testInContainer(t, "testdata/launcher-custom-dangerous-disable-container-support.yml", "Container support disabled in launcher-custom.yml", "-Xmx4M -Xmx1g")
 }
 
 func TestMainMethodJavaMaxRAMOverride(t *testing.T) {
-	testContainerSupport(t, "testdata/launcher-custom-max-ram-override.yml", "Container support disabled: -XX:MaxRAM override present", "-Xmx4M -XX:MaxRAM=1001")
+	testInContainer(t, "testdata/launcher-custom-max-ram-override.yml", "Container support disabled: -XX:MaxRAM override present", "-Xmx4M -XX:MaxRAM=1001")
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
@@ -81,6 +81,11 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
+}
+
+func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=80.0 -XX\\:MaxRAMPercentage=80.0")
+	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 
 func TestCreatesDirs(t *testing.T) {
@@ -138,8 +143,20 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
 }
 
-func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (string, error) {
-	output, err := mainWithArgs(t, staticConfigFile, customConfigFile).CombinedOutput()
+func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, env ...string) (string, error) {
+	jdkDir := "jdk"
+	javaHome, err := filepath.Abs(jdkDir)
+	if err != nil {
+		log.Fatalf("Failed to calculate absolute path of '%s': %v\n", jdkDir, err)
+	}
+
+	var customEnv []string
+	customEnv = append(customEnv, "JAVA_HOME="+javaHome)
+	customEnv = append(customEnv, env...)
+
+	command := mainWithArgs(t, staticConfigFile, customConfigFile)
+	command.Env = customEnv
+	output, err := command.CombinedOutput()
 	return string(output), err
 }
 
@@ -177,26 +194,12 @@ func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
 	return children
 }
 
-func TestMain(m *testing.M) {
-	jdkDir := "jdk"
-	javaHome, err := filepath.Abs(jdkDir)
-	if err != nil {
-		log.Fatalf("Failed to calculate absolute path of '%s': %v\n", jdkDir, err)
-	}
-	if err := os.Setenv("JAVA_HOME", javaHome); err != nil {
-		log.Fatalln("Failed to set a mock JAVA_HOME", err)
-	}
-	os.Exit(m.Run())
+func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string) string {
+	return testInContainer(t, launcherCustom, "Container support enabled", expectedJvmArgs)
 }
 
-func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string) {
-	testContainerSupport(t, launcherCustom, "Container support enabled", expectedJvmArgs)
-}
-
-func testContainerSupport(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string) {
-	_ = os.Setenv("CONTAINER", "true")
-
-	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", launcherCustom)
+func testInContainer(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string) string {
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", launcherCustom, "CONTAINER=")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
@@ -205,4 +208,5 @@ func testContainerSupport(t *testing.T, launcherCustom string, containerSupportM
 	assert.Regexp(t, containerSupportMessage, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
+	return output
 }

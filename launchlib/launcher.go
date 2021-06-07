@@ -333,9 +333,9 @@ func isHeapSizeArg(arg string) bool {
 }
 
 func isMaxRAMPercentage(arg string) bool {
-	return strings.HasPrefix(arg, "-XX:MaxRAMPercentage")
+	return strings.HasPrefix(arg, "-XX:MaxRAMPercentage=")
 }
 
 func isInitialRAMPercentage(arg string) bool {
-	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage")
+	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }

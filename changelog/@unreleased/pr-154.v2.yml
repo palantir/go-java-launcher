@@ -1,0 +1,5 @@
+type: improvement
+improvement:
+  description: 'When running inside container, java heap is configured automatically to take 80% of available memory.'
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/154

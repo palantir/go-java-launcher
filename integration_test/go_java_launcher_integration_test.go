@@ -44,7 +44,7 @@ func TestMainMethod(t *testing.T) {
 }
 
 func TestMainMethodJavaContainerSetsDefaults(t *testing.T) {
-	testContainerSupportEnabled(t, "testdata/launcher-custom.yml", "-XX\\:InitialRAMPercentage=80.0 -XX\\:MaxRAMPercentage=80.0")
+	testContainerSupportEnabled(t, "testdata/launcher-custom.yml", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0")
 }
 
 func TestMainMethodJavaContainerSupportLauncherCustomInitialRamPercentageOverride(t *testing.T) {
@@ -84,7 +84,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 }
 
 func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
-	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=80.0 -XX\\:MaxRAMPercentage=80.0")
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0")
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 
@@ -151,9 +151,7 @@ func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, en
 	}
 
 	// Override existing environment when running subprocess.
-	var customEnv []string
-	customEnv = append(customEnv, "JAVA_HOME="+javaHome)
-	customEnv = append(customEnv, env...)
+	var customEnv = append([]string{"JAVA_HOME=" + javaHome}, env...)
 
 	command := mainWithArgs(t, staticConfigFile, customConfigFile)
 	command.Env = customEnv

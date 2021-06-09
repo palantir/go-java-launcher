@@ -149,7 +149,7 @@ variable):
 
 1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out.
 2. If neither ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or
-   custom jvm opts, both will be set to ``80.0`` (i.e. ``-XX:InitialRAMPercentage=80.0 -XX:MaxRAMPercentage=80.0 `` will
+   custom jvm opts, both will be set to ``75.0`` (i.e. ``-XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 `` will
    be appended after all the other jvm opts).
 
 This will cause the JVM 11+ to discover the ``MaxRAM`` value using Linux cgroups, and calculate the heap sizes as the specified
@@ -162,7 +162,7 @@ and ``-XX:InitialRAMPercentage=`` and we recommend setting both to the same valu
 
 Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage``
 together with ``-Xmx|-Xms`` overrides safely: ``-Xmx/-Xms`` overrides ALWAYS take precedence and will be filtered out
-as per logic detailed above.
+when running inside a container, as per logic detailed above.
 
 ### Disabling container support
 

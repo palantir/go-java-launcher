@@ -309,8 +309,8 @@ func filterHeapSizeArgs(args []string) []string {
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		filtered = append(filtered, "-XX:InitialRAMPercentage=80.0")
-		filtered = append(filtered, "-XX:MaxRAMPercentage=80.0")
+		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
+		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
 	}
 	return filtered
 }

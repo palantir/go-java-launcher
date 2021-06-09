@@ -146,9 +146,7 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, env ...string) (string, error) {
 	jdkDir := "jdk"
 	javaHome, err := filepath.Abs(jdkDir)
-	if err != nil {
-		log.Fatalf("Failed to calculate absolute path of '%s': %v\n", jdkDir, err)
-	}
+	require.NoErrorf(t, err, "Failed to calculate absolute path of '%s': %v", jdkDir, err)
 
 	// Override existing environment when running subprocess.
 	var customEnv = append([]string{"JAVA_HOME=" + javaHome}, env...)

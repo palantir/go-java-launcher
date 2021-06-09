@@ -38,14 +38,13 @@ version gitVersion()
 task distTar(type: Tar) {
     compression Compression.GZIP
 
-    into ('bin') {
-        from 'dist'
-    }
+    def strippedVersion = version.startsWith('v') ? version.minus('v') : version
 
-    ['x86_64-unknown-linux-musl', 'x86_64-apple-darwin', 'x86_64-pc-windows-msvc'].each { target -> 
+    ['darwin-amd64', 'linux-amd64', 'linux-arm64'].each { target ->
         into ("bin/$target") {
-            from "target/$target/release/conjure-rust"
-            from "target/$target/release/conjure-rust.exe"
+//            from "target/$target/release/conjure-rust"
+//            from "target/$target/release/conjure-rust.exe"
+            from "out/dist/go-java-launcher/$strippedVersion/bin/go-java-launcher-$strippedVersion/service/bin/$target/go-java-launcher"
         }
     }
 

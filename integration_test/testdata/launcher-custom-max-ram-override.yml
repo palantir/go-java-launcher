@@ -1,0 +1,4 @@
+configType: java
+configVersion: 1
+jvmOpts:
+  - '-XX:MaxRAM=1001'

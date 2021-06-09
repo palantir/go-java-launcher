@@ -142,6 +142,41 @@ environment cannot be overwritten with this mechanism; use the `javaHome` mechan
 
 All output from `go-java-launcher` itself, and from the launch of all processes themselves is directed to stdout.
 
+## Java heap and container support
+
+By default, when starting a java process inside a container (as indicated by the presence of ``CONTAINER`` env
+variable):
+
+1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out.
+2. If neither ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or
+   custom jvm opts, both will be set to ``75.0`` (i.e. ``-XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 `` will
+   be appended after all the other jvm opts).
+
+This will cause the JVM 11+ to discover the ``MaxRAM`` value using Linux cgroups, and calculate the heap sizes as the specified
+percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage``.
+
+### Overriding default values
+
+Developers can override the heap percentage in containers by specifying both ``-XX:MaxRAMPercentage=``
+and ``-XX:InitialRAMPercentage=`` and we recommend setting both to the same value.
+
+Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage``
+together with ``-Xmx|-Xms`` overrides safely: ``-Xmx/-Xms`` overrides ALWAYS take precedence and will be filtered out
+when running inside a container, as per logic detailed above.
+
+### Disabling container support
+
+This behavior can be disabled by setting the following in ``launcher-custom.yml``:
+
+```yaml
+configType: java
+...
+dangerousDisableContainerSupport: true
+```
+
+Alternatively, the presence of ``-XX:MaxRAM=`` prefix in either static or custom jvm opts will also disable this
+behavior.
+
 # go-init
 
 This repository also publishes a binary called `go-init` that supports the commands `start`, `status`, and `stop`, in

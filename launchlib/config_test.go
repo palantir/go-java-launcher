@@ -186,7 +186,8 @@ jvmOpts:
 						"SOME_ENV_VAR":  "/etc/profile",
 						"OTHER_ENV_VAR": "/etc/redhat-release",
 					},
-					JvmOpts: []string{"jvmOpt1", "jvmOpt2"},
+					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
+					DisableContainerSupport: false,
 				},
 			},
 		},
@@ -282,6 +283,29 @@ subProcesses:
 							"LOG_LEVEL": "info",
 						},
 					},
+				},
+			},
+		},
+		{
+			name: "java custom config with container support disabled",
+			data: `
+configType: java
+configVersion: 1
+jvmOpts:
+  - jvmOpt1
+  - jvmOpt2
+dangerousDisableContainerSupport: true
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
+					DisableContainerSupport: true,
 				},
 			},
 		},

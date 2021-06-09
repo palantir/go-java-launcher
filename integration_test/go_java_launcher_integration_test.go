@@ -38,9 +38,68 @@ func TestMainMethod(t *testing.T) {
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
+}
+
+func TestMainMethodContainerSupportEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		launcherCustom  string
+		expectedJVMArgs string
+	}{
+		{
+			name:            "sets defaults",
+			launcherCustom:  "testdata/launcher-custom.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0",
+		},
+		{
+			name:            "does not set defaults if InitialRAMPercentage override is present",
+			launcherCustom:  "testdata/launcher-custom-initial-ram-percentage-override.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9",
+		},
+		{
+			name:            "does not set defaults if MaxRAMPercentage override is present",
+			launcherCustom:  "testdata/launcher-custom-max-ram-percentage-override.yml",
+			expectedJVMArgs: "-XX\\:MaxRAMPercentage=79.9",
+		},
+		{
+			name:            "does not set defaults if InitialRAMPercentage and MaxRAMPercentage overrides are present",
+			launcherCustom:  "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs)
+		})
+	}
+}
+
+func TestMainMethodContainerSupportDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		launcherCustom          string
+		containerSupportMessage string
+		expectedJVMArgs         string
+	}{
+		{
+			name:                    "disables container support if explicitly disabled via dangerousDisableContainerSupport",
+			launcherCustom:          "testdata/launcher-custom-dangerous-disable-container-support.yml",
+			containerSupportMessage: "Container support disabled in launcher-custom.yml",
+			expectedJVMArgs:         "-Xmx4M -Xmx1g",
+		},
+		{
+			name:                    "disables container support if MaxRAM override present",
+			launcherCustom:          "testdata/launcher-custom-max-ram-override.yml",
+			containerSupportMessage: "Container support disabled: -XX:MaxRAM override present",
+			expectedJVMArgs:         "-Xmx4M -XX:MaxRAM=1001",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testInContainer(t, tc.launcherCustom, tc.containerSupportMessage, tc.expectedJVMArgs)
+		})
+	}
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {
@@ -54,9 +113,14 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/github.com/palantir/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
+}
+
+func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0")
+	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 
 func TestCreatesDirs(t *testing.T) {
@@ -114,8 +178,17 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
 }
 
-func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string) (string, error) {
-	output, err := mainWithArgs(t, staticConfigFile, customConfigFile).CombinedOutput()
+func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, env ...string) (string, error) {
+	jdkDir := "jdk"
+	javaHome, err := filepath.Abs(jdkDir)
+	require.NoErrorf(t, err, "Failed to calculate absolute path of '%s': %v", jdkDir, err)
+
+	// Override existing environment when running subprocess.
+	var customEnv = append([]string{"JAVA_HOME=" + javaHome}, env...)
+
+	command := mainWithArgs(t, staticConfigFile, customConfigFile)
+	command.Env = customEnv
+	output, err := command.CombinedOutput()
 	return string(output), err
 }
 
@@ -151,6 +224,23 @@ func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
 
 	assert.Len(t, children, 2, "there should be one sub-process and one monitor")
 	return children
+}
+
+func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string) string {
+	return testInContainer(t, launcherCustom, "Container support enabled", expectedJvmArgs)
+}
+
+func testInContainer(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string) string {
+	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", launcherCustom, "CONTAINER=")
+	require.NoError(t, err, "failed: %s", output)
+
+	// part of expected output from launcher
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	// container support detected and running inside container
+	assert.Regexp(t, containerSupportMessage, output)
+	// expected output of Java program
+	assert.Regexp(t, `\nmain method\n`, output)
+	return output
 }
 
 func TestMain(m *testing.M) {

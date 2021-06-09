@@ -95,13 +95,18 @@ func compileCmdFromConfig(
 			staticConfig.JavaConfig.Classpath))
 		_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
+		var combinedJvmOpts []string
+		combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
+		combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
+
+		jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
 			return nil, executableErr
 		}
 		args = append(args, executable) // 0th argument is the command itself
-		args = append(args, staticConfig.JavaConfig.JvmOpts...)
-		args = append(args, customConfig.JvmOpts...)
+		args = append(args, jvmOpts...)
 		args = append(args, "-classpath", classpath)
 		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.Type == "executable" {
@@ -190,6 +195,11 @@ func loadEnvVar(envVar string) (string, error) {
 	return javaHome, nil
 }
 
+func isEnvVarSet(envVar string) bool {
+	_, set := os.LookupEnv(envVar)
+	return set
+}
+
 func getWorkingDir() string {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -264,4 +274,68 @@ func createReplacer() *strings.Replacer {
 
 func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
+}
+
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
+	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
+		_, _ = fmt.Fprintln(logger, "Container support enabled")
+		return filterHeapSizeArgs(combinedJvmOpts)
+	}
+
+	if isEnvVarSet("CONTAINER") {
+		if customConfig.DisableContainerSupport {
+			_, _ = fmt.Fprintln(logger, "Container support disabled in launcher-custom.yml")
+		} else if hasMaxRAMOverride(combinedJvmOpts) {
+			_, _ = fmt.Fprintln(logger, "Container support disabled: -XX:MaxRAM override present")
+		}
+	}
+
+	return combinedJvmOpts
+}
+
+func filterHeapSizeArgs(args []string) []string {
+	var filtered []string
+	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
+	for _, arg := range args {
+		if !isHeapSizeArg(arg) {
+			filtered = append(filtered, arg)
+		}
+
+		if isMaxRAMPercentage(arg) {
+			hasMaxRAMPercentage = true
+		} else if isInitialRAMPercentage(arg) {
+			hasInitialRAMPercentage = true
+		}
+	}
+
+	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
+		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
+		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
+	}
+	return filtered
+}
+
+func hasMaxRAMOverride(args []string) bool {
+	for _, arg := range args {
+		if isMaxRAM(arg) {
+			return true
+		}
+	}
+	return false
+}
+
+func isMaxRAM(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:MaxRAM=")
+}
+
+func isHeapSizeArg(arg string) bool {
+	return strings.HasPrefix(arg, "-Xmx") || strings.HasPrefix(arg, "-Xms")
+}
+
+func isMaxRAMPercentage(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:MaxRAMPercentage=")
+}
+
+func isInitialRAMPercentage(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }

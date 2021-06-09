@@ -43,28 +43,63 @@ func TestMainMethod(t *testing.T) {
 	assert.Regexp(t, `\nmain method\n`, output)
 }
 
-func TestMainMethodJavaContainerSetsDefaults(t *testing.T) {
-	testContainerSupportEnabled(t, "testdata/launcher-custom.yml", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0")
+func TestMainMethodContainerSupportEnabled(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		launcherCustom  string
+		expectedJVMArgs string
+	}{
+		{
+			name:            "sets defaults",
+			launcherCustom:  "testdata/launcher-custom.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0",
+		},
+		{
+			name:            "does not set defaults if InitialRAMPercentage override is present",
+			launcherCustom:  "testdata/launcher-custom-initial-ram-percentage-override.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9",
+		},
+		{
+			name:            "does not set defaults if MaxRAMPercentage override is present",
+			launcherCustom:  "testdata/launcher-custom-max-ram-percentage-override.yml",
+			expectedJVMArgs: "-XX\\:MaxRAMPercentage=79.9",
+		},
+		{
+			name:            "does not set defaults if InitialRAMPercentage and MaxRAMPercentage overrides are present",
+			launcherCustom:  "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs)
+		})
+	}
 }
 
-func TestMainMethodJavaContainerSupportLauncherCustomInitialRamPercentageOverride(t *testing.T) {
-	testContainerSupportEnabled(t, "testdata/launcher-custom-initial-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9")
-}
-
-func TestMainMethodJavaContainerSupportLauncherCustomMaxRamPercentageOverride(t *testing.T) {
-	testContainerSupportEnabled(t, "testdata/launcher-custom-max-ram-percentage-override.yml", "-XX\\:MaxRAMPercentage=79.9")
-}
-
-func TestMainMethodJavaContainerSupportLauncherCustomInitialAndMaxRamPercentageOverride(t *testing.T) {
-	testContainerSupportEnabled(t, "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml", "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9")
-}
-
-func TestMainMethodJavaDangerousDisableContainerSupport(t *testing.T) {
-	testInContainer(t, "testdata/launcher-custom-dangerous-disable-container-support.yml", "Container support disabled in launcher-custom.yml", "-Xmx4M -Xmx1g")
-}
-
-func TestMainMethodJavaMaxRAMOverride(t *testing.T) {
-	testInContainer(t, "testdata/launcher-custom-max-ram-override.yml", "Container support disabled: -XX:MaxRAM override present", "-Xmx4M -XX:MaxRAM=1001")
+func TestMainMethodContainerSupportDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name                    string
+		launcherCustom          string
+		containerSupportMessage string
+		expectedJVMArgs         string
+	}{
+		{
+			name:                    "disables container support if explicitly disabled via dangerousDisableContainerSupport",
+			launcherCustom:          "testdata/launcher-custom-dangerous-disable-container-support.yml",
+			containerSupportMessage: "Container support disabled in launcher-custom.yml",
+			expectedJVMArgs:         "-Xmx4M -Xmx1g",
+		},
+		{
+			name:                    "disables container support if MaxRAM override present",
+			launcherCustom:          "testdata/launcher-custom-max-ram-override.yml",
+			containerSupportMessage: "Container support disabled: -XX:MaxRAM override present",
+			expectedJVMArgs:         "-Xmx4M -XX:MaxRAM=1001",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testInContainer(t, tc.launcherCustom, tc.containerSupportMessage, tc.expectedJVMArgs)
+		})
+	}
 }
 
 func TestPanicsWhenJavaHomeIsNotAFile(t *testing.T) {

@@ -9,18 +9,16 @@ buildscript {
     }
 }
 
-apply plugin: 'com.palantir.external-publish-dist'
+apply plugin: 'com.palantir.external-publish-custom'
 apply plugin: 'com.palantir.git-version'
 
 group 'com.palantir.launching'
 
 version ((System.env.CIRCLE_TAG ?: gitVersion()).replaceAll('^v', ''))
 
-task distTar(type: Tar) {
-    compression Compression.GZIP
-
-    ['darwin-amd64', 'linux-amd64', 'linux-arm64'].each { target ->
-        into ("${project.version}/service/bin/$target") {
-            from "out/dist/go-java-launcher/${project.version}/bin/go-java-launcher-${project.version}/service/bin/${project.version}/go-java-launcher"
-        }
-    }}
+externalPublishing {
+    publication('dist') {
+        artifact file('out/dist/go-java-launcher/${project.version}/bin/go-java-launcher-${project.version}.tgz')
+        artifact file('out/dist/go-init/${project.version}/bin/go-init-${project.version}.tgz')
+    }
+}

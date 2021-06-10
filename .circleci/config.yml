@@ -24,7 +24,6 @@ all-tags-filter: &all-tags-filter
 
 jobs:
   publish:
-    # use same path as the restored cache directory
     working_directory: /go/src/github.com/palantir/go-java-launcher
     docker: [{ image: openjdk:11 }]
     steps:
@@ -56,5 +55,4 @@ workflows:
             tags:
               only: /^v?[0-9]+(\.[0-9]+)+(-rc[0-9]+)?$/
             branches:
-              only:
-                - ta/publish-with-gradle-circle
+              ignore: /.*/

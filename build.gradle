@@ -1,0 +1,28 @@
+buildscript {
+    repositories {
+        gradlePluginPortal()
+    }
+
+    dependencies {
+        classpath 'com.palantir.gradle.externalpublish:gradle-external-publish-plugin:1.2.1'
+        classpath 'com.palantir.gradle.gitversion:gradle-git-version:0.12.3'
+    }
+}
+
+apply plugin: 'com.palantir.external-publish-custom'
+apply plugin: 'com.palantir.git-version'
+
+group 'com.palantir.launching'
+
+version ((System.env.CIRCLE_TAG ?: gitVersion()).replaceAll('^v', ''))
+
+externalPublishing {
+    publication('goJavaLauncher') {
+        artifactId 'go-java-launcher'
+        artifact file("out/dist/go-java-launcher/${project.version}/bin/go-java-launcher-${project.version}.tgz")
+    }
+    publication('goInit') {
+        artifactId 'go-init'
+        artifact file("out/dist/go-init/${project.version}/bin/go-init-${project.version}.tgz")
+    }
+}

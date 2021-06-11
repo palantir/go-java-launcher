@@ -17,8 +17,12 @@ group 'com.palantir.launching'
 version ((System.env.CIRCLE_TAG ?: gitVersion()).replaceAll('^v', ''))
 
 externalPublishing {
-    publication('dist') {
-        artifact file('out/dist/go-java-launcher/${project.version}/bin/go-java-launcher-${project.version}.tgz')
-        artifact file('out/dist/go-init/${project.version}/bin/go-init-${project.version}.tgz')
+    publication('goJavaLauncher') {
+        artifactId 'go-java-launcher'
+        artifact file("out/dist/go-java-launcher/${project.version}/bin/go-java-launcher-${project.version}.tgz")
+    }
+    publication('goInit') {
+        artifactId 'go-init'
+        artifact file("out/dist/go-init/${project.version}/bin/go-init-${project.version}.tgz")
     }
 }

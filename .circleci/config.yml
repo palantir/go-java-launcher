@@ -31,7 +31,7 @@ jobs:
       - restore_cache:
           keys:
             - dist-{{ .Environment.CIRCLE_WORKFLOW_ID }}-{{ .Environment.CIRCLE_SHA1 }}-v1
-      - run: ./gradlew publish
+      - run: ./gradlew publish --parallel --stacktrace --continue
 
 workflows:
   version: 2

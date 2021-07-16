@@ -2,20 +2,23 @@
 # To request a modification to the general template, file an issue on Excavator.
 # To manually manage the CircleCI configuration for this project, remove the .circleci/template.sh file.
 
-owner-repo: &owner-repo
-  owner-repo: palantir/go-java-launcher
-
-executor: &executor
-  executor:
-    name: go/golang-docker
-    go-docker-version: 1.16-java-11-t71
-    <<: *owner-repo
-
 version: 2.1
 
 orbs:
-  go: palantir/go@0.0.18
-  godel: palantir/godel@0.0.18
+  go: palantir/go@0.0.25
+  godel: palantir/godel@0.0.25
+
+homepath: &homepath
+  homepath: /home/circleci
+
+gopath: &gopath
+  gopath: /home/circleci/go
+
+executors:
+  circleci-go:
+    docker:
+      - image: cimg/go:1.16-browsers
+    working_directory: /home/circleci/go/src/palantir/go-java-launcher
 
 all-tags-filter: &all-tags-filter
   filters:
@@ -39,15 +42,21 @@ workflows:
     jobs:
       - godel/verify:
           name: verify
-          <<: *executor
+          executor: circleci-go
+          <<: *homepath
+          <<: *gopath
           <<: *all-tags-filter
       - godel/test:
           name: test
-          <<: *executor
+          executor: circleci-go
+          <<: *homepath
+          <<: *gopath
           <<: *all-tags-filter
       - godel/dist:
           name: dist
-          <<: *executor
+          executor: circleci-go
+          <<: *homepath
+          <<: *gopath
           <<: *all-tags-filter
       - publish:
           requires: [verify, test, dist]

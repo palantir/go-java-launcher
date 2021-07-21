@@ -1,6 +1,6 @@
 module github.com/palantir/go-java-launcher
 
-go 1.14
+go 1.16
 
 require (
 	github.com/mitchellh/go-ps v1.0.0

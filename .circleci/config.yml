@@ -5,8 +5,8 @@
 version: 2.1
 
 orbs:
-  go: palantir/go@0.0.25
-  godel: palantir/godel@0.0.25
+  go: palantir/go@0.0.28
+  godel: palantir/godel@0.0.28
 
 homepath: &homepath
   homepath: /home/circleci

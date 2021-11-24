@@ -14,11 +14,14 @@ homepath: &homepath
 gopath: &gopath
   gopath: /home/circleci/go
 
+working_directory: &working_directory
+    working_directory: /home/circleci/go/src/github.com/palantir/go-java-launcher
+
 executors:
   circleci-go:
     docker:
       - image: cimg/go:1.16-browsers
-    working_directory: /home/circleci/go/src/github.com/palantir/go-java-launcher
+    <<: *working_directory
 
 all-tags-filter: &all-tags-filter
   filters:
@@ -27,7 +30,7 @@ all-tags-filter: &all-tags-filter
 
 jobs:
   publish:
-    working_directory: /go/src/github.com/palantir/go-java-launcher
+    <<: *working_directory
     docker: [{ image: openjdk:11 }]
     steps:
       - checkout

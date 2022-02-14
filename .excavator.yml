@@ -4,6 +4,7 @@ auto-label:
   names:
     versions-props/upgrade-all: [ "merge when ready" ]
     circleci/manage-circleci: [ "merge when ready" ]
+    go/manage-go-version-oss: [ "merge when ready", "autorelease" ]
   tags:
     roomba: [ "merge when ready" ]
     automerge: [ "merge when ready" ]

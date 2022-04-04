@@ -1,0 +1,5 @@
+type: fix
+fix:
+  description: Update golang.org/x/crypto
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/224

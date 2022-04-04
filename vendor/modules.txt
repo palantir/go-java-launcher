@@ -2,19 +2,19 @@
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/mitchellh/go-ps v1.0.0
-## explicit; go 1.13
+## explicit
 github.com/mitchellh/go-ps
 # github.com/mitchellh/go-wordwrap v1.0.0
 ## explicit
 github.com/mitchellh/go-wordwrap
 # github.com/palantir/godel/pkg/products/v2 v2.0.0
-## explicit; go 1.13
+## explicit
 github.com/palantir/godel/pkg/products/v2
 # github.com/palantir/pkg v1.0.1
-## explicit; go 1.13
+## explicit
 github.com/palantir/pkg
 # github.com/palantir/pkg/cli v1.0.1
-## explicit; go 1.13
+## explicit
 github.com/palantir/pkg/cli
 github.com/palantir/pkg/cli/completion
 github.com/palantir/pkg/cli/flag
@@ -25,22 +25,25 @@ github.com/pkg/errors
 ## explicit
 github.com/pmezard/go-difflib/difflib
 # github.com/stretchr/testify v1.7.1
-## explicit; go 1.13
+## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# golang.org/x/crypto v0.0.0-20191117063200-497ca9f6d64f
-## explicit; go 1.11
+# golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29
+## explicit
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/sys v0.0.0-20220330033206-e17cdc41300f
-## explicit; go 1.17
+## explicit
 golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1
+golang.org/x/term
 # gopkg.in/validator.v2 v2.0.0-20200605151824-2b28d334fa05
 ## explicit
 gopkg.in/validator.v2
 # gopkg.in/yaml.v2 v2.4.0
-## explicit; go 1.15
+## explicit
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 ## explicit

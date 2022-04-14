@@ -1,0 +1,5 @@
+type: fix
+fix:
+  description: Update golang.org/x/crypto to remediate CVE-2022-27191
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/228

@@ -1,0 +1,5 @@
+type: fix
+fix:
+  description: Updates github.com/palantir/pkg/cli module to v1.0.2.
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/232

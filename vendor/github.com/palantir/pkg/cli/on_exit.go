@@ -44,9 +44,11 @@ type registration struct {
 
 type byPriorityLIFO []registration
 
-func (a byPriorityLIFO) Len() int           { return len(a) }
-func (a byPriorityLIFO) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byPriorityLIFO) Less(i, j int) bool { return a[i].priority > a[j].priority || a[i].id > a[j].id }
+func (a byPriorityLIFO) Len() int      { return len(a) }
+func (a byPriorityLIFO) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+func (a byPriorityLIFO) Less(i, j int) bool {
+	return a[i].priority > a[j].priority || a[i].id > a[j].id
+}
 
 type onExit struct {
 	counter       OnExitID

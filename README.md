@@ -13,6 +13,8 @@ launch scripts which are susceptible to attacks via injection of environment var
 
 The launcher accepts as configuration two YAML files as follows:
 
+### launcher-static.yml
+
 ```yaml
 # StaticLauncherConfig - java version
 # REQUIRED - The type of configuration, must be the string "java"
@@ -83,6 +85,8 @@ subProcesses:
       - var/data/tmp
       - var/log
 ```
+
+### launcher-custom.yml
 
 ```yaml
 # CustomLauncherConfig

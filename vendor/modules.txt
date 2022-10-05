@@ -28,7 +28,7 @@ github.com/pmezard/go-difflib/difflib
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
-# golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
+# golang.org/x/crypto v0.0.0-20221005025214-4161e89ecf1b
 ## explicit; go 1.17
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a

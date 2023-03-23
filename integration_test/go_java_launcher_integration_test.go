@@ -16,6 +16,7 @@ package integration_test
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -173,9 +174,10 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 
 	assert.NoError(t, cmd.Wait())
 
-	trapped, err := regexp.Compile("Caught SIGPOLL")
+	trapped, err := regexp.Compile("Caught SIGIO")
 	require.NoError(t, err)
-	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
+	fmt.Printf("%s\n", output.Bytes())
+	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGIO was caught")
 }
 
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, env ...string) (string, error) {
@@ -206,19 +208,25 @@ func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
 	time.Sleep(500 * time.Millisecond)
 	ppid := cmd.Process.Pid
 
-	command := exec.Command("/bin/ps", "-o", "pid,command", "--no-headers", "--ppid", strconv.Itoa(ppid))
+	command := exec.Command("/bin/ps", "-o", "pid,ppid,command")
 	output, err := command.CombinedOutput()
 	require.NoError(t, err)
 
 	children := map[string]int{}
-	for _, child := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		parts := strings.SplitN(strings.TrimSpace(child), " ", 2)
+	// re-slice to skip header line
+	for _, process := range strings.Split(strings.TrimSpace(string(output)), "\n")[1:] {
+		parts := strings.Fields(process)
 		cpid, err := strconv.Atoi(parts[0])
-		cmdline := strings.TrimSpace(parts[1])
 		require.NoError(t, err)
+		processppid, err := strconv.Atoi(parts[1])
+		require.NoError(t, err)
+		cmdline := strings.Join(parts[2:], " ")
+		if processppid != ppid {
+			continue
+		}
 		// sleep forks into a separate process, we don't want to include it
 		if !strings.HasPrefix(cmdline, "sleep") {
-			children[strings.TrimSpace(parts[1])] = cpid
+			children[cmdline] = cpid
 		}
 	}
 

@@ -148,3 +148,11 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
 	}
 }
+
+func TestGenlog(t *testing.T) {
+	f := genlog(75, 95, 1, 50, 1)
+	for i := range [100]int{} {
+		fmt.Println(f(float64(i)))
+	}
+	t.Fail()
+}

@@ -17,6 +17,7 @@ package launchlib
 import (
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -308,6 +309,8 @@ func filterHeapSizeArgs(args []string) []string {
 		}
 	}
 
+	// TODO: detect container memory limits and use
+
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
 		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
 		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
@@ -338,4 +341,11 @@ func isMaxRAMPercentage(arg string) bool {
 
 func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
+}
+
+func genlog(min float64, max float64, growthRate float64, midpoint float64, v float64) func(float64) float64 {
+	return func(in float64) float64 {
+		// https://en.wikipedia.org/wiki/Generalised_logistic_function#Definition
+		return min + (max-min)/(math.Pow(1+math.Pow(math.E, -1*growthRate*(in-midpoint)), 1/v))
+	}
 }

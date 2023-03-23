@@ -169,7 +169,7 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 	}
 
 	assert.NotZero(t, monitor, "no monitor pid found")
-	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGPOLL))
+	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGIO))
 
 	assert.NoError(t, cmd.Wait())
 

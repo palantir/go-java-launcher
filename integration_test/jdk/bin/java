@@ -7,7 +7,7 @@ echo "main method"
 
 # sleep stops execution of the current process including echoing that a signal was received
 # breaking up the sleep gives time between sleeps for the trap to happen
-SLEEP_TIME=${SLEEP_TIME:-5}
+SLEEP_TIME=${SLEEP_TIME:-10}
 COUNTER=0
 while [ $COUNTER -lt $SLEEP_TIME ]; do
     sleep 1 > /dev/null 2>&1

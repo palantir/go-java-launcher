@@ -1,4 +1,4 @@
-// Copyright 2016 Palantir Technologies, Inc.
+// Copyright 2023 Palantir Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -113,7 +113,7 @@ func (c CGroupV1ProcessorCounter) cpuCGroupPath() (string, error) {
 				}
 				for _, mountBase := range mountBases {
 					if mountBase == cpuGroupName {
-						return filepath.Join(filepath.Dir(string(mount)), string(mountBase)), nil
+						return filepath.Join(filepath.Dir(string(mount)), mountBase), nil
 					}
 				}
 			}

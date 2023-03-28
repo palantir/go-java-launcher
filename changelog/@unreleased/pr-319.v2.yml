@@ -1,0 +1,8 @@
+type: feature
+feature:
+  description: Add support for setting the `-XX:ActiveProcessorCount` argument driven
+    by detecting cgroup `cpu.shares` and some heuristics around behavior when running
+    with too few processors. This feature is enabled within a new `experimental` configuration
+    block, with the intent of indicating the stability of the feature.
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/319

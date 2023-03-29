@@ -279,7 +279,11 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		return filterHeapSizeArgs(combinedJvmOpts)
+		combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+		if customConfig.Experimental.OverrideActiveProcessorCount {
+			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
+		}
+		return combinedJvmOpts
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -315,6 +319,29 @@ func filterHeapSizeArgs(args []string) []string {
 	return filtered
 }
 
+func ensureActiveProcessorCount(args []string, logger io.Writer) []string {
+	filtered := make([]string, 0, len(args)+1)
+
+	var hasActiveProcessorCount bool
+	for _, arg := range args {
+		if isActiveProcessorCount(arg) {
+			hasActiveProcessorCount = true
+		}
+		filtered = append(filtered, arg)
+	}
+
+	if !hasActiveProcessorCount {
+		processorCountArg, err := getActiveProcessorCountArg(logger)
+		if err == nil {
+			filtered = append(filtered, processorCountArg)
+		} else {
+			_, _ = fmt.Fprintln(logger, "Failed to detect cgroup CPU configuration, not setting active processor count", err.Error())
+		}
+	}
+
+	return filtered
+}
+
 func hasMaxRAMOverride(args []string) bool {
 	for _, arg := range args {
 		if isMaxRAM(arg) {
@@ -322,6 +349,18 @@ func hasMaxRAMOverride(args []string) bool {
 		}
 	}
 	return false
+}
+
+func getActiveProcessorCountArg(logger io.Writer) (string, error) {
+	cgroupProcessorCount, err := DefaultCGroupV1ProcessorCounter.ProcessorCount()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get cgroup processor count")
+	}
+	return fmt.Sprintf("-XX:ActiveProcessorCount=%d", cgroupProcessorCount), nil
+}
+
+func isActiveProcessorCount(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:ActiveProcessorCount=")
 }
 
 func isMaxRAM(arg string) bool {

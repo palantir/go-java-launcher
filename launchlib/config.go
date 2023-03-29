@@ -65,9 +65,14 @@ type PrimaryStaticLauncherConfig struct {
 
 type CustomLauncherConfig struct {
 	TypedConfig             `yaml:",inline"`
-	JvmOpts                 []string          `yaml:"jvmOpts"`
-	Env                     map[string]string `yaml:"env"`
-	DisableContainerSupport bool              `yaml:"dangerousDisableContainerSupport"`
+	JvmOpts                 []string                   `yaml:"jvmOpts"`
+	Env                     map[string]string          `yaml:"env"`
+	Experimental            ExperimentalLauncherConfig `yaml:"experimental"`
+	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
+}
+
+type ExperimentalLauncherConfig struct {
+	OverrideActiveProcessorCount bool `yaml:"overrideActiveProcessorCount"`
 }
 
 type PrimaryCustomLauncherConfig struct {

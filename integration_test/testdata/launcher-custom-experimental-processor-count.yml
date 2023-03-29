@@ -1,0 +1,6 @@
+configType: java
+configVersion: 1
+jvmOpts:
+  - '-Xmx1g'
+experimental:
+  overrideActiveProcessorCount: true

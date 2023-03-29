@@ -22,6 +22,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -70,11 +71,18 @@ func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
 	if err != nil {
 		return 0, errors.New("unable to convert cpu.shares value to expected type")
 	}
-	// We think we will be better off providing N>1 to ensure smaller applications don't get blocked by too few GC threads,
-	// as well as issues in many concurrent data-structures which assume they must operate differently when
-	// ActiveProcessorCount=1 because parallel computation is impossible.
+
+	virtualCPUs := runtime.NumCPU()
+	cpuShareCPUs := math.Floor(float64(cpuShares / 1024))
+
+	// We think we will be better off providing >1 cores in cases where the underlying host has multiple CPUs to ensure
+	// smaller applications don't get blocked by too few GC threads, as well as issues in many concurrent data-structures
+	// which assume they must operate differently when ActiveProcessorCount=1 because parallel computation is impossible.
 	// https://github.com/palantir/go-java-launcher/issues/313
-	return uint(math.Max(2.0, math.Floor(float64(cpuShares/1024)))), nil
+	if virtualCPUs == 1 {
+		return 1, nil
+	}
+	return uint(math.Max(2.0, math.Min(cpuShareCPUs, float64(virtualCPUs)))), nil
 }
 
 func (c CGroupV1ProcessorCounter) cpuCGroupPath() (string, error) {

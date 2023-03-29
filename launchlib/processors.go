@@ -70,6 +70,10 @@ func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
 	if err != nil {
 		return 0, errors.New("unable to convert cpu.shares value to expected type")
 	}
+	// We think we will be better off providing N>1 to ensure smaller applications don't get blocked by too few GC threads,
+	// as well as issues in many concurrent data-structures which assume they must operate differently when
+	// ActiveProcessorCount=1 because parallel computation is impossible.
+	// https://github.com/palantir/go-java-launcher/issues/313
 	return uint(math.Max(2.0, math.Floor(float64(cpuShares/1024)))), nil
 }
 

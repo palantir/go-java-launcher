@@ -73,6 +73,7 @@ type CustomLauncherConfig struct {
 
 type ExperimentalLauncherConfig struct {
 	OverrideActiveProcessorCount bool `yaml:"overrideActiveProcessorCount"`
+	DynamicRAMPercentage         bool `yaml:"dynamicRAMPercentage"`
 }
 
 type PrimaryCustomLauncherConfig struct {

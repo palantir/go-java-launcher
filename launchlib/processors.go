@@ -67,7 +67,7 @@ func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to read cpu.shares")
 	}
-	cpuShares, err := strconv.Atoi(string(cpuShareBytes))
+	cpuShares, err := strconv.Atoi(strings.TrimSpace(string(cpuShareBytes)))
 	if err != nil {
 		return 0, errors.New("unable to convert cpu.shares value to expected type")
 	}

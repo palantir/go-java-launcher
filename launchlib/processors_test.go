@@ -88,8 +88,8 @@ var (
 3473 5088 0:435 / /proc/scsi ro,relatime - tmpfs tmpfs ro
 3474 5092 0:436 / /sys/firmware ro,relatime - tmpfs tmpfs ro`)
 
-	lowCPUSharesContent  = []byte(`100`)
-	highCPUSharesContent = []byte(`10000`)
+	lowCPUSharesContent  = []byte("100\n")
+	highCPUSharesContent = []byte("10000\n")
 	badCPUSharesContent  = []byte(``)
 )
 

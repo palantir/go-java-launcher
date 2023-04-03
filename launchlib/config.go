@@ -73,6 +73,7 @@ type CustomLauncherConfig struct {
 
 type ExperimentalLauncherConfig struct {
 	OverrideActiveProcessorCount bool `yaml:"overrideActiveProcessorCount"`
+	ScaleRAMPercentageWithLimit  bool `yaml:"scaleRAMPercentageWithLimit"`
 }
 
 type PrimaryCustomLauncherConfig struct {

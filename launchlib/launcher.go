@@ -280,7 +280,11 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+		ramPercenter := NewStaticRAMPercent(75.0)
+		if customConfig.Experimental.ScaleRAMPercentageWithLimit {
+			ramPercenter = NewChainedRAMPercenter(NewScalingRAMPercenter(), NewStaticRAMPercent(75.0))
+		}
+		combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, ramPercenter)
 		if customConfig.Experimental.OverrideActiveProcessorCount {
 			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
@@ -298,7 +302,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts
 }
 
-func filterHeapSizeArgs(args []string) []string {
+func filterHeapSizeArgs(args []string, percent RAMPercenter) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
@@ -313,11 +317,15 @@ func filterHeapSizeArgs(args []string) []string {
 		}
 	}
 
-	// TODO: detect container memory limits and use
-
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
-		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
+		if p, err := percent.RAMPercent(); err == nil {
+			filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.2f", p))
+			filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.2f", p))
+		} else {
+			// Should be unreachable given the construction of our percenter, but we can't fail to set this so lets be sure
+			filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
+			filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
+		}
 	}
 	return filtered
 }

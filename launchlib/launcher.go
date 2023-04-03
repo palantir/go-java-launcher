@@ -283,6 +283,9 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		if customConfig.Experimental.OverrideActiveProcessorCount {
 			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
+		if customConfig.Experimental.DynamicRAMPercentage {
+			combinedJvmOpts = addDynamicRAMPercentageSystemProps(combinedJvmOpts, logger)
+		}
 		return combinedJvmOpts
 	}
 
@@ -340,6 +343,16 @@ func ensureActiveProcessorCount(args []string, logger io.Writer) []string {
 	}
 
 	return filtered
+}
+
+func addDynamicRAMPercentageSystemProps(args []string, logger io.Writer) []string {
+	ramPercenter := NewScalingRAMPercenter(defaultFS)
+	ramPercent, err := ramPercenter.RAMPercent()
+	if err != nil {
+		_, _ = fmt.Fprintln(logger, "Failed to detect cgroup memory configuration, not setting dynamic RAM percentage system property", err.Error())
+		return args
+	}
+	return append(args, fmt.Sprintf("-DDynamicRAMPercentage=%.1f", ramPercent))
 }
 
 func hasMaxRAMOverride(args []string) bool {

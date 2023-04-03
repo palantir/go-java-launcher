@@ -1,0 +1,5 @@
+type: fix
+fix:
+  description: Fix cpu.shares content parsing
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/321

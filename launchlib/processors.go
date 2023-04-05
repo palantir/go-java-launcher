@@ -15,8 +15,6 @@
 package launchlib
 
 import (
-	"bufio"
-	"bytes"
 	"io"
 	"io/fs"
 	"math"
@@ -30,9 +28,7 @@ import (
 )
 
 const (
-	selfCGroup    = "/proc/self/cgroup"
-	selfMountinfo = "/proc/self/mountinfo"
-	cpuGroupName  = "cpu"
+	cpuGroupName  = CGroupName("cpu")
 	cpuSharesName = "cpu.shares"
 )
 
@@ -40,26 +36,30 @@ type ProcessorCounter interface {
 	ProcessorCount() (uint, error)
 }
 
+var defaultFS = os.DirFS("/")
+
 var DefaultCGroupV1ProcessorCounter = CGroupV1ProcessorCounter{
-	fs: os.DirFS("/"),
+	cgroupPaths: NewCGroupV1Pather(defaultFS),
+	fs:          defaultFS,
 }
 
 type CGroupV1ProcessorCounter struct {
-	fs fs.FS
+	cgroupPaths CGroupPather
+	fs          fs.FS
 }
 
 func NewCGroupV1ProcessorCounter(filesystem fs.FS) ProcessorCounter {
-	return CGroupV1ProcessorCounter{fs: filesystem}
+	return CGroupV1ProcessorCounter{cgroupPaths: NewCGroupV1Pather(filesystem), fs: filesystem}
 }
 
 func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
-	cpuCgroupPath, err := c.cpuCGroupPath()
+	cpuCgroupPath, err := c.cgroupPaths.Path(cpuGroupName)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get path to cpu cgroup")
 	}
 
 	cpuSharesFilepath := filepath.Join(cpuCgroupPath, cpuSharesName)
-	cpuSharesFile, err := c.fs.Open(c.convertToFSPath(cpuSharesFilepath))
+	cpuSharesFile, err := c.fs.Open(convertToFSPath(cpuSharesFilepath))
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to open cpu.shares at expected location: %s", cpuSharesFilepath)
 	}
@@ -83,78 +83,4 @@ func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
 		return 1, nil
 	}
 	return uint(math.Max(2.0, math.Min(cpuShareCPUs, float64(virtualCPUs)))), nil
-}
-
-func (c CGroupV1ProcessorCounter) cpuCGroupPath() (string, error) {
-	selfCGroupFile, err := c.fs.Open(c.convertToFSPath(selfCGroup))
-	if err != nil {
-		return "", errors.Wrap(err, "failed to open cgroup file")
-	}
-	cpuCGroupRootMountPath, err := c.getCPUCGroupPath(selfCGroupFile)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get cpu cgroup information from cgroup entries")
-	}
-
-	selfMountinfoFile, err := c.fs.Open(c.convertToFSPath(selfMountinfo))
-	if err != nil {
-		return "", errors.Wrap(err, "failed to open mountinfo file")
-	}
-	mountinfo, err := io.ReadAll(selfMountinfoFile)
-	if err != nil {
-		return "", err
-	}
-
-	// iterate over mount points, filtering to entries which contain the path of our subsystem and the name of our subsystem
-	for _, entry := range bytes.Split(mountinfo, []byte("\n")) {
-		fields := bytes.Fields(entry)
-		if len(fields) < 10 {
-			continue
-		}
-
-		rootMount, mount, options := fields[3], fields[4], fields[len(fields)-1]
-
-		if !bytes.Equal(rootMount, []byte(cpuCGroupRootMountPath)) {
-			continue
-		}
-		// options and mount points may contain multiple cgroup types within them, separated by commas (e.g. cpu,cpuacct)
-		for _, option := range bytes.Split(options, []byte(",")) {
-			if bytes.Equal(option, []byte(cpuGroupName)) {
-				mountBases := strings.Split(filepath.Base(string(mount)), ",")
-				if len(mountBases) == 1 {
-					return string(mount), nil
-				}
-				for _, mountBase := range mountBases {
-					if mountBase == cpuGroupName {
-						return filepath.Join(filepath.Dir(string(mount)), mountBase), nil
-					}
-				}
-			}
-		}
-	}
-	return "", errors.New("unable to find cpu cgroup mount path")
-}
-
-func (c CGroupV1ProcessorCounter) getCPUCGroupPath(r io.Reader) (string, error) {
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		cgroupParts := strings.Split(s.Text(), ":")
-		if len(cgroupParts) < 3 {
-			continue
-		}
-		cgroupNames := cgroupParts[1]
-		for _, subgroup := range strings.Split(cgroupNames, ",") {
-			if subgroup == cpuGroupName {
-				return cgroupParts[2], nil
-			}
-		}
-	}
-	return "", errors.New("unable to find cpu cgroup mount path in cgroup entries")
-}
-
-func (c CGroupV1ProcessorCounter) convertToFSPath(path string) string {
-	// The io.fs package has some path quirks, the biggest being that it expects to work with unrooted paths, and will
-	// reject any paths with leading slashes as invalid. To deal with this, we have to remove any trailing slashes that
-	// we get back from parsing any
-	// https://pkg.go.dev/io/fs#ValidPath
-	return strings.TrimPrefix(path, "/")
 }

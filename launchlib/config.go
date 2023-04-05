@@ -73,6 +73,7 @@ type CustomLauncherConfig struct {
 
 type ExperimentalLauncherConfig struct {
 	OverrideActiveProcessorCount bool `yaml:"overrideActiveProcessorCount"`
+	DynamicMemoryLimits          bool `yaml:"dynamicMemoryLimits"`
 }
 
 type PrimaryCustomLauncherConfig struct {

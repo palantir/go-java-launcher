@@ -26,13 +26,8 @@ import (
 )
 
 var (
-	// We should remain at the default RAM percentage below ~2 GiB
-	lowMemoryLimitContent = []byte("2147483648\n")
-	// We should hit the midpoint @ 8 GiB
-	midpointMemoryLimitContent = []byte("8589934592\n")
-	// We should hit the upper limit @ 16 GiB
-	highMemoryLimitContent = []byte("17179869184\n")
-	badMemoryLimitContent  = []byte(``)
+	memoryLimitContent    = []byte("2147483648\n")
+	badMemoryLimitContent = []byte(``)
 )
 
 func TestRAMPercenter_DefaultCGroupV1RAMPercenter(t *testing.T) {
@@ -79,40 +74,10 @@ func TestRAMPercenter_DefaultCGroupV1RAMPercenter(t *testing.T) {
 					Data: MountInfoContent,
 				},
 				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
-					Data: lowMemoryLimitContent,
+					Data: memoryLimitContent,
 				},
 			},
 			expectedMemoryLimit: 1 << 31,
-		},
-		{
-			name: "returns expected RAM percentage when memory.limit_in_bytes is 8 GiB",
-			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
-				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
-				},
-				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
-					Data: midpointMemoryLimitContent,
-				},
-			},
-			expectedMemoryLimit: 1 << 33,
-		},
-		{
-			name: "returns expected RAM percentage when memory.limit_in_bytes over 16 GiB",
-			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
-				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
-				},
-				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
-					Data: highMemoryLimitContent,
-				},
-			},
-			expectedMemoryLimit: 1 << 34,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {

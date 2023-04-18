@@ -1,0 +1,7 @@
+type: feature
+feature:
+  description: Set system property for experimental memory-limit based heap settings.
+    Enabling this will allow gathering data on real workloads without any behavioral
+    changes.
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/324

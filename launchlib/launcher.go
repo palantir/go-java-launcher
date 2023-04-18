@@ -283,6 +283,9 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		if customConfig.Experimental.OverrideActiveProcessorCount {
 			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
+		if customConfig.Experimental.DynamicMemoryLimits {
+			combinedJvmOpts = addDynamicRAMPercentageSystemProps(combinedJvmOpts, logger)
+		}
 		return combinedJvmOpts
 	}
 
@@ -357,6 +360,15 @@ func getActiveProcessorCountArg(logger io.Writer) (string, error) {
 		return "", errors.Wrap(err, "failed to get cgroup processor count")
 	}
 	return fmt.Sprintf("-XX:ActiveProcessorCount=%d", cgroupProcessorCount), nil
+}
+
+func addDynamicRAMPercentageSystemProps(args []string, logger io.Writer) []string {
+	memoryLimit, err := DefaultMemoryLimit.MemoryLimit()
+	if err != nil {
+		_, _ = fmt.Fprintln(logger, "Failed to detect cgroup memory configuration, not setting dynamic RAM percentage system property", err.Error())
+		return args
+	}
+	return append(args, fmt.Sprintf("-DDynamicXMX=%d", uint64(float64(memoryLimit)*0.75)))
 }
 
 func isActiveProcessorCount(arg string) bool {

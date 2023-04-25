@@ -280,9 +280,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
-		if customConfig.Experimental.OverrideActiveProcessorCount {
-			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
-		}
+		combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		return combinedJvmOpts
 	}
 

@@ -71,9 +71,7 @@ type CustomLauncherConfig struct {
 	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
 }
 
-type ExperimentalLauncherConfig struct {
-	OverrideActiveProcessorCount bool `yaml:"overrideActiveProcessorCount"`
-}
+type ExperimentalLauncherConfig struct{}
 
 type PrimaryCustomLauncherConfig struct {
 	VersionedConfig      `yaml:",inline"`

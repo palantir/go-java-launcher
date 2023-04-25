@@ -151,8 +151,11 @@ All output from `go-java-launcher` itself, and from the launch of all processes 
 By default, when starting a java process inside a container (as indicated by the presence of ``CONTAINER`` env
 variable):
 
+1. `-XX:ActiveProcessorCount` will be set based on the discovered cgroup configurations and host information to a value
+   between 2 and the number of processors reported by the runtime. You can read more about the reasoning behind this
+   [here](https://github.com/palantir/go-java-launcher/issues/313).
 1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out.
-2. If neither ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or
+1. If neither ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or
    custom jvm opts, both will be set to ``75.0`` (i.e. ``-XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 `` will
    be appended after all the other jvm opts).
 

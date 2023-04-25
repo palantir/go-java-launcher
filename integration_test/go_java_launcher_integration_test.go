@@ -52,22 +52,22 @@ func TestMainMethodContainerSupportEnabled(t *testing.T) {
 		{
 			name:            "sets defaults",
 			launcherCustom:  "testdata/launcher-custom.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2",
 		},
 		{
 			name:            "does not set defaults if InitialRAMPercentage override is present",
 			launcherCustom:  "testdata/launcher-custom-initial-ram-percentage-override.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:ActiveProcessorCount=2",
 		},
 		{
 			name:            "does not set defaults if MaxRAMPercentage override is present",
 			launcherCustom:  "testdata/launcher-custom-max-ram-percentage-override.yml",
-			expectedJVMArgs: "-XX\\:MaxRAMPercentage=79.9",
+			expectedJVMArgs: "-XX\\:MaxRAMPercentage=79.9 -XX\\:ActiveProcessorCount=2",
 		},
 		{
 			name:            "does not set defaults if InitialRAMPercentage and MaxRAMPercentage overrides are present",
 			launcherCustom:  "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9 -XX\\:ActiveProcessorCount=2",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 }
 
 func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
-	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0")
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2")
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 

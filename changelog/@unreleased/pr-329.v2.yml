@@ -1,0 +1,5 @@
+type: feature
+feature:
+  description: Enable active processor count overriding by default
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/329

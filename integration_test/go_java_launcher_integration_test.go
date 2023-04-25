@@ -119,7 +119,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 }
 
 func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
-	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0")
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2")
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 

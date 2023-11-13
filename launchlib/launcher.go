@@ -314,7 +314,7 @@ func filterHeapSizeArgs(customConfig *CustomLauncherConfig, args []string) []str
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
 		initialHeapPercentage, err := computeInitialHeapPercentage(customConfig)
 		if err != nil {
-			initialHeapPercentage = 0.75
+			initialHeapPercentage = 75.0
 		}
 		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.2f", initialHeapPercentage))
 		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.2f", initialHeapPercentage))
@@ -386,7 +386,7 @@ func isInitialRAMPercentage(arg string) bool {
 // heap minus 3mb per processor, with a minimum value of 50%.
 func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, error) {
 	if !customConfig.Experimental.UseProcessorAwareInitialHeapPercentage {
-		return 0.75, nil
+		return 75.0, nil
 	}
 
 	cgroupProcessorCount, err := DefaultCGroupV1ProcessorCounter.ProcessorCount()
@@ -400,5 +400,5 @@ func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, 
 	var heapLimit = float64(cgroupMemoryLimitInBytes)
 	var processorAdjustment = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
 
-	return max(0.5, (0.75*heapLimit-processorAdjustment)/heapLimit), nil
+	return max(50.0, (0.75*heapLimit-processorAdjustment)/heapLimit*100.0), nil
 }

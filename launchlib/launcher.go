@@ -333,7 +333,7 @@ func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []strin
 		filtered = append(filtered, arg)
 	}
 
-	if !hasActiveProcessorCount && !customConfig.Experimental.UseProcessorAwareInitialHeapPercentage {
+	if !hasActiveProcessorCount && !customConfig.Experimental.UseProcessorAwareInitialHeapSize {
 		processorCountArg, err := getActiveProcessorCountArg(logger)
 		if err == nil {
 			filtered = append(filtered, processorCountArg)
@@ -382,10 +382,10 @@ func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }
 
-// If the experimental `UseProcessorAwareInitialHeapPercentage` is enabled, compute the heap percentage as 75% of the
+// If the experimental `UseProcessorAwareInitialHeapSize` is set, compute the heap percentage as 75% of the
 // heap minus 3mb per processor, with a minimum value of 50%.
 func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, error) {
-	if !customConfig.Experimental.UseProcessorAwareInitialHeapPercentage {
+	if !customConfig.Experimental.UseProcessorAwareInitialHeapSize {
 		return 75.0, nil
 	}
 

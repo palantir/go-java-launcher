@@ -316,8 +316,8 @@ func filterHeapSizeArgs(customConfig *CustomLauncherConfig, args []string) []str
 		if err != nil {
 			initialHeapPercentage = 75.0
 		}
-		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.2f", initialHeapPercentage))
-		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.2f", initialHeapPercentage))
+		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.1f", initialHeapPercentage))
+		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", initialHeapPercentage))
 	}
 	return filtered
 }

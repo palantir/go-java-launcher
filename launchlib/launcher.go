@@ -382,6 +382,8 @@ func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }
 
+// If the experimental `UseProcessorAwareInitialHeapPercentage` is enabled, compute the heap percentage as 75% of the
+// heap minus 3mb per processor, with a minimum value of 50%.
 func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, error) {
 	if !customConfig.Experimental.UseProcessorAwareInitialHeapPercentage {
 		return 0.75, nil
@@ -396,7 +398,7 @@ func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, 
 		return 0, errors.Wrap(err, "failed to get cgroup memory limit")
 	}
 	var heapLimit = float64(cgroupMemoryLimitInBytes)
-	var processorOffset = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
+	var processorAdjustment = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
 
-	return max(0.5, (0.75*heapLimit-processorOffset)/heapLimit), nil
+	return max(0.5, (0.75*heapLimit-processorAdjustment)/heapLimit), nil
 }

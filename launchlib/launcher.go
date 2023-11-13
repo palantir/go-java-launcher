@@ -31,6 +31,7 @@ const (
 	TemplateDelimsClose = "}}"
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
+	BytesInMebibyte        = 1048576
 )
 
 type ServiceCmds struct {
@@ -279,8 +280,8 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
-		combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
+		combinedJvmOpts = filterHeapSizeArgs(customConfig, combinedJvmOpts)
+		combinedJvmOpts = ensureActiveProcessorCount(customConfig, combinedJvmOpts, logger)
 		return combinedJvmOpts
 	}
 
@@ -295,7 +296,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts
 }
 
-func filterHeapSizeArgs(args []string) []string {
+func filterHeapSizeArgs(customConfig *CustomLauncherConfig, args []string) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
@@ -311,13 +312,17 @@ func filterHeapSizeArgs(args []string) []string {
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
-		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
+		initialHeapPercentage, err := computeInitialHeapPercentage(customConfig)
+		if err != nil {
+			initialHeapPercentage = 0.75
+		}
+		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%f", initialHeapPercentage))
+		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%f", initialHeapPercentage))
 	}
 	return filtered
 }
 
-func ensureActiveProcessorCount(args []string, logger io.Writer) []string {
+func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []string, logger io.Writer) []string {
 	filtered := make([]string, 0, len(args)+1)
 
 	var hasActiveProcessorCount bool
@@ -328,7 +333,7 @@ func ensureActiveProcessorCount(args []string, logger io.Writer) []string {
 		filtered = append(filtered, arg)
 	}
 
-	if !hasActiveProcessorCount {
+	if !hasActiveProcessorCount && !customConfig.Experimental.UseProcessorAwareInitialHeapPercentage {
 		processorCountArg, err := getActiveProcessorCountArg(logger)
 		if err == nil {
 			filtered = append(filtered, processorCountArg)
@@ -375,4 +380,23 @@ func isMaxRAMPercentage(arg string) bool {
 
 func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
+}
+
+func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, error) {
+	if !customConfig.Experimental.UseProcessorAwareInitialHeapPercentage {
+		return 0.75, nil
+	}
+
+	cgroupProcessorCount, err := DefaultCGroupV1ProcessorCounter.ProcessorCount()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get cgroup processor count")
+	}
+	cgroupMemoryLimitInBytes, err := DefaultMemoryLimit.MemoryLimitInBytes()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get cgroup memory limit")
+	}
+	var heapLimit = float64(cgroupMemoryLimitInBytes)
+	var processorOffset = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
+
+	return max(0.5, (0.75*heapLimit-processorOffset)/heapLimit), nil
 }

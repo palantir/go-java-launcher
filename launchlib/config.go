@@ -71,7 +71,10 @@ type CustomLauncherConfig struct {
 	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
 }
 
-type ExperimentalLauncherConfig struct{}
+type ExperimentalLauncherConfig struct {
+	// Also disables setting the active processor count JVM argument.
+	UseProcessorAwareInitialHeapPercentage bool `yaml:"useProcessorAwareInitialHeapPercentage"`
+}
 
 type PrimaryCustomLauncherConfig struct {
 	VersionedConfig      `yaml:",inline"`

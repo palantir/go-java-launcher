@@ -411,6 +411,6 @@ func computeJVMHeapSizeInBytes() (uint64, error) {
 	}
 	var heapLimit = float64(cgroupMemoryLimitInBytes)
 	var processorAdjustment = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
-	var computedHeapSize = max(0.5*heapLimit, (0.75*heapLimit-processorAdjustment)/heapLimit)
+	var computedHeapSize = max(0.5*heapLimit, 0.75*heapLimit-processorAdjustment)
 	return uint64(computedHeapSize), nil
 }

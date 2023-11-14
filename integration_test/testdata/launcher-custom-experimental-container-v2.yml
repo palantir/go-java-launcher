@@ -1,5 +1,5 @@
 configType: java
 configVersion: 1
-jvmOpts: {}
+jvmOpts: []
 experimental:
   experimentalContainerV2: true

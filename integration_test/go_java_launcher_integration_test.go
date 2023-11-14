@@ -203,6 +203,42 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
 }
 
+func TestComputeJVMHeapSize(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		numHostProcessors   int
+		memoryLimit         uint64
+		expectedMaxHeapSize uint64
+	}{
+		{
+			name:              "at least 50% of heap",
+			numHostProcessors: 1,
+			memoryLimit:       10 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 4.5mb
+			expectedMaxHeapSize: 5 * launchlib.BytesInMebibyte,
+		},
+		{
+			name:              "computes 75% of heap minus 3mb per processor",
+			numHostProcessors: 1,
+			memoryLimit:       12 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 6mb
+			expectedMaxHeapSize: 6 * launchlib.BytesInMebibyte,
+		},
+		{
+			name:              "multiple processors",
+			numHostProcessors: 3,
+			memoryLimit:       120 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 81mb
+			expectedMaxHeapSize: 81 * launchlib.BytesInMebibyte,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			heapSizeInBytes := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit)
+			assert.Equal(t, heapSizeInBytes, tc.expectedMaxHeapSize)
+		})
+	}
+}
+
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, env ...string) (string, error) {
 	jdkDir := "jdk"
 	javaHome, err := filepath.Abs(jdkDir)

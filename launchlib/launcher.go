@@ -347,11 +347,11 @@ func filterHeapSizeArgsV2(args []string, logger io.Writer) ([]string, error) {
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		jvmHeapSizeInBytes, err := computeJVMHeapSizeInBytes()
+		cgroupMemoryLimitInBytes, err := DefaultMemoryLimit.MemoryLimitInBytes()
 		if err != nil {
-			_, _ = fmt.Fprintln(logger, "Failed to compute JVM heap size", err.Error())
-			return filtered, err
+			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
 		}
+		jvmHeapSizeInBytes := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes)
 		filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
 	}
@@ -418,16 +418,11 @@ func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }
 
-// If the experimental `ExperimentalContainerV2` is set, compute the heap size to be 75% of the heap minus 3mb per
-// processor, with a minimum value of 50% of the heap.
-func computeJVMHeapSizeInBytes() (uint64, error) {
-	hostProcessorCount := runtime.NumCPU()
-	cgroupMemoryLimitInBytes, err := DefaultMemoryLimit.MemoryLimitInBytes()
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to get cgroup memory limit")
-	}
+// ComputeJVMHeapSizeInBytes If the experimental `ExperimentalContainerV2` is set, compute the heap size to be 75% of
+// the heap minus 3mb per processor, with a minimum value of 50% of the heap.
+func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64) uint64 {
 	var heapLimit = float64(cgroupMemoryLimitInBytes)
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 	var computedHeapSize = max(0.5*heapLimit, 0.75*heapLimit-processorAdjustment)
-	return uint64(computedHeapSize), nil
+	return uint64(computedHeapSize)
 }

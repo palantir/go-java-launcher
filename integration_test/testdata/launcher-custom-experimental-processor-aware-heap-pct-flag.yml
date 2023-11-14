@@ -1,6 +1,0 @@
-configType: java
-configVersion: 1
-jvmOpts:
-  - '-Xmx1g'
-experimental:
-  useProcessorAwareInitialHeapSize: true

@@ -69,6 +69,11 @@ func TestMainMethodContainerSupportEnabled(t *testing.T) {
 			launcherCustom:  "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml",
 			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9 -XX\\:ActiveProcessorCount=2",
 		},
+		{
+			name:            "does not set defaults if InitialRAMPercentage and MaxRAMPercentage overrides are present",
+			launcherCustom:  "testdata/launcher-custom-experimental-container-v2.yml",
+			expectedJVMArgs: "",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs)

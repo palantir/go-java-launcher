@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -100,7 +101,10 @@ func compileCmdFromConfig(
 		combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
 		combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
 
-		jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+		jvmOpts, err := createJvmOpts(combinedJvmOpts, customConfig, logger)
+		if err != nil {
+			return nil, err
+		}
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
@@ -277,12 +281,20 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		combinedJvmOpts = filterHeapSizeArgs(customConfig, combinedJvmOpts)
+		if customConfig.Experimental.ExperimentalContainerV2 {
+			jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts, logger)
+			if err != nil {
+				return nil, err
+			}
+			combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
+		} else {
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+		}
 		combinedJvmOpts = ensureActiveProcessorCount(customConfig, combinedJvmOpts, logger)
-		return combinedJvmOpts
+		return combinedJvmOpts, nil
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -293,10 +305,10 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		}
 	}
 
-	return combinedJvmOpts
+	return combinedJvmOpts, nil
 }
 
-func filterHeapSizeArgs(customConfig *CustomLauncherConfig, args []string) []string {
+func filterHeapSizeArgs(args []string) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
@@ -312,30 +324,38 @@ func filterHeapSizeArgs(customConfig *CustomLauncherConfig, args []string) []str
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		if customConfig.Experimental.ExperimentalContainerV2 {
-			jvmHeapSizeInBytes, err := computeJVMHeapSizeInBytes()
-			if err != nil {
-				filtered = setJVMHeapPercentage(filtered)
-			} else {
-				filtered = setJVMHeapSize(filtered, jvmHeapSizeInBytes)
-			}
-		} else {
-			filtered = setJVMHeapPercentage(filtered)
-		}
+		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
+		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
 	}
 	return filtered
 }
 
-func setJVMHeapPercentage(args []string) []string {
-	args = append(args, "-XX:InitialRAMPercentage=75.0")
-	args = append(args, "-XX:MaxRAMPercentage=75.0")
-	return args
-}
+// Used when the experimentalContainerV2 flag is set
+func filterHeapSizeArgsV2(args []string, logger io.Writer) ([]string, error) {
+	var filtered []string
+	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
+	for _, arg := range args {
+		if !isHeapSizeArg(arg) {
+			filtered = append(filtered, arg)
+		}
 
-func setJVMHeapSize(args []string, heapSizeInBytes uint64) []string {
-	args = append(args, fmt.Sprintf("-Xms%d", heapSizeInBytes))
-	args = append(args, fmt.Sprintf("-Xmx%d", heapSizeInBytes))
-	return args
+		if isMaxRAMPercentage(arg) {
+			hasMaxRAMPercentage = true
+		} else if isInitialRAMPercentage(arg) {
+			hasInitialRAMPercentage = true
+		}
+	}
+
+	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
+		jvmHeapSizeInBytes, err := computeJVMHeapSizeInBytes()
+		if err != nil {
+			_, _ = fmt.Fprintln(logger, "Failed to compute JVM heap size", err.Error())
+			return filtered, err
+		}
+		filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
+		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
+	}
+	return filtered, nil
 }
 
 func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []string, logger io.Writer) []string {
@@ -401,16 +421,13 @@ func isInitialRAMPercentage(arg string) bool {
 // If the experimental `ExperimentalContainerV2` is set, compute the heap size to be 75% of the heap minus 3mb per
 // processor, with a minimum value of 50% of the heap.
 func computeJVMHeapSizeInBytes() (uint64, error) {
-	cgroupProcessorCount, err := DefaultCGroupV1ProcessorCounter.ProcessorCount()
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to get cgroup processor count")
-	}
+	hostProcessorCount := runtime.NumCPU()
 	cgroupMemoryLimitInBytes, err := DefaultMemoryLimit.MemoryLimitInBytes()
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get cgroup memory limit")
 	}
 	var heapLimit = float64(cgroupMemoryLimitInBytes)
-	var processorAdjustment = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
+	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 	var computedHeapSize = max(0.5*heapLimit, 0.75*heapLimit-processorAdjustment)
 	return uint64(computedHeapSize), nil
 }

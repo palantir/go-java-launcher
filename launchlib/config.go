@@ -72,8 +72,7 @@ type CustomLauncherConfig struct {
 }
 
 type ExperimentalLauncherConfig struct {
-	// Also disables setting the active processor count JVM argument.
-	UseProcessorAwareInitialHeapSize bool `yaml:"useProcessorAwareInitialHeapSize"`
+	ExperimentalContainerV2 bool `yaml:"experimentalContainerV2"`
 }
 
 type PrimaryCustomLauncherConfig struct {

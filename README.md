@@ -148,7 +148,7 @@ All output from `go-java-launcher` itself, and from the launch of all processes 
 
 ## Java heap and container support
 
-By default, when starting a java process inside a container (as indicated by the presence of ``CONTAINER`` env
+By _default_, when starting a java process inside a container (as indicated by the presence of ``CONTAINER`` env
 variable):
 
 1. If `-XX:ActiveProcessorCount` is unset, it will be set based on the discovered cgroup configurations and host
@@ -161,6 +161,16 @@ variable):
 
 This will cause the JVM 11+ to discover the ``MaxRAM`` value using Linux cgroups, and calculate the heap sizes as the specified
 percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage``.
+
+If the experimental flag `experimentalContainerV2` is set:
+1. The `-XX:ActiveProcessorCount` is unset, it will remain unset.
+1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out. If neither 
+ ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or custom jvm opts,
+ ``-Xmx|-Xms`` will both be set to be 75% of the heap size minus 3mb per processor, with a minimum value of 50% of the 
+  heap.
+1. If neither ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or
+   custom jvm opts, both will be set to ``75.0`` (i.e. ``-XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 `` will
+   be appended after all the other jvm opts).
 
 ### Overriding default values
 

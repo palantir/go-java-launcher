@@ -312,14 +312,30 @@ func filterHeapSizeArgs(customConfig *CustomLauncherConfig, args []string) []str
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		initialHeapPercentage, err := computeInitialHeapPercentage(customConfig)
-		if err != nil {
-			initialHeapPercentage = 75.0
+		if customConfig.Experimental.ExperimentalContainerV2 {
+			jvmHeapSizeInBytes, err := computeJVMHeapSizeInBytes()
+			if err != nil {
+				filtered = setJVMHeapPercentage(filtered)
+			} else {
+				filtered = setJVMHeapSize(filtered, jvmHeapSizeInBytes)
+			}
+		} else {
+			filtered = setJVMHeapPercentage(filtered)
 		}
-		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.1f", initialHeapPercentage))
-		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", initialHeapPercentage))
 	}
 	return filtered
+}
+
+func setJVMHeapPercentage(args []string) []string {
+	args = append(args, "-XX:InitialRAMPercentage=75.0")
+	args = append(args, "-XX:MaxRAMPercentage=75.0")
+	return args
+}
+
+func setJVMHeapSize(args []string, heapSizeInBytes uint64) []string {
+	args = append(args, fmt.Sprintf("-Xms%d", heapSizeInBytes))
+	args = append(args, fmt.Sprintf("-Xmx%d", heapSizeInBytes))
+	return args
 }
 
 func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []string, logger io.Writer) []string {
@@ -333,7 +349,7 @@ func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []strin
 		filtered = append(filtered, arg)
 	}
 
-	if !hasActiveProcessorCount && !customConfig.Experimental.UseProcessorAwareInitialHeapSize {
+	if !hasActiveProcessorCount && !customConfig.Experimental.ExperimentalContainerV2 {
 		processorCountArg, err := getActiveProcessorCountArg(logger)
 		if err == nil {
 			filtered = append(filtered, processorCountArg)
@@ -382,13 +398,9 @@ func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }
 
-// If the experimental `UseProcessorAwareInitialHeapSize` is set, compute the heap percentage as 75% of the
-// heap minus 3mb per processor, with a minimum value of 50%.
-func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, error) {
-	if !customConfig.Experimental.UseProcessorAwareInitialHeapSize {
-		return 75.0, nil
-	}
-
+// If the experimental `ExperimentalContainerV2` is set, compute the heap size to be 75% of the heap minus 3mb per
+// processor, with a minimum value of 50% of the heap.
+func computeJVMHeapSizeInBytes() (uint64, error) {
 	cgroupProcessorCount, err := DefaultCGroupV1ProcessorCounter.ProcessorCount()
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get cgroup processor count")
@@ -399,6 +411,6 @@ func computeInitialHeapPercentage(customConfig *CustomLauncherConfig) (float64, 
 	}
 	var heapLimit = float64(cgroupMemoryLimitInBytes)
 	var processorAdjustment = 3 * BytesInMebibyte * float64(cgroupProcessorCount)
-
-	return max(50.0, (0.75*heapLimit-processorAdjustment)/heapLimit*100.0), nil
+	var computedHeapSize = max(0.5*heapLimit, (0.75*heapLimit-processorAdjustment)/heapLimit)
+	return uint64(computedHeapSize), nil
 }

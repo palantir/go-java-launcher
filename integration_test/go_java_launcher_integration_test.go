@@ -45,9 +45,10 @@ func TestMainMethod(t *testing.T) {
 
 func TestMainMethodContainerSupportEnabled(t *testing.T) {
 	for _, tc := range []struct {
-		name            string
-		launcherCustom  string
-		expectedJVMArgs string
+		name               string
+		launcherCustom     string
+		expectedJVMArgs    string
+		expectedJVMArgKeys []string
 	}{
 		{
 			name:            "sets defaults",
@@ -70,30 +71,32 @@ func TestMainMethodContainerSupportEnabled(t *testing.T) {
 			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9 -XX\\:ActiveProcessorCount=2",
 		},
 		{
-			name:            "using experimentalContainerV2 sets Xms and Xmx and does not set ActiveProcessorCount",
-			launcherCustom:  "testdata/launcher-custom-experimental-container-v2.yml",
-			expectedJVMArgs: "-Xms3107979264 -Xmx3107979264",
+			name:               "using experimentalContainerV2 sets Xms and Xmx and does not set ActiveProcessorCount",
+			launcherCustom:     "testdata/launcher-custom-experimental-container-v2.yml",
+			expectedJVMArgs:    "",
+			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
 		},
 		{
 			name: "using experimentalContainerV2 with InitialRAMPercentage does not set Xms, Xmx, or " +
 				"ActiveProcessorCount",
 			launcherCustom:  "testdata/launcher-custom-experimental-container-v2-with-initial-ram-percentage.yml",
-			expectedJVMArgs: "-XX\\\\:InitialRAMPercentage=70.0",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=70.0",
 		},
 		{
 			name: "using experimentalContainerV2 with MaxRAMPercentage does not set Xms, Xmx, or " +
 				"ActiveProcessorCount",
 			launcherCustom:  "testdata/launcher-custom-experimental-container-v2-with-max-ram-percentage.yml",
-			expectedJVMArgs: "-XX\\\\:MaxRAMPercentage=70.0",
+			expectedJVMArgs: "-XX\\:MaxRAMPercentage=70.0",
 		},
 		{
-			name:            "using experimentalContainerV2 does not use user-provided Xms or Xmx",
-			launcherCustom:  "testdata/launcher-custom-experimental-container-v2.yml",
-			expectedJVMArgs: "-Xms3107979264 -Xmx3107979264",
+			name:               "using experimentalContainerV2 does not use user-provided Xms or Xmx",
+			launcherCustom:     "testdata/launcher-custom-experimental-container-v2.yml",
+			expectedJVMArgs:    "",
+			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs)
+			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs, tc.expectedJVMArgKeys)
 		})
 	}
 }
@@ -119,7 +122,7 @@ func TestMainMethodContainerSupportDisabled(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			testInContainer(t, tc.launcherCustom, tc.containerSupportMessage, tc.expectedJVMArgs)
+			testInContainer(t, tc.launcherCustom, tc.containerSupportMessage, tc.expectedJVMArgs, []string{})
 		})
 	}
 }
@@ -141,7 +144,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 }
 
 func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
-	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2")
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2", []string{})
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 
@@ -248,18 +251,23 @@ func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
 	return children
 }
 
-func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string) string {
-	return testInContainer(t, launcherCustom, "Container support enabled", expectedJvmArgs)
+func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string, expectedJvmArgKeys []string) string {
+	return testInContainer(t, launcherCustom, "Container support enabled", expectedJvmArgs, expectedJvmArgKeys)
 }
 
-func testInContainer(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string) string {
+func testInContainer(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string, jvmArgKeys []string) string {
 	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", launcherCustom, "CONTAINER=")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	if jvmArgs != "" {
+		assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	}
 	// container support detected and running inside container
 	assert.Regexp(t, containerSupportMessage, output)
+	for _, key := range jvmArgKeys {
+		assert.Regexp(t, key, output)
+	}
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 	return output

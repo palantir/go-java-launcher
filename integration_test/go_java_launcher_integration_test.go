@@ -220,9 +220,9 @@ func TestComputeJVMHeapSize(t *testing.T) {
 		{
 			name:              "computes 75% of heap minus 3mb per processor",
 			numHostProcessors: 1,
-			memoryLimit:       12 * launchlib.BytesInMebibyte,
-			// 75% of heap - 3mb*processors = 6mb
-			expectedMaxHeapSize: 6 * launchlib.BytesInMebibyte,
+			memoryLimit:       16 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 9mb
+			expectedMaxHeapSize: 9 * launchlib.BytesInMebibyte,
 		},
 		{
 			name:              "multiple processors",

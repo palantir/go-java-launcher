@@ -209,6 +209,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 		numHostProcessors   int
 		memoryLimit         uint64
 		expectedMaxHeapSize uint64
+		expectError         bool
 	}{
 		{
 			name:              "at least 50% of heap",
@@ -216,6 +217,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			memoryLimit:       10 * launchlib.BytesInMebibyte,
 			// 75% of heap - 3mb*processors = 4.5mb
 			expectedMaxHeapSize: 5 * launchlib.BytesInMebibyte,
+			expectError:         false,
 		},
 		{
 			name:              "computes 75% of heap minus 3mb per processor",
@@ -223,6 +225,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			memoryLimit:       16 * launchlib.BytesInMebibyte,
 			// 75% of heap - 3mb*processors = 9mb
 			expectedMaxHeapSize: 9 * launchlib.BytesInMebibyte,
+			expectError:         false,
 		},
 		{
 			name:              "multiple processors",
@@ -230,11 +233,24 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			memoryLimit:       120 * launchlib.BytesInMebibyte,
 			// 75% of heap - 3mb*processors = 81mb
 			expectedMaxHeapSize: 81 * launchlib.BytesInMebibyte,
+			expectError:         false,
+		},
+		{
+			name:                "memory limit too large",
+			numHostProcessors:   1,
+			memoryLimit:         1_000_001 * launchlib.BytesInMebibyte,
+			expectedMaxHeapSize: 0,
+			expectError:         true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			heapSizeInBytes := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit)
-			assert.Equal(t, heapSizeInBytes, tc.expectedMaxHeapSize)
+			heapSizeInBytes, err := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit)
+			if tc.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, heapSizeInBytes, tc.expectedMaxHeapSize)
+			}
 		})
 	}
 }

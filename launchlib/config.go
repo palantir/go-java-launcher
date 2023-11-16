@@ -72,7 +72,7 @@ type CustomLauncherConfig struct {
 }
 
 type ExperimentalLauncherConfig struct {
-	ExperimentalContainerV2 bool `yaml:"experimentalContainerV2"`
+	ContainerV2 bool `yaml:"containerV2"`
 }
 
 type PrimaryCustomLauncherConfig struct {

@@ -4,4 +4,4 @@ jvmOpts:
   - '-Xms1g'
   - '-Xmx1g'
 experimental:
-  experimentalContainerV2: true
+  containerV2: true

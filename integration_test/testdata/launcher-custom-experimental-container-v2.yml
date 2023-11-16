@@ -2,4 +2,4 @@ configType: java
 configVersion: 1
 jvmOpts: []
 experimental:
-  experimentalContainerV2: true
+  containerV2: true

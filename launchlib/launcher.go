@@ -101,10 +101,7 @@ func compileCmdFromConfig(
 		combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
 		combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
 
-		jvmOpts, err := createJvmOpts(combinedJvmOpts, customConfig, logger)
-		if err != nil {
-			return nil, err
-		}
+		jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
 
 		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 		if executableErr != nil {
@@ -281,7 +278,7 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		if customConfig.Experimental.ContainerV2 {
@@ -298,7 +295,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
 			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
-		return combinedJvmOpts, nil
+		return combinedJvmOpts
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -309,7 +306,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		}
 	}
 
-	return combinedJvmOpts, nil
+	return combinedJvmOpts
 }
 
 func filterHeapSizeArgs(args []string) []string {

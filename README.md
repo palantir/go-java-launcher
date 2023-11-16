@@ -165,11 +165,9 @@ percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage
 If the experimental flag `containerV2` is set:
 1. The `-XX:ActiveProcessorCount` is unset, it will remain unset.
 1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out. If neither 
- ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or custom jvm opts:
-    - if we can obtain the cgroups memory limit ``-Xmx|-Xms`` will both be set to be 75% of the cgroups memory limit 
-     minus 3mb per processor, with a minimum value of 50% of the heap.
-    - if we cannot obtain the cgroups memory limit, both RAM percentage values will be set to ``75.0`` (i.e. 
-    ``-XX:InitialRAMPercentage=75.0 -XX:MaxRAMPercentage=75.0 `` will be appended after all the other jvm opts)
+ ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or custom jvm opts 
+ ``-Xmx|-Xms`` will both be set to be 75% of the cgroups memory limit minus 3mb per processor, with a minimum value of 
+  50% of the heap.
 
 ### Overriding default values
 

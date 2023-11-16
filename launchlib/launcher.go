@@ -287,6 +287,9 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		if customConfig.Experimental.ContainerV2 {
 			jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts)
 			if err != nil {
+				// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
+				// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
+				// by all Java platforms.
 				combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
 			} else {
 				combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
@@ -422,8 +425,8 @@ func isInitialRAMPercentage(arg string) bool {
 // ComputeJVMHeapSizeInBytes If the experimental `ContainerV2` is set, compute the heap size to be 75% of
 // the heap minus 3mb per processor, with a minimum value of 50% of the heap.
 func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64) uint64 {
-	var heapLimit = float64(cgroupMemoryLimitInBytes)
+	var memoryLimit = float64(cgroupMemoryLimitInBytes)
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
-	var computedHeapSize = max(0.5*heapLimit, 0.75*heapLimit-processorAdjustment)
+	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
 	return uint64(computedHeapSize)
 }

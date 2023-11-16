@@ -236,7 +236,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			expectError:         false,
 		},
 		{
-			name:                "memory limit too_large",
+			name:                "memory limit too large",
 			numHostProcessors:   1,
 			memoryLimit:         1_000_001 * launchlib.BytesInMebibyte,
 			expectedMaxHeapSize: 0,

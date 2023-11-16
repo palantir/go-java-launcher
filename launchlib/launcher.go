@@ -429,7 +429,7 @@ func isInitialRAMPercentage(arg string) bool {
 // the heap minus 3mb per processor, with a minimum value of 50% of the heap.
 func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64) (uint64, error) {
 	if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
-		return 0, errors.New("cgroups memory limit is unusually high. Not setting JVM heap size options")
+		return 0, errors.New("cgroups memory limit is unusually high. Not computing JVM heap size")
 	}
 	var memoryLimit = float64(cgroupMemoryLimitInBytes)
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)

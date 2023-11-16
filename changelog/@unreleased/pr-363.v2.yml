@@ -1,0 +1,6 @@
+type: improvement
+improvement:
+  description: Add test to check that heap size is not computed when cgroups memory
+    limits are over 1TB
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/363

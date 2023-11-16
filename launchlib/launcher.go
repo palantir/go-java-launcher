@@ -287,7 +287,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 				// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 				// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
 				// by all platforms using Java.
-				// Also, when the memory limit is unusually high (defined to be over 1TB), we also revert to the
+				// Also, when the memory limit is unusually high (defined to be over 1TB), we revert to the
 				// percentage-based heap sizing. This is to handle the edge case where the cgroups memory limit is set
 				// to be an arbitrary large value.
 				combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)

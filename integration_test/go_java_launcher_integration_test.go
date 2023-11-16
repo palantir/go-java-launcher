@@ -45,9 +45,10 @@ func TestMainMethod(t *testing.T) {
 
 func TestMainMethodContainerSupportEnabled(t *testing.T) {
 	for _, tc := range []struct {
-		name            string
-		launcherCustom  string
-		expectedJVMArgs string
+		name               string
+		launcherCustom     string
+		expectedJVMArgs    string
+		expectedJVMArgKeys []string
 	}{
 		{
 			name:            "sets defaults",
@@ -69,9 +70,33 @@ func TestMainMethodContainerSupportEnabled(t *testing.T) {
 			launcherCustom:  "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml",
 			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9 -XX\\:ActiveProcessorCount=2",
 		},
+		{
+			name:               "using containerV2 sets Xms and Xmx and does not set ActiveProcessorCount",
+			launcherCustom:     "testdata/launcher-custom-experimental-container-v2.yml",
+			expectedJVMArgs:    "",
+			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
+		},
+		{
+			name: "using containerV2 with InitialRAMPercentage does not set Xms, Xmx, or " +
+				"ActiveProcessorCount",
+			launcherCustom:  "testdata/launcher-custom-experimental-container-v2-with-initial-ram-percentage.yml",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=70.0",
+		},
+		{
+			name: "using containerV2 with MaxRAMPercentage does not set Xms, Xmx, or " +
+				"ActiveProcessorCount",
+			launcherCustom:  "testdata/launcher-custom-experimental-container-v2-with-max-ram-percentage.yml",
+			expectedJVMArgs: "-XX\\:MaxRAMPercentage=70.0",
+		},
+		{
+			name:               "using containerV2 does not use user-provided Xms or Xmx",
+			launcherCustom:     "testdata/launcher-custom-experimental-container-v2.yml",
+			expectedJVMArgs:    "",
+			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs)
+			testContainerSupportEnabled(t, tc.launcherCustom, tc.expectedJVMArgs, tc.expectedJVMArgKeys)
 		})
 	}
 }
@@ -97,7 +122,7 @@ func TestMainMethodContainerSupportDisabled(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			testInContainer(t, tc.launcherCustom, tc.containerSupportMessage, tc.expectedJVMArgs)
+			testInContainer(t, tc.launcherCustom, tc.containerSupportMessage, tc.expectedJVMArgs, []string{})
 		})
 	}
 }
@@ -119,7 +144,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 }
 
 func TestMainMethodContainerWithoutCustomConfig(t *testing.T) {
-	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2")
+	output := testContainerSupportEnabled(t, "foo", "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2", []string{})
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
 }
 
@@ -178,6 +203,42 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
 }
 
+func TestComputeJVMHeapSize(t *testing.T) {
+	for _, tc := range []struct {
+		name                string
+		numHostProcessors   int
+		memoryLimit         uint64
+		expectedMaxHeapSize uint64
+	}{
+		{
+			name:              "at least 50% of heap",
+			numHostProcessors: 1,
+			memoryLimit:       10 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 4.5mb
+			expectedMaxHeapSize: 5 * launchlib.BytesInMebibyte,
+		},
+		{
+			name:              "computes 75% of heap minus 3mb per processor",
+			numHostProcessors: 1,
+			memoryLimit:       16 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 9mb
+			expectedMaxHeapSize: 9 * launchlib.BytesInMebibyte,
+		},
+		{
+			name:              "multiple processors",
+			numHostProcessors: 3,
+			memoryLimit:       120 * launchlib.BytesInMebibyte,
+			// 75% of heap - 3mb*processors = 81mb
+			expectedMaxHeapSize: 81 * launchlib.BytesInMebibyte,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			heapSizeInBytes := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit)
+			assert.Equal(t, heapSizeInBytes, tc.expectedMaxHeapSize)
+		})
+	}
+}
+
 func runMainWithArgs(t *testing.T, staticConfigFile, customConfigFile string, env ...string) (string, error) {
 	jdkDir := "jdk"
 	javaHome, err := filepath.Abs(jdkDir)
@@ -226,18 +287,23 @@ func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
 	return children
 }
 
-func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string) string {
-	return testInContainer(t, launcherCustom, "Container support enabled", expectedJvmArgs)
+func testContainerSupportEnabled(t *testing.T, launcherCustom string, expectedJvmArgs string, expectedJvmArgKeys []string) string {
+	return testInContainer(t, launcherCustom, "Container support enabled", expectedJvmArgs, expectedJvmArgKeys)
 }
 
-func testInContainer(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string) string {
+func testInContainer(t *testing.T, launcherCustom string, containerSupportMessage string, jvmArgs string, jvmArgKeys []string) string {
 	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", launcherCustom, "CONTAINER=")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	if jvmArgs != "" {
+		assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	}
 	// container support detected and running inside container
 	assert.Regexp(t, containerSupportMessage, output)
+	for _, key := range jvmArgKeys {
+		assert.Regexp(t, key, output)
+	}
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 	return output

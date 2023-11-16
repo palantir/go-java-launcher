@@ -1,0 +1,7 @@
+type: improvement
+improvement:
+  description: When the experimental `containerV2` is set, 1) compute the heap percentage
+    as 75% of the heap minus 3mb per processor, with a minimum value of 50%, and 2)
+    don't set the -XX:ActiveProcessorCount JVM option.
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/361

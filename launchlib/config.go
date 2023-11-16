@@ -71,7 +71,9 @@ type CustomLauncherConfig struct {
 	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
 }
 
-type ExperimentalLauncherConfig struct{}
+type ExperimentalLauncherConfig struct {
+	ContainerV2 bool `yaml:"containerV2"`
+}
 
 type PrimaryCustomLauncherConfig struct {
 	VersionedConfig      `yaml:",inline"`

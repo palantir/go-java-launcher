@@ -21,6 +21,7 @@ import (
 	"os/exec"
 	"path"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -31,6 +32,7 @@ const (
 	TemplateDelimsClose = "}}"
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
 	ExecPathBlackListRegex = `[^\w.\/_\-]`
+	BytesInMebibyte        = 1048576
 )
 
 type ServiceCmds struct {
@@ -279,8 +281,20 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
-		combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
+		if customConfig.Experimental.ContainerV2 {
+			jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts)
+			if err != nil {
+				// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
+				// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
+				// by all platforms using Java.
+				combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			} else {
+				combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
+			}
+		} else {
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
+		}
 		return combinedJvmOpts
 	}
 
@@ -315,6 +329,34 @@ func filterHeapSizeArgs(args []string) []string {
 		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
 	}
 	return filtered
+}
+
+// Used when the containerV2 flag is set
+func filterHeapSizeArgsV2(args []string) ([]string, error) {
+	var filtered []string
+	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
+	for _, arg := range args {
+		if !isHeapSizeArg(arg) {
+			filtered = append(filtered, arg)
+		}
+
+		if isMaxRAMPercentage(arg) {
+			hasMaxRAMPercentage = true
+		} else if isInitialRAMPercentage(arg) {
+			hasInitialRAMPercentage = true
+		}
+	}
+
+	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
+		cgroupMemoryLimitInBytes, err := DefaultMemoryLimit.MemoryLimitInBytes()
+		if err != nil {
+			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
+		}
+		jvmHeapSizeInBytes := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes)
+		filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
+		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
+	}
+	return filtered, nil
 }
 
 func ensureActiveProcessorCount(args []string, logger io.Writer) []string {
@@ -375,4 +417,13 @@ func isMaxRAMPercentage(arg string) bool {
 
 func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
+}
+
+// ComputeJVMHeapSizeInBytes If the experimental `ContainerV2` is set, compute the heap size to be 75% of
+// the heap minus 3mb per processor, with a minimum value of 50% of the heap.
+func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64) uint64 {
+	var memoryLimit = float64(cgroupMemoryLimitInBytes)
+	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
+	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
+	return uint64(computedHeapSize)
 }

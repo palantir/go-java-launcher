@@ -1,0 +1,6 @@
+configType: java
+configVersion: 1
+jvmOpts:
+  - '-XX:InitialRAMPercentage=70.0'
+experimental:
+  containerV2: true

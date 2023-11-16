@@ -296,8 +296,8 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			}
 		} else {
 			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
-		combinedJvmOpts = ensureActiveProcessorCount(customConfig, combinedJvmOpts, logger)
 		return combinedJvmOpts, nil
 	}
 
@@ -362,7 +362,7 @@ func filterHeapSizeArgsV2(args []string) ([]string, error) {
 	return filtered, nil
 }
 
-func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []string, logger io.Writer) []string {
+func ensureActiveProcessorCount(args []string, logger io.Writer) []string {
 	filtered := make([]string, 0, len(args)+1)
 
 	var hasActiveProcessorCount bool
@@ -373,7 +373,7 @@ func ensureActiveProcessorCount(customConfig *CustomLauncherConfig, args []strin
 		filtered = append(filtered, arg)
 	}
 
-	if !hasActiveProcessorCount && !customConfig.Experimental.ContainerV2 {
+	if !hasActiveProcessorCount {
 		processorCountArg, err := getActiveProcessorCountArg(logger)
 		if err == nil {
 			filtered = append(filtered, processorCountArg)

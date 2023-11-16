@@ -289,7 +289,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			if err != nil {
 				// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 				// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
-				// by all Java platforms.
+				// by all platforms using Java.
 				combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
 			} else {
 				combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs

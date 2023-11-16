@@ -352,6 +352,9 @@ func filterHeapSizeArgsV2(args []string) ([]string, error) {
 		if err != nil {
 			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
 		}
+		if cgroupMemoryLimitInBytes > 1000000*BytesInMebibyte {
+			return filtered, errors.New("Memory limit is unusually high. Not setting heap size")
+		}
 		jvmHeapSizeInBytes := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes)
 		filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))

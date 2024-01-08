@@ -4,3 +4,5 @@ jvmOpts:
   - '-Xmx1g'
   - '-XX:InitialRAMPercentage=79.9'
   - '-XX:MaxRAMPercentage=80.9'
+experimental:
+  containerV2: false

@@ -281,7 +281,9 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		if !customConfig.Experimental.ContainerV2 {
+		// If the containerV2 field is nil, there was a failure reading the custom config file, and we use the default
+		// behavior of enabling containerV2 behavior.
+		if customConfig.Experimental.ContainerV2 != nil && !*customConfig.Experimental.ContainerV2 {
 			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
 			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		} else {

@@ -11,3 +11,5 @@ args:
 dirs:
   - foo
   - bar/baz
+experimental:
+  containerV2: false

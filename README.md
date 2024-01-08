@@ -162,6 +162,7 @@ variable):
 This will cause the JVM 11+ to discover the ``MaxRAM`` value using Linux cgroups, and calculate the heap sizes as the specified
 percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage``.
 
+TODO(pmarupaka): Update this.
 If the experimental flag `containerV2` is set:
 1. The `-XX:ActiveProcessorCount` is unset, it will remain unset.
 1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out. If neither 

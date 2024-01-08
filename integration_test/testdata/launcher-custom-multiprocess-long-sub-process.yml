@@ -9,3 +9,5 @@ subProcesses:
       SLEEP_TIME: "200"
     jvmOpts:
       - '-Xmx1g'
+experimental:
+  containerV2: false

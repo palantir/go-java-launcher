@@ -281,7 +281,10 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		if customConfig.Experimental.ContainerV2 {
+		if !customConfig.Experimental.ContainerV2 {
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
+		} else {
 			jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts)
 			if err != nil {
 				// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
@@ -294,9 +297,6 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			} else {
 				combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
 			}
-		} else {
-			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
-			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
 		return combinedJvmOpts
 	}

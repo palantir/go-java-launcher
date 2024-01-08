@@ -3,5 +3,3 @@ configVersion: 1
 jvmOpts:
   - '-Xms1g'
   - '-Xmx1g'
-experimental:
-  containerV2: true

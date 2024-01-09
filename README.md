@@ -150,7 +150,7 @@ All output from `go-java-launcher` itself, and from the launch of all processes 
 
 By _default_, when starting a java process inside a container (as indicated by the presence of ``CONTAINER`` env
 variable):
-1. The `-XX:ActiveProcessorCount` is unset, it will remain unset.
+1. If the `-XX:ActiveProcessorCount` is unset, it will remain unset.
 1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out. If neither
    ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or custom jvm opts
    ``-Xmx|-Xms`` will both be set to be 75% of the cgroups memory limit minus 3mb per processor, with a minimum value of

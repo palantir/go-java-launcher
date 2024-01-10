@@ -281,7 +281,12 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		if customConfig.Experimental.ContainerV2 {
+		// If the containerV2 field is nil, there was a failure reading the custom config file, and we use the default
+		// behavior of enabling containerV2 behavior.
+		if customConfig.Experimental.ContainerV2 != nil && !*customConfig.Experimental.ContainerV2 {
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
+		} else {
 			jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts)
 			if err != nil {
 				// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
@@ -294,9 +299,6 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			} else {
 				combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
 			}
-		} else {
-			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
-			combinedJvmOpts = ensureActiveProcessorCount(combinedJvmOpts, logger)
 		}
 		return combinedJvmOpts
 	}
@@ -334,7 +336,7 @@ func filterHeapSizeArgs(args []string) []string {
 	return filtered
 }
 
-// Used when the containerV2 flag is set
+// Used when the containerV2 flag is set to `true`. This is the default behavior.
 func filterHeapSizeArgsV2(args []string) ([]string, error) {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
@@ -425,8 +427,8 @@ func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }
 
-// ComputeJVMHeapSizeInBytes If the experimental `ContainerV2` is set, compute the heap size to be 75% of
-// the heap minus 3mb per processor, with a minimum value of 50% of the heap.
+// ComputeJVMHeapSizeInBytes If the experimental `ContainerV2` is set to `true` (which it is by default), compute the
+// heap size to be 75% of the heap minus 3mb per processor, with a minimum value of 50% of the heap.
 func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64) (uint64, error) {
 	if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
 		return 0, errors.New("cgroups memory limit is unusually high. Not computing JVM heap size")

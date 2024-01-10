@@ -1,5 +1,3 @@
 configType: java
 configVersion: 1
 jvmOpts: []
-experimental:
-  containerV2: true

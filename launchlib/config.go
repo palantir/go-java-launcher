@@ -72,7 +72,7 @@ type CustomLauncherConfig struct {
 }
 
 type ExperimentalLauncherConfig struct {
-	ContainerV2 bool `yaml:"containerV2"`
+	ContainerV2 *bool `yaml:"containerV2"`
 }
 
 type PrimaryCustomLauncherConfig struct {
@@ -266,6 +266,10 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid launch config in custom "+
 				"subProcess config %s", name)
 		}
+	}
+	if config.Experimental.ContainerV2 == nil {
+		var trueVal = true
+		config.Experimental.ContainerV2 = &trueVal
 	}
 	return config, nil
 }

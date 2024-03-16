@@ -5,6 +5,7 @@ buildscript {
     }
 
     dependencies {
+        classpath 'com.palantir.gradle.failure-reports:gradle-failure-reports:1.9.0'
         classpath 'com.palantir.gradle.externalpublish:gradle-external-publish-plugin:1.15.0'
         classpath 'com.palantir.gradle.gitversion:gradle-git-version:3.0.0'
     }
@@ -12,6 +13,7 @@ buildscript {
 
 apply plugin: 'com.palantir.external-publish-custom'
 apply plugin: 'com.palantir.git-version'
+apply plugin: 'com.palantir.failure-reports'
 
 group 'com.palantir.launching'
 

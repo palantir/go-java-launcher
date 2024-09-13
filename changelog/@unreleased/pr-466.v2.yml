@@ -1,0 +1,5 @@
+type: improvement
+improvement:
+  description: Remove the experimental `ContainerV2` flag
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/466

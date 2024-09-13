@@ -1,4 +1,0 @@
-configType: java
-configVersion: 1
-jvmOpts:
-  - '-XX:InitialRAMPercentage=70.0'

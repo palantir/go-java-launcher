@@ -20,8 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var trueValue = true
-
 func TestParseStaticConfig(t *testing.T) {
 	for i, currCase := range []struct {
 		name string
@@ -190,7 +188,7 @@ jvmOpts:
 					},
 					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
 					DisableContainerSupport: false,
-					Experimental:            ExperimentalLauncherConfig{ContainerV2: &trueValue},
+					Experimental:            ExperimentalLauncherConfig{},
 				},
 			},
 		},
@@ -212,7 +210,7 @@ jvmOpts:
 						Type: "java",
 					},
 					JvmOpts:      []string{"jvmOpt1", "jvmOpt2"},
-					Experimental: ExperimentalLauncherConfig{ContainerV2: &trueValue},
+					Experimental: ExperimentalLauncherConfig{},
 				},
 			},
 		},
@@ -239,7 +237,7 @@ jvmOpts:
 						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 					},
 					JvmOpts:      []string{"jvmOpt1", "jvmOpt2"},
-					Experimental: ExperimentalLauncherConfig{ContainerV2: &trueValue},
+					Experimental: ExperimentalLauncherConfig{},
 				},
 			},
 		},
@@ -278,7 +276,7 @@ subProcesses:
 						"SOME_ENV_VAR": "{{CWD}}/etc/profile",
 					},
 					JvmOpts:      []string{"jvmOpt1", "jvmOpt2"},
-					Experimental: ExperimentalLauncherConfig{ContainerV2: &trueValue},
+					Experimental: ExperimentalLauncherConfig{},
 				},
 				SubProcesses: map[string]CustomLauncherConfig{
 					"envoy": {
@@ -312,7 +310,7 @@ dangerousDisableContainerSupport: true
 					},
 					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
 					DisableContainerSupport: true,
-					Experimental:            ExperimentalLauncherConfig{ContainerV2: &trueValue},
+					Experimental:            ExperimentalLauncherConfig{},
 				},
 			},
 		},
@@ -337,7 +335,7 @@ env:
 						"SOME_ENV_VAR":  "/etc/profile",
 						"OTHER_ENV_VAR": "/etc/redhat-release",
 					},
-					Experimental: ExperimentalLauncherConfig{ContainerV2: &trueValue},
+					Experimental: ExperimentalLauncherConfig{},
 				},
 			},
 		},

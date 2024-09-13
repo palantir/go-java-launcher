@@ -2,5 +2,3 @@ configType: java
 configVersion: 1
 jvmOpts:
   - '-XX:MaxRAM=1001'
-experimental:
-  containerV2: false

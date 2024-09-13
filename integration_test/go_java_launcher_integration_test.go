@@ -51,48 +51,25 @@ func TestMainMethodContainerSupportEnabled(t *testing.T) {
 		expectedJVMArgKeys []string
 	}{
 		{
-			name:            "sets defaults",
-			launcherCustom:  "testdata/launcher-custom.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=75.0 -XX\\:MaxRAMPercentage=75.0 -XX\\:ActiveProcessorCount=2",
+			name:               "sets defaults",
+			launcherCustom:     "testdata/launcher-custom.yml",
+			expectedJVMArgs:    "",
+			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
 		},
 		{
 			name:            "does not set defaults if InitialRAMPercentage override is present",
 			launcherCustom:  "testdata/launcher-custom-initial-ram-percentage-override.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:ActiveProcessorCount=2",
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9",
 		},
 		{
 			name:            "does not set defaults if MaxRAMPercentage override is present",
 			launcherCustom:  "testdata/launcher-custom-max-ram-percentage-override.yml",
-			expectedJVMArgs: "-XX\\:MaxRAMPercentage=79.9 -XX\\:ActiveProcessorCount=2",
+			expectedJVMArgs: "-XX\\:MaxRAMPercentage=79.9",
 		},
 		{
 			name:            "does not set defaults if InitialRAMPercentage and MaxRAMPercentage overrides are present",
 			launcherCustom:  "testdata/launcher-custom-initial-and-max-ram-percentage-override.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9 -XX\\:ActiveProcessorCount=2",
-		},
-		{
-			name:               "using containerV2 sets Xms and Xmx and does not set ActiveProcessorCount",
-			launcherCustom:     "testdata/launcher-custom-experimental-container-v2.yml",
-			expectedJVMArgs:    "",
-			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
-		},
-		{
-			name: "using containerV2 with InitialRAMPercentage does not set Xms, Xmx, or " +
-				"ActiveProcessorCount",
-			launcherCustom:  "testdata/launcher-custom-experimental-container-v2-with-initial-ram-percentage.yml",
-			expectedJVMArgs: "-XX\\:InitialRAMPercentage=70.0",
-		},
-		{
-			name: "using containerV2 with MaxRAMPercentage does not set Xms, Xmx, or " +
-				"ActiveProcessorCount",
-			launcherCustom:  "testdata/launcher-custom-experimental-container-v2-with-max-ram-percentage.yml",
-			expectedJVMArgs: "-XX\\:MaxRAMPercentage=70.0",
-		},
-		{
-			name:               "using containerV2 does not use user-provided Xms or Xmx",
-			launcherCustom:     "testdata/launcher-custom-experimental-container-v2.yml",
-			expectedJVMArgs:    "",
-			expectedJVMArgKeys: []string{"-Xmx", "-Xms"},
+			expectedJVMArgs: "-XX\\:InitialRAMPercentage=79.9 -XX\\:MaxRAMPercentage=80.9",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

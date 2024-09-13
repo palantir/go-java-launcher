@@ -9,5 +9,3 @@ jvmOpts:
 args:
   - arg1
 javaHome: /foo/bar
-experimental:
-  containerV2: false

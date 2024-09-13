@@ -8,5 +8,3 @@ jvmOpts:
   - '-Xmx4M'
 args:
   - arg1
-experimental:
-  containerV2: false

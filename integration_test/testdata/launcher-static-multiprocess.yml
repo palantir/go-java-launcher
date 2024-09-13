@@ -16,5 +16,3 @@ subProcesses:
       - ./testdata/
     jvmOpts:
       - '-Xmx4M'
-experimental:
-  containerV2: false

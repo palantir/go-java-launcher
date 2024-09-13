@@ -7,5 +7,3 @@ subProcesses:
     configType: java
     jvmOpts:
       - '-Xmx1g'
-experimental:
-  containerV2: false

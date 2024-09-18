@@ -8,12 +8,16 @@ buildscript {
         classpath 'com.palantir.gradle.externalpublish:gradle-external-publish-plugin:1.19.0'
         classpath 'com.palantir.gradle.failure-reports:gradle-failure-reports:1.13.0'
         classpath 'com.palantir.gradle.gitversion:gradle-git-version:3.1.0'
+        classpath 'com.palantir.gradle.jdks:gradle-jdks:0.47.0'
+        classpath 'com.palantir.gradle.jdkslatest:gradle-jdks-latest:0.15.0'
     }
 }
 
 apply plugin: 'com.palantir.external-publish-custom'
 apply plugin: 'com.palantir.failure-reports'
 apply plugin: 'com.palantir.git-version'
+apply plugin: 'com.palantir.jdks'
+apply plugin: 'com.palantir.jdks.latest'
 
 group 'com.palantir.launching'
 
@@ -28,4 +32,8 @@ externalPublishing {
         artifactId 'go-init'
         artifact file("out/dist/go-init/${project.version}/bin/go-init-${project.version}.tgz")
     }
+}
+
+jdks {
+    daemonTarget = 17
 }

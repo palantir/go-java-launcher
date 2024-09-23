@@ -6,3 +6,6 @@
 /dist/
 /out/
 /.gradle
+
+# Gradle JDKs setup
+!gradle/*

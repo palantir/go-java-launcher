@@ -37,6 +37,25 @@ requires_jobs: &requires_jobs
   - test
   - dist
 
+jobs:
+  publish:
+    working_directory: /home/circleci/go/src/github.com/palantir/go-java-launcher
+    docker: [{ image: openjdk:11 }]
+    steps:
+      - checkout
+      - restore_cache:
+          name: "Restore gradle cache"
+          keys:
+            - gradle-v1-{{ checksum "gradlew" }}
+      - go-jobs/restore_cache_with_mod_time:
+          cache_dir: out/dist
+      - run: ./gradlew publish --parallel --stacktrace --continue
+      - save_cache:
+          name: "Save gradle cache"
+          key: gradle-v1-{{ checksum "gradlew" }}
+          paths:
+            - ~/.gradle
+
 workflows:
   version: 2
   verify:
@@ -64,6 +83,14 @@ workflows:
           requires:
             - build
           <<: *all-tags-filter
+      - publish:
+          requires:
+            - dist
+          filters:
+            tags:
+              only: /^v?[0-9]+(\.[0-9]+)+(-rc[0-9]+)?$/
+            branches:
+              ignore: /.*/
       - go-jobs/circle_all:
           name: "circle-all"
           image: "busybox:1.36.1"

@@ -85,6 +85,8 @@ workflows:
           <<: *all-tags-filter
       - publish:
           requires:
+            - verify
+            - test
             - dist
           filters:
             tags:

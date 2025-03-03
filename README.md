@@ -98,7 +98,7 @@ configVersion: 1
 env:
   CUSTOM_VAR: CUSTOM_VALUE
   CUSTOM_PATH: '{{CWD}}/some/path'
-# Additional JVM options to be passed to the java command, will override defaults in static config. Ignored if configType is "executable"
+# Additional JVM options to be passed to the java command. Ignored if configType is "executable"
 jvmOpts:
   - '-Xmx2g'
 # OPTIONAL - A map of configurations of secondary processes to launch

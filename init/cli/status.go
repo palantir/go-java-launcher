@@ -98,7 +98,7 @@ func status(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
 
 	code, err := matched.ExitStatus(serviceStatus, err)
 	if code != 0 {
-		_, _ = fmt.Fprintf(os.Stderr, matched.Description)
+		_, _ = fmt.Fprint(os.Stderr, matched.Description)
 		if err != nil {
 			return logErrorAndReturnWithExitCode(ctx, err, code)
 		}

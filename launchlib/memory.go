@@ -34,21 +34,28 @@ type MemoryLimit interface {
 	MemoryLimitInBytes() (uint64, error)
 }
 
-var DefaultMemoryLimit = NewCGroupMemoryLimit(os.DirFS("/"))
+var DefaultMemoryLimit = NewMemoryLimit(os.DirFS("/"))
 
-type CGroupMemoryLimit struct {
+func NewMemoryLimit(filesystem fs.FS) MemoryLimit {
+	if IsCGroupV2(filesystem) {
+		return NewCGroupV2MemoryLimit(filesystem)
+	}
+	return NewCGroupV1MemoryLimit(filesystem)
+}
+
+type CGroupV1MemoryLimit struct {
 	pather CGroupPather
 	fs     fs.FS
 }
 
-func NewCGroupMemoryLimit(filesystem fs.FS) MemoryLimit {
-	return CGroupMemoryLimit{
+func NewCGroupV1MemoryLimit(filesystem fs.FS) MemoryLimit {
+	return CGroupV1MemoryLimit{
 		pather: NewCGroupV1Pather(filesystem),
 		fs:     filesystem,
 	}
 }
 
-func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
+func (c CGroupV1MemoryLimit) MemoryLimitInBytes() (uint64, error) {
 	memoryCGroupPath, err := c.pather.Path(memGroupName)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get memory cgroup path")
@@ -59,13 +66,17 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", memLimitFilepath)
 	}
+	defer func() {
+		_ = memLimitFile.Close()
+	}()
+
 	memLimitBytes, err := io.ReadAll(memLimitFile)
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to read memory.limit_in_bytes")
 	}
-	memLimit, err := strconv.Atoi(strings.TrimSpace(string(memLimitBytes)))
+	memLimit, err := strconv.ParseUint(strings.TrimSpace(string(memLimitBytes)), 10, 64)
 	if err != nil {
 		return 0, errors.New("unable to convert memory.limit_in_bytes value to expected type")
 	}
-	return uint64(memLimit), nil
+	return memLimit, nil
 }

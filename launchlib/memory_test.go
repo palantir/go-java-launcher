@@ -30,6 +30,24 @@ var (
 	badMemoryLimitContent = []byte(``)
 )
 
+const MountInfoContentV1Memory = `28 21 0:25 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:13 - cgroup cgroup rw,memory`
+
+const CGroupV1Content = `12:memory:/user.slice/user-1000.slice/session-2.scope
+11:devices:/user.slice/user-1000.slice/session-2.scope
+10:freezer:/
+9:blkio:/user.slice
+8:pids:/user.slice/user-1000.slice/session-2.scope
+7:perf_event:/
+6:cpu,cpuacct:/user.slice
+5:hugetlb:/
+4:cpuset:/
+3:rdma:/
+2:net_cls,net_prio:/
+1:name=systemd:/user.slice/user-1000.slice/session-2.scope
+0::/user.slice/user-1000.slice/session-2.scope`
+
+const CGroupV2Content = `0::/user.slice/user-1000.slice/session-2.scope`
+
 func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 	for _, test := range []struct {
 		name                string
@@ -41,10 +59,10 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 			name: "fails when unable to read memory.limit_in_bytes",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1Memory),
 				},
 			},
 			expectedError: errors.New("unable to open memory.limit_in_bytes at expected location"),
@@ -53,10 +71,10 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 			name: "fails when unable to parse memory.limit_in_bytes",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1Memory),
 				},
 				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
 					Data: badMemoryLimitContent,
@@ -68,10 +86,10 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 			name: "returns expected RAM percentage when memory.limit_in_bytes under 2 GiB",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1Memory),
 				},
 				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
 					Data: memoryLimitContent,
@@ -81,7 +99,7 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			limit := launchlib.NewCGroupMemoryLimit(test.filesystem)
+			limit := launchlib.NewCGroupV1MemoryLimit(test.filesystem)
 			memoryLimit, err := limit.MemoryLimitInBytes()
 			if test.expectedError != nil {
 				require.Error(t, err)
@@ -92,4 +110,79 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 			assert.Equal(t, test.expectedMemoryLimit, memoryLimit)
 		})
 	}
+}
+
+func TestMemoryLimitV1(t *testing.T) {
+	test := struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		name: "memory limit v1",
+		filesystem: fstest.MapFS{
+			"proc/self/cgroup": &fstest.MapFile{
+				Data: []byte(CGroupV1Content),
+			},
+			"proc/self/mountinfo": &fstest.MapFile{
+				Data: []byte("28 21 0:25 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:13 - cgroup cgroup rw,memory"),
+			},
+			"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+				Data: []byte("2147483648\n"),
+			},
+		},
+	}
+
+	limit := launchlib.NewMemoryLimit(test.filesystem)
+	bytes, err := limit.MemoryLimitInBytes()
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2147483648), bytes)
+}
+
+func TestMemoryLimitV2(t *testing.T) {
+	test := struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		name: "memory limit v2",
+		filesystem: fstest.MapFS{
+			"proc/self/cgroup": &fstest.MapFile{
+				Data: []byte(CGroupV2Content),
+			},
+			"proc/self/mountinfo": &fstest.MapFile{
+				Data: []byte("28 21 0:25 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:13 - cgroup2 cgroup2 rw"),
+			},
+			"sys/fs/cgroup/user.slice/user-1000.slice/session-2.scope/memory.max": &fstest.MapFile{
+				Data: []byte("2147483648\n"),
+			},
+		},
+	}
+
+	limit := launchlib.NewMemoryLimit(test.filesystem)
+	bytes, err := limit.MemoryLimitInBytes()
+	require.NoError(t, err)
+	assert.Equal(t, uint64(2147483648), bytes)
+}
+
+func TestMemoryLimitV2Unlimited(t *testing.T) {
+	test := struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		name: "memory limit v2 unlimited",
+		filesystem: fstest.MapFS{
+			"proc/self/cgroup": &fstest.MapFile{
+				Data: []byte(CGroupV2Content),
+			},
+			"proc/self/mountinfo": &fstest.MapFile{
+				Data: []byte("28 21 0:25 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:13 - cgroup2 cgroup2 rw"),
+			},
+			"sys/fs/cgroup/user.slice/user-1000.slice/session-2.scope/memory.max": &fstest.MapFile{
+				Data: []byte("max\n"),
+			},
+		},
+	}
+
+	limit := launchlib.NewMemoryLimit(test.filesystem)
+	_, err := limit.MemoryLimitInBytes()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no memory limit set (unlimited)")
 }

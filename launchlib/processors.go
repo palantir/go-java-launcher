@@ -38,6 +38,15 @@ type ProcessorCounter interface {
 
 var defaultFS = os.DirFS("/")
 
+var DefaultProcessorCounter = NewProcessorCounter(defaultFS)
+
+func NewProcessorCounter(filesystem fs.FS) ProcessorCounter {
+	if IsCGroupV2(filesystem) {
+		return NewCGroupV2ProcessorCounter(filesystem)
+	}
+	return NewCGroupV1ProcessorCounter(filesystem)
+}
+
 var DefaultCGroupV1ProcessorCounter = CGroupV1ProcessorCounter{
 	cgroupPaths: NewCGroupV1Pather(defaultFS),
 	fs:          defaultFS,

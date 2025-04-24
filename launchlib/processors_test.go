@@ -31,6 +31,9 @@ var (
 	badCPUSharesContent  = []byte(``)
 )
 
+const MountInfoContentV1CPU = `28 21 0:25 / /sys/fs/cgroup/cpu rw,nosuid,nodev,noexec,relatime shared:13 - cgroup cgroup rw,cpu`
+const MountInfoContentV2 = `28 21 0:25 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:13 - cgroup2 cgroup2 rw`
+
 func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 	for _, test := range []struct {
 		name                   string
@@ -42,10 +45,10 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			name: "fails when unable to read cpu.shares",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1CPU),
 				},
 			},
 			expectedError: errors.New("unable to open cpu.shares at expected location"),
@@ -54,10 +57,10 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			name: "fails when unable to parse cpu.shares",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1CPU),
 				},
 				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
 					Data: badCPUSharesContent,
@@ -69,10 +72,10 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			name: "returns expected processor count when cpu.shares under 2 cores",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1CPU),
 				},
 				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
 					Data: lowCPUSharesContent,
@@ -84,10 +87,10 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			name: "returns expected processor count when cpu.shares over 2 cores",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
+					Data: []byte(CGroupV1Content),
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: []byte(MountInfoContentV1CPU),
 				},
 				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
 					Data: highCPUSharesContent,
@@ -108,4 +111,79 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			assert.Equal(t, test.expectedProcessorCount, processorCount)
 		})
 	}
+}
+
+func TestProcessorCountV1(t *testing.T) {
+	test := struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		name: "processor count v1",
+		filesystem: fstest.MapFS{
+			"proc/self/cgroup": &fstest.MapFile{
+				Data: []byte(CGroupV1Content),
+			},
+			"proc/self/mountinfo": &fstest.MapFile{
+				Data: []byte("28 21 0:25 / /sys/fs/cgroup/cpu rw,nosuid,nodev,noexec,relatime shared:13 - cgroup cgroup rw,cpu"),
+			},
+			"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
+				Data: []byte("2048\n"),
+			},
+		},
+	}
+
+	counter := launchlib.NewProcessorCounter(test.filesystem)
+	count, err := counter.ProcessorCount()
+	require.NoError(t, err)
+	assert.Equal(t, uint(2), count)
+}
+
+func TestProcessorCountV2(t *testing.T) {
+	test := struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		name: "processor count v2",
+		filesystem: fstest.MapFS{
+			"proc/self/cgroup": &fstest.MapFile{
+				Data: []byte(CGroupV2Content),
+			},
+			"proc/self/mountinfo": &fstest.MapFile{
+				Data: []byte("28 21 0:25 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:13 - cgroup2 cgroup2 rw"),
+			},
+			"sys/fs/cgroup/user.slice/user-1000.slice/session-2.scope/cpu.max": &fstest.MapFile{
+				Data: []byte("200000 100000\n"),
+			},
+		},
+	}
+
+	counter := launchlib.NewProcessorCounter(test.filesystem)
+	count, err := counter.ProcessorCount()
+	require.NoError(t, err)
+	assert.Equal(t, uint(2), count)
+}
+
+func TestProcessorCountV2Unlimited(t *testing.T) {
+	test := struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		name: "processor count v2 unlimited",
+		filesystem: fstest.MapFS{
+			"proc/self/cgroup": &fstest.MapFile{
+				Data: []byte(CGroupV2Content),
+			},
+			"proc/self/mountinfo": &fstest.MapFile{
+				Data: []byte("28 21 0:25 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:13 - cgroup2 cgroup2 rw"),
+			},
+			"sys/fs/cgroup/user.slice/user-1000.slice/session-2.scope/cpu.max": &fstest.MapFile{
+				Data: []byte("max 100000\n"),
+			},
+		},
+	}
+
+	counter := launchlib.NewProcessorCounter(test.filesystem)
+	_, err := counter.ProcessorCount()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no CPU quota set")
 }

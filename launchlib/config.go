@@ -79,6 +79,7 @@ type PrimaryCustomLauncherConfig struct {
 	CustomLauncherConfig `yaml:",inline"`
 	SubProcesses         map[string]CustomLauncherConfig `yaml:"subProcesses"`
 	CgroupsV1            map[string]string               `yaml:"cgroupsV1"`
+	CgroupsV2            map[string]string               `yaml:"cgroupsV2"`
 }
 
 type AllowedLauncherConfigValues struct {

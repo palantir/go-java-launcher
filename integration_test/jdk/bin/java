@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-trap 'echo "Caught SIGPOLL"' 29
+trap 'echo "Caught SIGUSR1"' USR1
 
 echo
 echo "main method"

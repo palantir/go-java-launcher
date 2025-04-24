@@ -171,13 +171,13 @@ func TestSubProcessesParsedMonitorSignals(t *testing.T) {
 	}
 
 	assert.NotZero(t, monitor, "no monitor pid found")
-	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGPOLL))
+	require.NoError(t, launchlib.SignalPid(monitor, syscall.SIGUSR1))
 
 	assert.NoError(t, cmd.Wait())
 
-	trapped, err := regexp.Compile("Caught SIGPOLL")
+	trapped, err := regexp.Compile("Caught SIGUSR1")
 	require.NoError(t, err)
-	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGPOLL was caught")
+	assert.Len(t, trapped.FindAll(output.Bytes(), -1), 2, "expect two messages that SIGUSR1 was caught")
 }
 
 func TestComputeJVMHeapSize(t *testing.T) {

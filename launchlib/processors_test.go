@@ -27,7 +27,7 @@ import (
 
 var (
 	lowCPUSharesContent  = []byte("100\n")
-	highCPUSharesContent = []byte("10000\n")
+	highCPUSharesContent = []byte("1000\n")
 	badCPUSharesContent  = []byte(``)
 )
 
@@ -93,7 +93,7 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 					Data: highCPUSharesContent,
 				},
 			},
-			expectedProcessorCount: 9,
+			expectedProcessorCount: 10,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {

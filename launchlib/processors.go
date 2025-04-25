@@ -29,7 +29,7 @@ import (
 
 const (
 	cpuGroupName  = CGroupName("cpu")
-	cpuSharesName = "cpu.shares"
+	cpuSharesName = "cpu.weight"
 )
 
 type ProcessorCounter interface {
@@ -73,7 +73,7 @@ func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
 	}
 
 	virtualCPUs := runtime.NumCPU()
-	cpuShareCPUs := math.Floor(float64(cpuShares / 1024))
+	cpuShareCPUs := math.Floor(float64(cpuShares / 100))
 
 	// We think we will be better off providing >1 cores in cases where the underlying host has multiple CPUs to ensure
 	// smaller applications don't get blocked by too few GC threads, as well as issues in many concurrent data-structures

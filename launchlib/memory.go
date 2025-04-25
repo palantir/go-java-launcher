@@ -27,7 +27,7 @@ import (
 
 const (
 	memGroupName = "memory"
-	memLimitName = "memory.limit_in_bytes"
+	memLimitName = "memory.max"
 )
 
 type MemoryLimit interface {

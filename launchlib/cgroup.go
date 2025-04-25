@@ -125,7 +125,12 @@ func (c CGroupV2Pather) Path(name CGroupName) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to open mountinfo file")
 	}
-	defer mountinfo.Close()
+	var closeErr error
+	defer func() {
+		if cerr := mountinfo.Close(); cerr != nil && err == nil {
+			closeErr = errors.Wrap(cerr, "failed to close mountinfo file")
+		}
+	}()
 
 	// Read and parse mountinfo to find cgroup2 mount point
 	content, err := io.ReadAll(mountinfo)
@@ -172,7 +177,11 @@ func (c CGroupV2Pather) Path(name CGroupName) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to read available controllers")
 	}
-	defer controllers.Close()
+	defer func() {
+		if cerr := controllers.Close(); cerr != nil && err == nil {
+			closeErr = errors.Wrap(cerr, "failed to close controllers file")
+		}
+	}()
 
 	content, err = io.ReadAll(controllers)
 	if err != nil {
@@ -189,6 +198,10 @@ func (c CGroupV2Pather) Path(name CGroupName) (string, error) {
 
 	if !found {
 		return "", errors.Errorf("controller %q not enabled in cgroup v2 hierarchy", name)
+	}
+
+	if closeErr != nil {
+		return "", closeErr
 	}
 
 	// In cgroup v2, all controllers are mounted at the unified hierarchy root

@@ -28,6 +28,8 @@ import (
 const (
 	memGroupName = "memory"
 	memLimitName = "memory.max"
+	// DefaultMemoryBytes is the default memory limit in bytes (2GB).
+	DefaultMemoryBytes = 2 * 1024 * 1024 * 1024
 )
 
 type MemoryLimit interface {
@@ -59,7 +61,12 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to open memory.max at expected location: %s", memLimitFilepath)
 	}
-	defer memLimitFile.Close()
+	var closeErr error
+	defer func() {
+		if cerr := memLimitFile.Close(); cerr != nil && err == nil {
+			closeErr = errors.Wrap(cerr, "failed to close memory.max")
+		}
+	}()
 
 	memLimitBytes, err := io.ReadAll(memLimitFile)
 	if err != nil {
@@ -69,5 +76,65 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 	if err != nil {
 		return 0, errors.New("unable to convert memory.max value to expected type")
 	}
+
+	if closeErr != nil {
+		return 0, closeErr
+	}
+
 	return uint64(memLimit), nil
+}
+
+// MemoryLimiter provides functionality to get memory limits from cgroup v2.
+type MemoryLimiter interface {
+	MemoryLimit() (uint64, error)
+}
+
+// DefaultMemoryLimiter is the default MemoryLimiter that uses the system's cgroup v2.
+var DefaultMemoryLimiter = NewMemoryLimiter(DefaultCGroupPather)
+
+type memoryLimiter struct {
+	pather CGroupPather
+}
+
+// NewMemoryLimiter creates a new MemoryLimiter that uses the given CGroupPather.
+func NewMemoryLimiter(pather CGroupPather) MemoryLimiter {
+	return &memoryLimiter{pather: pather}
+}
+
+// MemoryLimit returns the memory limit in bytes from cgroup v2's memory.max file.
+// If the limit cannot be read or parsed, returns DefaultMemoryBytes.
+func (m *memoryLimiter) MemoryLimit() (uint64, error) {
+	cgroupPath, err := m.pather.Path("memory")
+	if err != nil {
+		return DefaultMemoryBytes, errors.Wrap(err, "failed to get cgroup path")
+	}
+
+	memLimitFile, err := os.Open(filepath.Join(cgroupPath, "memory.max"))
+	if err != nil {
+		return DefaultMemoryBytes, errors.Wrap(err, "failed to open memory.max")
+	}
+	var closeErr error
+	defer func() {
+		if cerr := memLimitFile.Close(); cerr != nil && err == nil {
+			closeErr = errors.Wrap(cerr, "failed to close memory.max")
+		}
+	}()
+
+	content, err := io.ReadAll(memLimitFile)
+	if err != nil {
+		return DefaultMemoryBytes, errors.Wrap(err, "failed to read memory.max")
+	}
+
+	// Parse the memory limit value
+	memStr := strings.TrimSpace(string(content))
+	memBytes, err := strconv.ParseUint(memStr, 10, 64)
+	if err != nil {
+		return DefaultMemoryBytes, errors.Wrap(err, "failed to parse memory.max")
+	}
+
+	if closeErr != nil {
+		return DefaultMemoryBytes, closeErr
+	}
+
+	return memBytes, nil
 }

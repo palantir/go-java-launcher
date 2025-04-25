@@ -30,10 +30,14 @@ import (
 const (
 	cpuGroupName  = CGroupName("cpu")
 	cpuWeightName = "cpu.weight"
+	// DefaultProcessorCount is the default number of processors (2).
+	DefaultProcessorCount = 2
+	// WeightPerProcessor is the CPU weight per processor in cgroup v2 (100).
+	WeightPerProcessor = 100
 )
 
 type ProcessorCounter interface {
-	ProcessorCount() (uint, error)
+	ProcessorCount() (int, error)
 }
 
 var defaultFS = os.DirFS("/")
@@ -49,35 +53,45 @@ func NewCGroupProcessorCounter(filesystem fs.FS) ProcessorCounter {
 	return CGroupProcessorCounter{cgroupPaths: NewCGroupV2Pather(filesystem), fs: filesystem}
 }
 
-func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
+func (c CGroupProcessorCounter) ProcessorCount() (int, error) {
 	cpuCgroupPath, err := c.cgroupPaths.Path(cpuGroupName)
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to get path to cpu cgroup")
+		return DefaultProcessorCount, errors.Wrap(err, "failed to get path to cpu cgroup")
 	}
 
 	cpuWeightFilepath := filepath.Join(cpuCgroupPath, cpuWeightName)
 	cpuWeightFile, err := c.fs.Open(convertToFSPath(cpuWeightFilepath))
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to open cpu.weight at expected location: %s", cpuWeightFilepath)
+		return DefaultProcessorCount, errors.Wrapf(err, "unable to open cpu.weight at expected location: %s", cpuWeightFilepath)
 	}
-	defer cpuWeightFile.Close()
+	var closeErr error
+	defer func() {
+		if cerr := cpuWeightFile.Close(); cerr != nil && err == nil {
+			closeErr = errors.Wrap(cerr, "failed to close cpu.weight")
+		}
+	}()
 
 	cpuWeightBytes, err := io.ReadAll(cpuWeightFile)
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to read cpu.weight")
+		return DefaultProcessorCount, errors.Wrapf(err, "unable to read cpu.weight")
 	}
 	cpuWeight, err := strconv.Atoi(strings.TrimSpace(string(cpuWeightBytes)))
 	if err != nil {
-		return 0, errors.New("unable to convert cpu.weight value to expected type")
+		return DefaultProcessorCount, errors.New("unable to convert cpu.weight value to expected type")
 	}
 
-	// Convert weight to equivalent shares value
-	// cpu.weight range is 1-10000, while cpu.shares was 2-262144
-	// conversion: shares = (weight * 262144) / 10000
-	cpuShares := int(float64(cpuWeight) * 262144.0 / 10000.0)
+	if closeErr != nil {
+		return DefaultProcessorCount, closeErr
+	}
+
+	// Convert weight to processor count (weight of 100 = 1 processor)
+	processors := cpuWeight / WeightPerProcessor
+	if processors < 1 {
+		processors = 1
+	}
 
 	virtualCPUs := runtime.NumCPU()
-	cpuShareCPUs := math.Floor(float64(cpuShares / 100))
+	cpuShareCPUs := math.Floor(float64(processors / 100))
 
 	// We think we will be better off providing >1 cores in cases where the underlying host has multiple CPUs to ensure
 	// smaller applications don't get blocked by too few GC threads, as well as issues in many concurrent data-structures
@@ -86,5 +100,5 @@ func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 	if virtualCPUs == 1 {
 		return 1, nil
 	}
-	return uint(math.Max(2.0, math.Min(cpuShareCPUs, float64(virtualCPUs)))), nil
+	return int(math.Max(2.0, math.Min(cpuShareCPUs, float64(virtualCPUs)))), nil
 }

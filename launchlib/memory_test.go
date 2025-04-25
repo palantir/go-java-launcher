@@ -58,7 +58,7 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 				"proc/self/mountinfo": &fstest.MapFile{
 					Data: MountInfoContent,
 				},
-				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+				"sys/fs/cgroup/memory/memory.max": &fstest.MapFile{
 					Data: badMemoryLimitContent,
 				},
 			},
@@ -73,7 +73,7 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 				"proc/self/mountinfo": &fstest.MapFile{
 					Data: MountInfoContent,
 				},
-				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+				"sys/fs/cgroup/memory/memory.max": &fstest.MapFile{
 					Data: memoryLimitContent,
 				},
 			},

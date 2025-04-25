@@ -59,7 +59,7 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 				"proc/self/mountinfo": &fstest.MapFile{
 					Data: MountInfoContent,
 				},
-				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
+				"sys/fs/cgroup/cpu/cpu.weight": &fstest.MapFile{
 					Data: badCPUSharesContent,
 				},
 			},
@@ -74,7 +74,7 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 				"proc/self/mountinfo": &fstest.MapFile{
 					Data: MountInfoContent,
 				},
-				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
+				"sys/fs/cgroup/cpu/cpu.weight": &fstest.MapFile{
 					Data: lowCPUSharesContent,
 				},
 			},
@@ -89,7 +89,7 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 				"proc/self/mountinfo": &fstest.MapFile{
 					Data: MountInfoContent,
 				},
-				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{
+				"sys/fs/cgroup/cpu/cpu.weight": &fstest.MapFile{
 					Data: highCPUSharesContent,
 				},
 			},

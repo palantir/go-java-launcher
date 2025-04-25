@@ -29,7 +29,7 @@ import (
 
 const (
 	cpuGroupName  = CGroupName("cpu")
-	cpuSharesName = "cpu.weight"
+	cpuWeightName = "cpu.weight"
 )
 
 type ProcessorCounter interface {
@@ -38,39 +38,43 @@ type ProcessorCounter interface {
 
 var defaultFS = os.DirFS("/")
 
-var DefaultCGroupV1ProcessorCounter = CGroupV1ProcessorCounter{
-	cgroupPaths: NewCGroupV2Pather(defaultFS),
-	fs:          defaultFS,
-}
+var DefaultProcessorCounter = NewCGroupProcessorCounter(defaultFS)
 
-type CGroupV1ProcessorCounter struct {
+type CGroupProcessorCounter struct {
 	cgroupPaths CGroupPather
 	fs          fs.FS
 }
 
-func NewCGroupV1ProcessorCounter(filesystem fs.FS) ProcessorCounter {
-	return CGroupV1ProcessorCounter{cgroupPaths: NewCGroupV2Pather(filesystem), fs: filesystem}
+func NewCGroupProcessorCounter(filesystem fs.FS) ProcessorCounter {
+	return CGroupProcessorCounter{cgroupPaths: NewCGroupV2Pather(filesystem), fs: filesystem}
 }
 
-func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
+func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 	cpuCgroupPath, err := c.cgroupPaths.Path(cpuGroupName)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get path to cpu cgroup")
 	}
 
-	cpuSharesFilepath := filepath.Join(cpuCgroupPath, cpuSharesName)
-	cpuSharesFile, err := c.fs.Open(convertToFSPath(cpuSharesFilepath))
+	cpuWeightFilepath := filepath.Join(cpuCgroupPath, cpuWeightName)
+	cpuWeightFile, err := c.fs.Open(convertToFSPath(cpuWeightFilepath))
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to open cpu.shares at expected location: %s", cpuSharesFilepath)
+		return 0, errors.Wrapf(err, "unable to open cpu.weight at expected location: %s", cpuWeightFilepath)
 	}
-	cpuShareBytes, err := io.ReadAll(cpuSharesFile)
+	defer cpuWeightFile.Close()
+
+	cpuWeightBytes, err := io.ReadAll(cpuWeightFile)
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to read cpu.shares")
+		return 0, errors.Wrapf(err, "unable to read cpu.weight")
 	}
-	cpuShares, err := strconv.Atoi(strings.TrimSpace(string(cpuShareBytes)))
+	cpuWeight, err := strconv.Atoi(strings.TrimSpace(string(cpuWeightBytes)))
 	if err != nil {
-		return 0, errors.New("unable to convert cpu.shares value to expected type")
+		return 0, errors.New("unable to convert cpu.weight value to expected type")
 	}
+
+	// Convert weight to equivalent shares value
+	// cpu.weight range is 1-10000, while cpu.shares was 2-262144
+	// conversion: shares = (weight * 262144) / 10000
+	cpuShares := int(float64(cpuWeight) * 262144.0 / 10000.0)
 
 	virtualCPUs := runtime.NumCPU()
 	cpuShareCPUs := math.Floor(float64(cpuShares / 100))

@@ -30,7 +30,7 @@ var (
 	badMemoryLimitContent = []byte(``)
 )
 
-func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
+func TestMemoryLimit(t *testing.T) {
 	for _, test := range []struct {
 		name                string
 		filesystem          fs.FS
@@ -38,42 +38,33 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 		expectedError       error
 	}{
 		{
-			name: "fails when unable to read memory.limit_in_bytes",
+			name: "fails when unable to read memory.max",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
 			},
-			expectedError: errors.New("unable to open memory.limit_in_bytes at expected location"),
+			expectedError: errors.New("unable to open memory.max at expected location"),
 		},
 		{
-			name: "fails when unable to parse memory.limit_in_bytes",
+			name: "fails when unable to parse memory.max",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/memory/memory.max": &fstest.MapFile{
+				"sys/fs/cgroup/memory.max": &fstest.MapFile{
 					Data: badMemoryLimitContent,
 				},
 			},
-			expectedError: errors.New("unable to convert memory.limit_in_bytes value to expected type"),
+			expectedError: errors.New("unable to convert memory.max value to expected type"),
 		},
 		{
-			name: "returns expected RAM percentage when memory.limit_in_bytes under 2 GiB",
+			name: "returns expected RAM percentage when memory.max under 2 GiB",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/memory/memory.max": &fstest.MapFile{
+				"sys/fs/cgroup/memory.max": &fstest.MapFile{
 					Data: memoryLimitContent,
 				},
 			},

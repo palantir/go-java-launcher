@@ -26,12 +26,14 @@ import (
 )
 
 var (
-	lowCPUSharesContent  = []byte("100\n")
-	highCPUSharesContent = []byte("1000\n")
-	badCPUSharesContent  = []byte(``)
+	// cpu.weight range is 1-10000, while cpu.shares was 2-262144
+	// conversion: weight = (shares * 10000) / 262144
+	lowCPUWeightContent  = []byte("3814\n")  // ~100 shares
+	highCPUWeightContent = []byte("38146\n") // ~1000 shares
+	badCPUWeightContent  = []byte(``)
 )
 
-func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
+func TestProcessorCounter(t *testing.T) {
 	for _, test := range []struct {
 		name                   string
 		filesystem             fs.FS
@@ -39,65 +41,53 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 		expectedError          error
 	}{
 		{
-			name: "fails when unable to read cpu.shares",
+			name: "fails when unable to read cpu.weight",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
 			},
-			expectedError: errors.New("unable to open cpu.shares at expected location"),
+			expectedError: errors.New("unable to open cpu.weight at expected location"),
 		},
 		{
-			name: "fails when unable to parse cpu.shares",
+			name: "fails when unable to parse cpu.weight",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/cpu/cpu.weight": &fstest.MapFile{
-					Data: badCPUSharesContent,
+				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{
+					Data: badCPUWeightContent,
 				},
 			},
-			expectedError: errors.New("unable to convert cpu.shares value to expected type"),
+			expectedError: errors.New("unable to convert cpu.weight value to expected type"),
 		},
 		{
-			name: "returns expected processor count when cpu.shares under 2 cores",
+			name: "returns expected processor count when cpu.weight under 2 cores equivalent",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/cpu/cpu.weight": &fstest.MapFile{
-					Data: lowCPUSharesContent,
+				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{
+					Data: lowCPUWeightContent,
 				},
 			},
 			expectedProcessorCount: 2,
 		},
 		{
-			name: "returns expected processor count when cpu.shares over 2 cores",
+			name: "returns expected processor count when cpu.weight over 2 cores equivalent",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/cpu/cpu.weight": &fstest.MapFile{
-					Data: highCPUSharesContent,
+				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{
+					Data: highCPUWeightContent,
 				},
 			},
 			expectedProcessorCount: 10,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			counter := launchlib.NewCGroupV1ProcessorCounter(test.filesystem)
+			counter := launchlib.NewCGroupProcessorCounter(test.filesystem)
 			processorCount, err := counter.ProcessorCount()
 			if test.expectedError != nil {
 				require.Error(t, err)

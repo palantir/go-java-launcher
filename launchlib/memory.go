@@ -57,15 +57,17 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 	memLimitFilepath := filepath.Join(memoryCGroupPath, memLimitName)
 	memLimitFile, err := c.fs.Open(convertToFSPath(memLimitFilepath))
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", memLimitFilepath)
+		return 0, errors.Wrapf(err, "unable to open memory.max at expected location: %s", memLimitFilepath)
 	}
+	defer memLimitFile.Close()
+
 	memLimitBytes, err := io.ReadAll(memLimitFile)
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to read memory.limit_in_bytes")
+		return 0, errors.Wrapf(err, "unable to read memory.max")
 	}
 	memLimit, err := strconv.Atoi(strings.TrimSpace(string(memLimitBytes)))
 	if err != nil {
-		return 0, errors.New("unable to convert memory.limit_in_bytes value to expected type")
+		return 0, errors.New("unable to convert memory.max value to expected type")
 	}
 	return uint64(memLimit), nil
 }

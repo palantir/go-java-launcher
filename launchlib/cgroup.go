@@ -109,3 +109,17 @@ func convertToFSPath(path string) string {
 	// https://pkg.go.dev/io/fs#ValidPath
 	return strings.TrimPrefix(path, "/")
 }
+
+type CGroupV2Pather struct {
+	fs fs.FS
+}
+
+func NewCGroupV2Pather(filesystem fs.FS) CGroupPather {
+	return CGroupV2Pather{fs: filesystem}
+}
+
+// Path implements CGroupPather
+func (c CGroupV2Pather) Path(name CGroupName) (string, error) {
+	// In cgroupv2, all controllers are mounted under a single unified hierarchy
+	return "/sys/fs/cgroup", nil
+}

@@ -43,7 +43,7 @@ type CGroupMemoryLimit struct {
 
 func NewCGroupMemoryLimit(filesystem fs.FS) MemoryLimit {
 	return CGroupMemoryLimit{
-		pather: NewCGroupV1Pather(filesystem),
+		pather: NewCGroupV2Pather(filesystem),
 		fs:     filesystem,
 	}
 }

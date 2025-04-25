@@ -39,7 +39,7 @@ type ProcessorCounter interface {
 var defaultFS = os.DirFS("/")
 
 var DefaultCGroupV1ProcessorCounter = CGroupV1ProcessorCounter{
-	cgroupPaths: NewCGroupV1Pather(defaultFS),
+	cgroupPaths: NewCGroupV2Pather(defaultFS),
 	fs:          defaultFS,
 }
 
@@ -49,7 +49,7 @@ type CGroupV1ProcessorCounter struct {
 }
 
 func NewCGroupV1ProcessorCounter(filesystem fs.FS) ProcessorCounter {
-	return CGroupV1ProcessorCounter{cgroupPaths: NewCGroupV1Pather(filesystem), fs: filesystem}
+	return CGroupV1ProcessorCounter{cgroupPaths: NewCGroupV2Pather(filesystem), fs: filesystem}
 }
 
 func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {

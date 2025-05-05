@@ -3,6 +3,7 @@ package launchlib
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -13,8 +14,9 @@ import (
 )
 
 const (
-	selfCGroup    = "/proc/self/cgroup"
-	selfMountinfo = "/proc/self/mountinfo"
+	selfCGroup      = "/proc/self/cgroup"
+	selfMountinfo   = "/proc/self/mountinfo"
+	procFilesystems = "/proc/filesystems"
 )
 
 type CGroupName string
@@ -25,6 +27,21 @@ type CGroupPather interface {
 
 var DefaultCGroupV1Pather = CGroupV1Pather{
 	fs: os.DirFS("/"),
+}
+
+func IsCGroupV2(filesystem fs.FS) (bool, error) {
+	file, err := filesystem.Open(convertToFSPath(procFilesystems))
+	if err != nil {
+		return false, fmt.Errorf("failed to open %s: %w", procFilesystems, err)
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return false, fmt.Errorf("failed to read %s: %w", procFilesystems, err)
+	}
+
+	return bytes.Contains(data, []byte("cgroup2")), nil
 }
 
 type CGroupV1Pather struct {

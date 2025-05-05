@@ -29,6 +29,10 @@ var DefaultCGroupV1Pather = CGroupV1Pather{
 	fs: os.DirFS("/"),
 }
 
+var DefaultCGroupV2Pather = CGroupV2Pather{
+	fs: os.DirFS("/"),
+}
+
 func IsCGroupV2(filesystem fs.FS) (bool, error) {
 	file, err := filesystem.Open(convertToFSPath(procFilesystems))
 	if err != nil {
@@ -117,6 +121,20 @@ func (c CGroupV1Pather) getCGroupPath(r io.Reader, name CGroupName) (string, err
 		}
 	}
 	return "", errors.Errorf("unable to find cgroup mount path for module %s in cgroup entries", name)
+}
+
+type CGroupV2Pather struct {
+	fs fs.FS
+}
+
+func NewCGroupV2Pather(filesystem fs.FS) CGroupPather {
+	return CGroupV2Pather{fs: filesystem}
+}
+
+func (c CGroupV2Pather) Path(name CGroupName) (string, error) {
+	// In cgroup v2, all cgroups are mounted under /sys/fs/cgroup
+	// The memory cgroup is mounted at /sys/fs/cgroup/memory.max
+	return "/sys/fs/cgroup", nil
 }
 
 func convertToFSPath(path string) string {

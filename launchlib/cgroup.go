@@ -3,7 +3,6 @@ package launchlib
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -35,13 +34,15 @@ var DefaultCGroupV2Pather = CGroupV2Pather{
 func IsCGroupV2(filesystem fs.FS) (bool, error) {
 	file, err := filesystem.Open(convertToFSPath(selfMountinfo))
 	if err != nil {
-		return false, fmt.Errorf("failed to open %s: %w", selfMountinfo, err)
+		return false, errors.Wrapf(err, "failed to open %s", selfMountinfo)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return false, fmt.Errorf("failed to read %s: %w", selfMountinfo, err)
+		return false, errors.Wrapf(err, "failed to read %s", selfMountinfo)
 	}
 
 	return bytes.Contains(data, []byte("cgroup2")), nil

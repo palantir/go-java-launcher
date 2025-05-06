@@ -37,7 +37,6 @@ func TestMemoryLimit_CGroupV1(t *testing.T) {
 		expectedMemoryLimit uint64
 		expectedError       error
 	}{
-
 		{
 			name: "cgroupv1 fails when unable to read memory.limit_in_bytes",
 			filesystem: fstest.MapFS{
@@ -65,7 +64,6 @@ func TestMemoryLimit_CGroupV1(t *testing.T) {
 			},
 			expectedError: errors.New("unable to convert memory limit value to expected type"),
 		},
-
 		{
 			name: "cgroupv1 returns expected RAM percentage when memory.limit_in_bytes under 2 GiB",
 			filesystem: fstest.MapFS{
@@ -83,7 +81,8 @@ func TestMemoryLimit_CGroupV1(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			limit := launchlib.NewCGroupMemoryLimit(test.filesystem)
+			limit, err := launchlib.NewCGroupMemoryLimit(test.filesystem)
+			require.NoError(t, err)
 			memoryLimit, err := limit.MemoryLimitInBytes()
 			if test.expectedError != nil {
 				require.Error(t, err)
@@ -150,7 +149,8 @@ func TestMemoryLimit_CGroupV2(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			limit := launchlib.NewCGroupMemoryLimit(test.filesystem)
+			limit, err := launchlib.NewCGroupMemoryLimit(test.filesystem)
+			require.NoError(t, err)
 			memoryLimit, err := limit.MemoryLimitInBytes()
 			if test.expectedError != nil {
 				require.Error(t, err)

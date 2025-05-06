@@ -17,8 +17,6 @@ package launchlib
 import (
 	"io"
 	"io/fs"
-	"log"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,32 +34,27 @@ type MemoryLimit interface {
 	MemoryLimitInBytes() (uint64, error)
 }
 
-var DefaultMemoryLimit = NewCGroupMemoryLimit(os.DirFS("/"))
-
 type CGroupMemoryLimit struct {
 	pather CGroupPather
 	fs     fs.FS
 }
 
-func NewCGroupMemoryLimit(filesystem fs.FS) MemoryLimit {
+func NewCGroupMemoryLimit(filesystem fs.FS) (MemoryLimit, error) {
 	isCGroupV2, err := IsCGroupV2(filesystem)
 	if err != nil {
-		return CGroupMemoryLimit{}
+		return CGroupMemoryLimit{}, errors.Wrap(err, "failed to determine cgroup version")
 	}
 
 	if isCGroupV2 {
-		log.Println("Using cgroupv2 memory limit")
 		return CGroupMemoryLimit{
-			pather: NewCGroupV2Pather(filesystem),
+			pather: NewCGroupV2Pather(),
 			fs:     filesystem,
-		}
+		}, nil
 	}
-	log.Println("Using cgroupv1 memory limit")
 	return CGroupMemoryLimit{
 		pather: NewCGroupV1Pather(filesystem),
 		fs:     filesystem,
-	}
-
+	}, nil
 }
 
 func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {

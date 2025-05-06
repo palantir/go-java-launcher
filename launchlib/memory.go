@@ -70,16 +70,22 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 		return 0, errors.Wrap(err, "failed to get memory cgroup path")
 	}
 
-	memLimitBytes, err := c.readCGroupV1MemoryLimit(memoryCGroupPath)
+	isCGroupV2, err := IsCGroupV2(c.fs)
 	if err != nil {
-		log.Println("failed to get cgroupv1 memory limit, trying cgroupv2")
-		// If v1 fails, try v2
+		return 0, errors.Wrap(err, "failed to determine cgroup version")
+	}
+
+	var memLimitBytes []byte
+	if isCGroupV2 {
 		memLimitBytes, err = c.readCGroupV2MemoryLimit(memoryCGroupPath)
 		if err != nil {
-			log.Println("failed to get cgroupv2 memory limit, returning 0")
-			return 0, errors.Wrap(err, "failed to read memory limit from both cgroup v1 and v2")
+			return 0, errors.Wrapf(err, "failed to get cgroupv2 memory limit")
 		}
-		log.Println("successfully got cgroupv2 memory limit")
+	} else {
+		memLimitBytes, err = c.readCGroupV1MemoryLimit(memoryCGroupPath)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get cgroupv1 memory limit")
+		}
 	}
 
 	memLimitStr := strings.TrimSpace(string(memLimitBytes))

@@ -14,9 +14,8 @@ import (
 )
 
 const (
-	selfCGroup      = "/proc/self/cgroup"
-	selfMountinfo   = "/proc/self/mountinfo"
-	procFilesystems = "/proc/filesystems"
+	selfCGroup    = "/proc/self/cgroup"
+	selfMountinfo = "/proc/self/mountinfo"
 )
 
 type CGroupName string
@@ -34,15 +33,15 @@ var DefaultCGroupV2Pather = CGroupV2Pather{
 }
 
 func IsCGroupV2(filesystem fs.FS) (bool, error) {
-	file, err := filesystem.Open(convertToFSPath(procFilesystems))
+	file, err := filesystem.Open(convertToFSPath(selfMountinfo))
 	if err != nil {
-		return false, fmt.Errorf("failed to open %s: %w", procFilesystems, err)
+		return false, fmt.Errorf("failed to open %s: %w", selfMountinfo, err)
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return false, fmt.Errorf("failed to read %s: %w", procFilesystems, err)
+		return false, fmt.Errorf("failed to read %s: %w", selfMountinfo, err)
 	}
 
 	return bytes.Contains(data, []byte("cgroup2")), nil

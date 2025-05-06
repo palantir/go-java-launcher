@@ -30,7 +30,73 @@ var (
 	badMemoryLimitContent = []byte(``)
 )
 
-func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
+func TestMemoryLimit_CGroupV1(t *testing.T) {
+	for _, test := range []struct {
+		name                string
+		filesystem          fs.FS
+		expectedMemoryLimit uint64
+		expectedError       error
+	}{
+
+		{
+			name: "cgroupv1 fails when unable to read memory.limit_in_bytes",
+			filesystem: fstest.MapFS{
+				"proc/self/cgroup": &fstest.MapFile{
+					Data: CGroupContent,
+				},
+				"proc/self/mountinfo": &fstest.MapFile{
+					Data: CGroupV1MountInfoContent,
+				},
+			},
+			expectedError: errors.New("unable to open memory.limit_in_bytes at expected location"),
+		},
+		{
+			name: "cgroupv1 fails when unable to parse memory.limit_in_bytes",
+			filesystem: fstest.MapFS{
+				"proc/self/cgroup": &fstest.MapFile{
+					Data: CGroupContent,
+				},
+				"proc/self/mountinfo": &fstest.MapFile{
+					Data: CGroupV1MountInfoContent,
+				},
+				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+					Data: badMemoryLimitContent,
+				},
+			},
+			expectedError: errors.New("unable to convert memory limit value to expected type"),
+		},
+
+		{
+			name: "cgroupv1 returns expected RAM percentage when memory.limit_in_bytes under 2 GiB",
+			filesystem: fstest.MapFS{
+				"proc/self/cgroup": &fstest.MapFile{
+					Data: CGroupContent,
+				},
+				"proc/self/mountinfo": &fstest.MapFile{
+					Data: CGroupV1MountInfoContent,
+				},
+				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+					Data: memoryLimitContent,
+				},
+			},
+			expectedMemoryLimit: 1 << 31,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			limit := launchlib.NewCGroupMemoryLimit(test.filesystem)
+			memoryLimit, err := limit.MemoryLimitInBytes()
+			if test.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError.Error())
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedMemoryLimit, memoryLimit)
+		})
+	}
+}
+
+func TestMemoryLimit_CGroupV2(t *testing.T) {
 	for _, test := range []struct {
 		name                string
 		filesystem          fs.FS
@@ -38,46 +104,49 @@ func TestMemoryLimit_DefaultMemoryLimit(t *testing.T) {
 		expectedError       error
 	}{
 		{
-			name: "fails when unable to read memory.limit_in_bytes",
+			name: "cgroupv2 fails when unable to read memory.max",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
 			},
-			expectedError: errors.New("unable to open memory.limit_in_bytes at expected location"),
+			expectedError: errors.New("unable to open memory.max at expected location"),
 		},
 		{
-			name: "fails when unable to parse memory.limit_in_bytes",
+			name: "cgroupv2 fails when unable to parse memory.max",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+				"sys/fs/cgroup/memory.max": &fstest.MapFile{
 					Data: badMemoryLimitContent,
 				},
 			},
-			expectedError: errors.New("unable to convert memory.limit_in_bytes value to expected type"),
+			expectedError: errors.New("unable to convert memory limit value to expected type"),
 		},
 		{
-			name: "returns expected RAM percentage when memory.limit_in_bytes under 2 GiB",
+			name: "cgroupv2 returns expected RAM when memory.max is set",
 			filesystem: fstest.MapFS{
-				"proc/self/cgroup": &fstest.MapFile{
-					Data: CGroupContent,
-				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV2MountInfoContent,
 				},
-				"sys/fs/cgroup/memory/memory.limit_in_bytes": &fstest.MapFile{
+				"sys/fs/cgroup/memory.max": &fstest.MapFile{
 					Data: memoryLimitContent,
 				},
 			},
 			expectedMemoryLimit: 1 << 31,
+		},
+		{
+			name: "cgroupv2 fails when memory.max is 'max'",
+			filesystem: fstest.MapFS{
+				"proc/self/mountinfo": &fstest.MapFile{
+					Data: CGroupV2MountInfoContent,
+				},
+				"sys/fs/cgroup/memory.max": &fstest.MapFile{
+					Data: []byte("max\n"),
+				},
+			},
+			expectedError: errors.New("memory limit is set to max"),
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {

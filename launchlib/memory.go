@@ -55,13 +55,13 @@ func NewCGroupMemoryLimit(filesystem fs.FS) MemoryLimit {
 			pather: NewCGroupV2Pather(filesystem),
 			fs:     filesystem,
 		}
-	} else {
-		log.Println("Using cgroupv1 memory limit")
-		return CGroupMemoryLimit{
-			pather: NewCGroupV1Pather(filesystem),
-			fs:     filesystem,
-		}
 	}
+	log.Println("Using cgroupv1 memory limit")
+	return CGroupMemoryLimit{
+		pather: NewCGroupV1Pather(filesystem),
+		fs:     filesystem,
+	}
+
 }
 
 func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {

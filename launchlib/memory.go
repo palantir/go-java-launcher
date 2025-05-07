@@ -17,7 +17,6 @@ package launchlib
 import (
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -26,26 +25,44 @@ import (
 )
 
 const (
-	memGroupName = "memory"
-	memLimitName = "memory.limit_in_bytes"
+	memGroupName         = "memory"
+	cgroupV1MemLimitName = "memory.limit_in_bytes"
+	cgroupV2MemLimitName = "memory.max"
 )
 
 type MemoryLimit interface {
 	MemoryLimitInBytes() (uint64, error)
+	IsCGroupV2() bool
 }
-
-var DefaultMemoryLimit = NewCGroupMemoryLimit(os.DirFS("/"))
 
 type CGroupMemoryLimit struct {
-	pather CGroupPather
-	fs     fs.FS
+	pather     CGroupPather
+	fs         fs.FS
+	isCGroupV2 bool
 }
 
-func NewCGroupMemoryLimit(filesystem fs.FS) MemoryLimit {
-	return CGroupMemoryLimit{
-		pather: NewCGroupV1Pather(filesystem),
-		fs:     filesystem,
+func NewCGroupMemoryLimit(filesystem fs.FS) (MemoryLimit, error) {
+	isCGroupV2, err := IsCGroupV2(filesystem)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine cgroup version")
 	}
+
+	if isCGroupV2 {
+		return CGroupMemoryLimit{
+			pather:     NewCGroupV2Pather(),
+			fs:         filesystem,
+			isCGroupV2: true,
+		}, nil
+	}
+	return CGroupMemoryLimit{
+		pather:     NewCGroupV1Pather(filesystem),
+		fs:         filesystem,
+		isCGroupV2: false,
+	}, nil
+}
+
+func (c CGroupMemoryLimit) IsCGroupV2() bool {
+	return c.isCGroupV2
 }
 
 func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
@@ -54,18 +71,59 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 		return 0, errors.Wrap(err, "failed to get memory cgroup path")
 	}
 
-	memLimitFilepath := filepath.Join(memoryCGroupPath, memLimitName)
-	memLimitFile, err := c.fs.Open(convertToFSPath(memLimitFilepath))
-	if err != nil {
-		return 0, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", memLimitFilepath)
+	var memLimitBytes []byte
+	if c.isCGroupV2 {
+		memLimitBytes, err = c.readCGroupV2MemoryLimit(memoryCGroupPath)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get cgroupv2 memory limit")
+		}
+	} else {
+		memLimitBytes, err = c.readCGroupV1MemoryLimit(memoryCGroupPath)
+		if err != nil {
+			return 0, errors.Wrapf(err, "failed to get cgroupv1 memory limit")
+		}
 	}
-	memLimitBytes, err := io.ReadAll(memLimitFile)
-	if err != nil {
-		return 0, errors.Wrapf(err, "unable to read memory.limit_in_bytes")
+
+	memLimitStr := strings.TrimSpace(string(memLimitBytes))
+	if memLimitStr == "max" {
+		return 0, errors.New("memory limit is set to max")
 	}
-	memLimit, err := strconv.Atoi(strings.TrimSpace(string(memLimitBytes)))
+
+	memLimit, err := strconv.Atoi(memLimitStr)
 	if err != nil {
-		return 0, errors.New("unable to convert memory.limit_in_bytes value to expected type")
+		return 0, errors.New("unable to convert memory limit value to expected type")
 	}
 	return uint64(memLimit), nil
+}
+
+func (c CGroupMemoryLimit) readCGroupV1MemoryLimit(memoryCGroupPath string) ([]byte, error) {
+	cgroupV1MemLimitFilepath := filepath.Join(memoryCGroupPath, cgroupV1MemLimitName)
+	cgroupV1MemLimitFile, err := c.fs.Open(convertToFSPath(cgroupV1MemLimitFilepath))
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", cgroupV1MemLimitFilepath)
+	}
+	defer func() {
+		_ = cgroupV1MemLimitFile.Close()
+	}()
+	memLimitBytes, err := io.ReadAll(cgroupV1MemLimitFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to read memory.limit_in_bytes")
+	}
+	return memLimitBytes, nil
+}
+
+func (c CGroupMemoryLimit) readCGroupV2MemoryLimit(memoryCGroupPath string) ([]byte, error) {
+	cgroupV2MemLimitFilepath := filepath.Join(memoryCGroupPath, cgroupV2MemLimitName)
+	cgroupV2MemLimitFile, err := c.fs.Open(convertToFSPath(cgroupV2MemLimitFilepath))
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to open memory.max at expected location: %s", cgroupV2MemLimitFilepath)
+	}
+	defer func() {
+		_ = cgroupV2MemLimitFile.Close()
+	}()
+	memLimitBytes, err := io.ReadAll(cgroupV2MemLimitFile)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to read memory.max")
+	}
+	return memLimitBytes, nil
 }

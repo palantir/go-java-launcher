@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -23,8 +22,21 @@ type CGroupPather interface {
 	Path(name CGroupName) (string, error)
 }
 
-var DefaultCGroupV1Pather = CGroupV1Pather{
-	fs: os.DirFS("/"),
+func IsCGroupV2(filesystem fs.FS) (bool, error) {
+	file, err := filesystem.Open(convertToFSPath(selfMountinfo))
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to open %s", selfMountinfo)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to read %s", selfMountinfo)
+	}
+
+	return bytes.Contains(data, []byte("cgroup2")), nil
 }
 
 type CGroupV1Pather struct {
@@ -100,6 +112,17 @@ func (c CGroupV1Pather) getCGroupPath(r io.Reader, name CGroupName) (string, err
 		}
 	}
 	return "", errors.Errorf("unable to find cgroup mount path for module %s in cgroup entries", name)
+}
+
+type CGroupV2Pather struct{}
+
+func NewCGroupV2Pather() CGroupPather {
+	return CGroupV2Pather{}
+}
+
+func (c CGroupV2Pather) Path(name CGroupName) (string, error) {
+	// In cgroup v2, all cgroups are mounted under /sys/fs/cgroup
+	return "/sys/fs/cgroup", nil
 }
 
 func convertToFSPath(path string) string {

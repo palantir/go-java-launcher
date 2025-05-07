@@ -345,7 +345,11 @@ func filterHeapSizeArgsV2(args []string) ([]string, error) {
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		cgroupMemoryLimitInBytes, err := DefaultMemoryLimit.MemoryLimitInBytes()
+		memoryLimit, err := NewCGroupMemoryLimit(os.DirFS("/"))
+		if err != nil {
+			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
+		}
+		cgroupMemoryLimitInBytes, err := memoryLimit.MemoryLimitInBytes()
 		if err != nil {
 			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
 		}

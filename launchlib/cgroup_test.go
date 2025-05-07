@@ -40,7 +40,7 @@ var (
 1:name=systemd:/5f371271ccf0fa6b567f2cec7054b449931d48c603fadc31487214897c206151
 0::/5f371271ccf0fa6b567f2cec7054b449931d48c603fadc31487214897c206151`)
 
-	MountInfoContent = []byte(`5087 3462 0:337 / / rw,relatime master:945 - overlay overlay rw,lowerdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/618/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/617/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/616/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/615/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/614/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/15/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs,upperdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/619/fs,workdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/619/work,xino=off
+	CGroupV1MountInfoContent = []byte(`5087 3462 0:337 / / rw,relatime master:945 - overlay overlay rw,lowerdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/618/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/617/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/616/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/615/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/614/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/15/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs,upperdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/619/fs,workdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/619/work,xino=off
 5088 5087 0:338 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
 5089 5087 0:339 / /dev rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
 5090 5089 0:356 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,gid=5,mode=620,ptmxmode=666
@@ -71,6 +71,8 @@ var (
 3472 5088 0:339 /null /proc/sched_debug rw,nosuid - tmpfs tmpfs rw,size=65536k,mode=755
 3473 5088 0:435 / /proc/scsi ro,relatime - tmpfs tmpfs ro
 3474 5092 0:436 / /sys/firmware ro,relatime - tmpfs tmpfs ro`)
+
+	CGroupV2MountInfoContent = []byte(`36 25 0:33 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw`)
 
 	badMountInfoContent = []byte(`5087 3462 0:337 / / rw,relatime master:945 - overlay overlay rw,lowerdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/618/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/617/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/616/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/615/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/614/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/15/fs:/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs,upperdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/619/fs,workdir=/var/lib/container-runtime/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/619/work,xino=off
 5088 5087 0:338 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
@@ -132,7 +134,7 @@ func TestGCroupPather_CGroupV1Pather(t *testing.T) {
 					Data: CGroupContent,
 				},
 				"proc/self/mountinfo": &fstest.MapFile{
-					Data: MountInfoContent,
+					Data: CGroupV1MountInfoContent,
 				},
 			},
 			cgroupName:   "cpu",

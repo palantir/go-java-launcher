@@ -32,29 +32,37 @@ const (
 
 type MemoryLimit interface {
 	MemoryLimitInBytes() (uint64, error)
+	IsCGroupV2() bool
 }
 
 type CGroupMemoryLimit struct {
-	pather CGroupPather
-	fs     fs.FS
+	pather     CGroupPather
+	fs         fs.FS
+	isCGroupV2 bool
 }
 
 func NewCGroupMemoryLimit(filesystem fs.FS) (MemoryLimit, error) {
 	isCGroupV2, err := IsCGroupV2(filesystem)
 	if err != nil {
-		return CGroupMemoryLimit{}, errors.Wrap(err, "failed to determine cgroup version")
+		return nil, errors.Wrap(err, "failed to determine cgroup version")
 	}
 
 	if isCGroupV2 {
 		return CGroupMemoryLimit{
-			pather: NewCGroupV2Pather(),
-			fs:     filesystem,
+			pather:     NewCGroupV2Pather(),
+			fs:         filesystem,
+			isCGroupV2: true,
 		}, nil
 	}
 	return CGroupMemoryLimit{
-		pather: NewCGroupV1Pather(filesystem),
-		fs:     filesystem,
+		pather:     NewCGroupV1Pather(filesystem),
+		fs:         filesystem,
+		isCGroupV2: false,
 	}, nil
+}
+
+func (c CGroupMemoryLimit) IsCGroupV2() bool {
+	return c.isCGroupV2
 }
 
 func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
@@ -63,13 +71,8 @@ func (c CGroupMemoryLimit) MemoryLimitInBytes() (uint64, error) {
 		return 0, errors.Wrap(err, "failed to get memory cgroup path")
 	}
 
-	isCGroupV2, err := IsCGroupV2(c.fs)
-	if err != nil {
-		return 0, errors.Wrap(err, "failed to determine cgroup version")
-	}
-
 	var memLimitBytes []byte
-	if isCGroupV2 {
+	if c.isCGroupV2 {
 		memLimitBytes, err = c.readCGroupV2MemoryLimit(memoryCGroupPath)
 		if err != nil {
 			return 0, errors.Wrapf(err, "failed to get cgroupv2 memory limit")
@@ -97,8 +100,9 @@ func (c CGroupMemoryLimit) readCGroupV1MemoryLimit(memoryCGroupPath string) ([]b
 	cgroupV1MemLimitFilepath := filepath.Join(memoryCGroupPath, cgroupV1MemLimitName)
 	cgroupV1MemLimitFile, err := c.fs.Open(convertToFSPath(cgroupV1MemLimitFilepath))
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", cgroupV1MemLimitFile)
+		return nil, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", cgroupV1MemLimitFilepath)
 	}
+	defer cgroupV1MemLimitFile.Close()
 	memLimitBytes, err := io.ReadAll(cgroupV1MemLimitFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read memory.limit_in_bytes")
@@ -110,8 +114,9 @@ func (c CGroupMemoryLimit) readCGroupV2MemoryLimit(memoryCGroupPath string) ([]b
 	cgroupV2MemLimitFilepath := filepath.Join(memoryCGroupPath, cgroupV2MemLimitName)
 	cgroupV2MemLimitFile, err := c.fs.Open(convertToFSPath(cgroupV2MemLimitFilepath))
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to open memory.max at expected location: %s", cgroupV2MemLimitFile)
+		return nil, errors.Wrapf(err, "unable to open memory.max at expected location: %s", cgroupV2MemLimitFilepath)
 	}
+	defer cgroupV2MemLimitFile.Close()
 	memLimitBytes, err := io.ReadAll(cgroupV2MemLimitFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read memory.max")

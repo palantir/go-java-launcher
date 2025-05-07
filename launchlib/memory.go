@@ -102,7 +102,9 @@ func (c CGroupMemoryLimit) readCGroupV1MemoryLimit(memoryCGroupPath string) ([]b
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to open memory.limit_in_bytes at expected location: %s", cgroupV1MemLimitFilepath)
 	}
-	defer cgroupV1MemLimitFile.Close()
+	defer func() {
+		_ = cgroupV1MemLimitFile.Close()
+	}()
 	memLimitBytes, err := io.ReadAll(cgroupV1MemLimitFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read memory.limit_in_bytes")
@@ -116,7 +118,9 @@ func (c CGroupMemoryLimit) readCGroupV2MemoryLimit(memoryCGroupPath string) ([]b
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to open memory.max at expected location: %s", cgroupV2MemLimitFilepath)
 	}
-	defer cgroupV2MemLimitFile.Close()
+	defer func() {
+		_ = cgroupV2MemLimitFile.Close()
+	}()
 	memLimitBytes, err := io.ReadAll(cgroupV2MemLimitFile)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to read memory.max")

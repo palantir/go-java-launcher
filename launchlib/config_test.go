@@ -188,6 +188,7 @@ jvmOpts:
 					},
 					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
 					DisableContainerSupport: false,
+					HeapPercentage:          nil,
 					Experimental:            ExperimentalLauncherConfig{},
 				},
 			},

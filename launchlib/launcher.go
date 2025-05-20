@@ -402,7 +402,7 @@ func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes 
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 
 	if heapPercentage != nil {
-		return uint64(*heapPercentage * memoryLimit), nil
+		return uint64(*heapPercentage / 100 * memoryLimit), nil
 	}
 	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
 	return uint64(computedHeapSize), nil

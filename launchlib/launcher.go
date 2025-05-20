@@ -289,7 +289,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			// Also, when the memory limit is unusually high (defined to be over 1TB), we revert to the
 			// percentage-based heap sizing. This is to handle the edge case where the cgroups memory limit is set
 			// to be an arbitrary large value.
-			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		} else {
 			combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
 		}
@@ -307,7 +307,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts
 }
 
-func filterHeapSizeArgs(args []string) []string {
+func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
@@ -323,8 +323,12 @@ func filterHeapSizeArgs(args []string) []string {
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
-		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
+		percentage := 75.0
+		if heapPercentage != nil {
+			percentage = *heapPercentage
+		}
+		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.1f", percentage))
+		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", percentage))
 	}
 	return filtered
 }

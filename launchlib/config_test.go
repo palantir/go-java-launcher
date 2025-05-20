@@ -299,6 +299,7 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 dangerousDisableContainerSupport: true
+heapPercentage: 75
 `,
 			want: PrimaryCustomLauncherConfig{
 				VersionedConfig: VersionedConfig{
@@ -310,6 +311,7 @@ dangerousDisableContainerSupport: true
 					},
 					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
 					DisableContainerSupport: true,
+					HeapPercentage:          &[]float64{75}[0],
 					Experimental:            ExperimentalLauncherConfig{},
 				},
 			},

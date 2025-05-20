@@ -399,11 +399,12 @@ func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes 
 		return 0, errors.New("cgroups memory limit is unusually high. Not computing JVM heap size")
 	}
 	var memoryLimit = float64(cgroupMemoryLimitInBytes)
-	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 
 	if heapPercentage != nil {
 		return uint64(*heapPercentage / 100 * memoryLimit), nil
 	}
+
+	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
 	return uint64(computedHeapSize), nil
 }

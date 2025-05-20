@@ -161,11 +161,9 @@ percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage
 
 ### Overriding default values
 
-To override the heap percentage, developers can set `heap-percentage` in ``launcher-custom.yml``. This will use the cgroups memory limit to calculate the ``-Xmx|-Xms`` values, without the per processor adjustment. Setting ``-Xmx`` and ``-Xms`` equal to each other ensures the heap will never shrink. 
+To override the heap percentage, developers can set `heap-percentage` in ``launcher-custom.yml``. This will use the cgroups memory limit to calculate the ``-Xmx|-Xms`` values, without the per processor adjustment. Setting ``-Xmx`` and ``-Xms`` to the same value ensures the heap will never shrink. 
 
-Alternatively, developers can override the heap percentage in containers by specifying both ``-XX:MaxRAMPercentage=``
-and ``-XX:InitialRAMPercentage=`` and we recommend setting both to the same value. Setting ``-XX:MaxRAMPercentage=``
-and ``-XX:InitialRAMPercentage=`` does not guarantee the heap will not shrink. 
+Alternatively, developers can override the heap percentage in containers by specifying both ``-XX:MaxRAMPercentage=`` and ``-XX:InitialRAMPercentage=`` and we recommend setting both to the same value. Note that setting ``-XX:MaxRAMPercentage=`` and ``-XX:InitialRAMPercentage=`` to the same value does not prevent the heap from shrinking. 
 
 Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage``
 together with ``-Xmx|-Xms`` overrides safely: ``-Xmx/-Xms`` overrides ALWAYS take precedence and will be filtered out

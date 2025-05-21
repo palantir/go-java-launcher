@@ -188,6 +188,7 @@ jvmOpts:
 					},
 					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
 					DisableContainerSupport: false,
+					HeapPercentage:          nil,
 					Experimental:            ExperimentalLauncherConfig{},
 				},
 			},
@@ -299,6 +300,7 @@ jvmOpts:
   - jvmOpt1
   - jvmOpt2
 dangerousDisableContainerSupport: true
+heapPercentage: 75
 `,
 			want: PrimaryCustomLauncherConfig{
 				VersionedConfig: VersionedConfig{
@@ -310,6 +312,7 @@ dangerousDisableContainerSupport: true
 					},
 					JvmOpts:                 []string{"jvmOpt1", "jvmOpt2"},
 					DisableContainerSupport: true,
+					HeapPercentage:          toPointer(75.0),
 					Experimental:            ExperimentalLauncherConfig{},
 				},
 			},
@@ -508,4 +511,8 @@ subProcesses:
 		assert.Regexp(t, currCase.msg, err.Error(), "Case %d: %s had the wrong error message", i, currCase.name)
 	}
 
+}
+
+func toPointer[T any](t T) *T {
+	return &t
 }

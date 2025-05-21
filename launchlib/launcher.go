@@ -281,7 +281,7 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts)
+		jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage)
 		if err != nil {
 			// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 			// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
@@ -289,7 +289,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			// Also, when the memory limit is unusually high (defined to be over 1TB), we revert to the
 			// percentage-based heap sizing. This is to handle the edge case where the cgroups memory limit is set
 			// to be an arbitrary large value.
-			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts)
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		} else {
 			combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
 		}
@@ -307,7 +307,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts
 }
 
-func filterHeapSizeArgs(args []string) []string {
+func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
@@ -323,13 +323,17 @@ func filterHeapSizeArgs(args []string) []string {
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		filtered = append(filtered, "-XX:InitialRAMPercentage=75.0")
-		filtered = append(filtered, "-XX:MaxRAMPercentage=75.0")
+		percentage := 75.0
+		if heapPercentage != nil {
+			percentage = *heapPercentage
+		}
+		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.1f", percentage))
+		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", percentage))
 	}
 	return filtered
 }
 
-func filterHeapSizeArgsV2(args []string) ([]string, error) {
+func filterHeapSizeArgsV2(args []string, heapPercentage *float64) ([]string, error) {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
@@ -353,7 +357,7 @@ func filterHeapSizeArgsV2(args []string) ([]string, error) {
 		if err != nil {
 			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
 		}
-		jvmHeapSizeInBytes, err := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes)
+		jvmHeapSizeInBytes, err := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes, heapPercentage)
 		if err != nil {
 			return filtered, errors.New("cgroups memory limit is unusually high. Not setting JVM heap size options")
 		}
@@ -388,13 +392,18 @@ func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
 }
 
-// ComputeJVMHeapSizeInBytes Compute the heap size to be 75% of the heap minus 3mb per processor, with a minimum value
-// of 50% of the heap.
-func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64) (uint64, error) {
+// ComputeJVMHeapSizeInBytes By default, compute the heap size to be 75% of the heap minus 3mb per processor, with a minimum value
+// of 50% of the heap. If heapPercentage is provided, use that percentage instead with no processor adjustment.
+func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64, heapPercentage *float64) (uint64, error) {
 	if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
 		return 0, errors.New("cgroups memory limit is unusually high. Not computing JVM heap size")
 	}
 	var memoryLimit = float64(cgroupMemoryLimitInBytes)
+
+	if heapPercentage != nil {
+		return uint64(*heapPercentage / 100 * memoryLimit), nil
+	}
+
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
 	return uint64(computedHeapSize), nil

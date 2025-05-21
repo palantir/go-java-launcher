@@ -185,6 +185,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 		name                string
 		numHostProcessors   int
 		memoryLimit         uint64
+		heapPercentage      *float64
 		expectedMaxHeapSize uint64
 		expectError         bool
 	}{
@@ -192,6 +193,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			name:              "at least 50% of heap",
 			numHostProcessors: 1,
 			memoryLimit:       10 * launchlib.BytesInMebibyte,
+			heapPercentage:    nil,
 			// 75% of heap - 3mb*processors = 4.5mb
 			expectedMaxHeapSize: 5 * launchlib.BytesInMebibyte,
 			expectError:         false,
@@ -200,6 +202,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			name:              "computes 75% of heap minus 3mb per processor",
 			numHostProcessors: 1,
 			memoryLimit:       16 * launchlib.BytesInMebibyte,
+			heapPercentage:    nil,
 			// 75% of heap - 3mb*processors = 9mb
 			expectedMaxHeapSize: 9 * launchlib.BytesInMebibyte,
 			expectError:         false,
@@ -208,6 +211,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			name:              "multiple processors",
 			numHostProcessors: 3,
 			memoryLimit:       120 * launchlib.BytesInMebibyte,
+			heapPercentage:    nil,
 			// 75% of heap - 3mb*processors = 81mb
 			expectedMaxHeapSize: 81 * launchlib.BytesInMebibyte,
 			expectError:         false,
@@ -216,12 +220,21 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			name:                "memory limit too large",
 			numHostProcessors:   1,
 			memoryLimit:         1_000_001 * launchlib.BytesInMebibyte,
+			heapPercentage:      nil,
 			expectedMaxHeapSize: 0,
 			expectError:         true,
 		},
+		{
+			name:                "computes heap as 10% of memory limit using heapPercentage",
+			numHostProcessors:   3,
+			memoryLimit:         10 * launchlib.BytesInMebibyte,
+			heapPercentage:      toPointer(10.0),
+			expectedMaxHeapSize: 1 * launchlib.BytesInMebibyte,
+			expectError:         false,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			heapSizeInBytes, err := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit)
+			heapSizeInBytes, err := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit, tc.heapPercentage)
 			if tc.expectError {
 				assert.Error(t, err)
 			} else {
@@ -312,4 +325,8 @@ func TestMain(m *testing.M) {
 		log.Fatalln("Failed to set a mock JAVA_HOME", err)
 	}
 	os.Exit(m.Run())
+}
+
+func toPointer[T any](t T) *T {
+	return &t
 }

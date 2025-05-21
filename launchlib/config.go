@@ -69,6 +69,7 @@ type CustomLauncherConfig struct {
 	Env                     map[string]string          `yaml:"env"`
 	Experimental            ExperimentalLauncherConfig `yaml:"experimental"`
 	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
+	HeapPercentage          *float64                   `yaml:"heapPercentage" validate:"gt=0,lte=100"`
 }
 
 type ExperimentalLauncherConfig struct {

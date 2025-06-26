@@ -155,8 +155,8 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "my-service-native")
 	require.NoError(t, err)
 	tmpPath := tmpFile.Name()
-	tmpFile.Close()
-	defer os.Remove(tmpPath)
+	require.NoError(t, tmpFile.Close())
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	staticCfg := StaticLauncherConfig{
 		TypedConfig: TypedConfig{Type: "java"}, // value irrelevant for native mode branch
@@ -192,8 +192,8 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "nativeExeHP")
 	require.NoError(t, err)
 	tmpPath := tmpFile.Name()
-	tmpFile.Close()
-	defer os.Remove(tmpPath)
+	require.NoError(t, tmpFile.Close())
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	heap := 60.0
 

@@ -108,8 +108,8 @@ func compileCmdFromConfig(
 				}
 			}
 			if !hasFlag {
-				maxRamFlag := fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", *customConfig.HeapPercentage)
-				args = append(args, maxRamFlag)
+				maxRAMFlag := fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", *customConfig.HeapPercentage)
+				args = append(args, maxRAMFlag)
 			}
 		}
 	} else if staticConfig.Type == "java" {

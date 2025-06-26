@@ -98,6 +98,20 @@ func compileCmdFromConfig(
 		for _, nativeArg := range customConfig.Experimental.NativeImageArguments {
 			args = append(args, nativeArg)
 		}
+		// If heapPercentage is specified, ensure MaxRAMPercentage flag is present
+		if customConfig.HeapPercentage != nil {
+			hasFlag := false
+			for _, arg := range customConfig.Experimental.NativeImageArguments {
+				if strings.HasPrefix(arg, "-XX:MaxRAMPercentage=") {
+					hasFlag = true
+					break
+				}
+			}
+			if !hasFlag {
+				maxRamFlag := fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", *customConfig.HeapPercentage)
+				args = append(args, maxRamFlag)
+			}
+		}
 	} else if staticConfig.Type == "java" {
 		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 		if javaHomeErr != nil {

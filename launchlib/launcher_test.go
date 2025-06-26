@@ -187,3 +187,35 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	assert.Equal(t, tmpPath, cmd.Path)
 	assert.Equal(t, wantArgs, cmd.Args)
 }
+
+func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "nativeExeHP")
+	require.NoError(t, err)
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	heap := 60.0
+
+	staticCfg := StaticLauncherConfig{
+		TypedConfig: TypedConfig{Type: "java"},
+	}
+
+	customCfg := CustomLauncherConfig{
+		TypedConfig:    TypedConfig{Type: "java"},
+		HeapPercentage: &heap,
+		Experimental: ExperimentalLauncherConfig{
+			ExecutionMode:             ExecutionModeNative,
+			NativeImageExecutablePath: tmpPath,
+			NativeImageArguments:      []string{},
+		},
+	}
+
+	cgroups := map[string]string{}
+	createLogger := func() (io.WriteCloser, error) { return &NoopClosingWriter{io.Discard}, nil }
+
+	cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
+	require.NoError(t, err)
+
+	assert.Contains(t, cmd.Args, "-XX:MaxRAMPercentage=60.0")
+}

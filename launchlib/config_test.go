@@ -342,6 +342,32 @@ env:
 				},
 			},
 		},
+		{
+			name: "nonexistent key",
+			data: `
+configType: executable
+configVersion: 1
+nonexistentKey: value
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "executable",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Experimental: ExperimentalLauncherConfig{},
+				},
+			},
+		},
 	} {
 		got, _ := parseCustomConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)

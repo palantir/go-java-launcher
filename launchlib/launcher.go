@@ -86,7 +86,19 @@ func compileCmdFromConfig(
 	var executable string
 	var executableErr error
 
-	if staticConfig.Type == "java" {
+	// Handle experimental nativeImage execution mode before standard processing
+	if customConfig.Experimental.ExecutionMode == ExecutionModeNative {
+		executable, executableErr = verifyPathIsSafeForExec(customConfig.Experimental.NativeImageExecutablePath)
+		if executableErr != nil {
+			return nil, executableErr
+		}
+		args = append(args, executable) // 0th argument is the command itself
+		// Add default system properties
+		args = append(args, "-Djava.io.tmpdir=var/data/tmp", "-Dsun.net.inetaddr.ttl=20")
+		for _, nativeArg := range customConfig.Experimental.NativeImageArguments {
+			args = append(args, nativeArg)
+		}
+	} else if staticConfig.Type == "java" {
 		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 		if javaHomeErr != nil {
 			return nil, javaHomeErr

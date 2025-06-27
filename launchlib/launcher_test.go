@@ -167,7 +167,7 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 		Experimental: ExperimentalLauncherConfig{
 			ExecutionMode:             ExecutionModeNative,
 			NativeImageExecutablePath: tmpPath,
-			NativeImageArguments:      []string{"-XX:MaxRAMPercentage=50"},
+			NativeImageArguments:      []string{"-XX:MaximumHeapSizePercent=50"},
 		},
 	}
 
@@ -180,9 +180,7 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	// Expect command path and arguments
 	wantArgs := []string{
 		tmpPath,
-		"-Djava.io.tmpdir=var/data/tmp",
-		"-Dsun.net.inetaddr.ttl=20",
-		"-XX:MaxRAMPercentage=50",
+		"-XX:MaximumHeapSizePercent=50",
 	}
 	assert.Equal(t, tmpPath, cmd.Path)
 	assert.Equal(t, wantArgs, cmd.Args)
@@ -217,5 +215,5 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 	cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
 	require.NoError(t, err)
 
-	assert.Contains(t, cmd.Args, "-XX:MaxRAMPercentage=60.0")
+	assert.Contains(t, cmd.Args, "-XX:MaximumHeapSizePercent=60.00")
 }

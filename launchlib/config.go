@@ -106,6 +106,8 @@ var allowedLauncherConfigs = AllowedLauncherConfigValues{
 
 type ExecutionMode string
 
+// ExecutionModeNative indicates that the application should be launched as a GraalVM native image executable. ExecutionModeJvm
+// indicates that the application should be launched as a JVM application.
 const (
 	ExecutionModeNative ExecutionMode = "native"
 	ExecutionModeJvm    ExecutionMode = "jvm"

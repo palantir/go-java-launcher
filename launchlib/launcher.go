@@ -86,57 +86,57 @@ func compileCmdFromConfig(
 	var executable string
 	var executableErr error
 
-	// Handle experimental nativeImage execution mode before standard processing
-	if customConfig.Experimental.ExecutionMode == ExecutionModeNative {
-		executable, executableErr = verifyPathIsSafeForExec(customConfig.Experimental.NativeImageExecutablePath)
-		if executableErr != nil {
-			return nil, executableErr
-		}
-		args = append(args, executable) // 0th argument is the command itself
-		// Add default system properties
-		args = append(args, "-Djava.io.tmpdir=var/data/tmp", "-Dsun.net.inetaddr.ttl=20")
-		for _, nativeArg := range customConfig.Experimental.NativeImageArguments {
-			args = append(args, nativeArg)
-		}
-		// If heapPercentage is specified, ensure MaxRAMPercentage flag is present
-		if customConfig.HeapPercentage != nil {
-			hasFlag := false
-			for _, arg := range customConfig.Experimental.NativeImageArguments {
-				if strings.HasPrefix(arg, "-XX:MaxRAMPercentage=") {
-					hasFlag = true
-					break
+	if staticConfig.Type == "java" {
+		// Handle experimental nativeImage execution mode before standard processing
+		if customConfig.Experimental.ExecutionMode == ExecutionModeNative {
+			executable, executableErr = verifyPathIsSafeForExec(customConfig.Experimental.NativeImageExecutablePath)
+			if executableErr != nil {
+				return nil, executableErr
+			}
+			args = append(args, executable) // 0th argument is the command itself
+			for _, nativeArg := range customConfig.Experimental.NativeImageArguments {
+				args = append(args, nativeArg)
+			}
+			// If MaximumHeapSizePercent is not present in NativeImageArguments, use heapPercentage.
+			if customConfig.HeapPercentage != nil {
+				hasFlag := false
+				for _, arg := range customConfig.Experimental.NativeImageArguments {
+					if strings.HasPrefix(arg, "-XX:MaximumHeapSizePercent=") {
+						hasFlag = true
+						break
+					}
+				}
+				if !hasFlag {
+					maxHeapSizeFlag := fmt.Sprintf("-XX:MaximumHeapSizePercent=%.2f", *customConfig.HeapPercentage)
+					args = append(args, maxHeapSizeFlag)
 				}
 			}
-			if !hasFlag {
-				maxRAMFlag := fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", *customConfig.HeapPercentage)
-				args = append(args, maxRAMFlag)
+		} else {
+			javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
+			if javaHomeErr != nil {
+				return nil, javaHomeErr
 			}
+			_, _ = fmt.Fprintf(logger, "Using JAVA_HOME: %s\n", javaHome)
+
+			classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
+				staticConfig.JavaConfig.Classpath))
+			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
+
+			var combinedJvmOpts []string
+			combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
+			combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
+
+			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+
+			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+			if executableErr != nil {
+				return nil, executableErr
+			}
+			args = append(args, executable) // 0th argument is the command itself
+			args = append(args, jvmOpts...)
+			args = append(args, "-classpath", classpath)
+			args = append(args, staticConfig.JavaConfig.MainClass)
 		}
-	} else if staticConfig.Type == "java" {
-		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
-		if javaHomeErr != nil {
-			return nil, javaHomeErr
-		}
-		_, _ = fmt.Fprintf(logger, "Using JAVA_HOME: %s\n", javaHome)
-
-		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
-			staticConfig.JavaConfig.Classpath))
-		_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
-
-		var combinedJvmOpts []string
-		combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
-		combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
-
-		jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
-
-		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
-		if executableErr != nil {
-			return nil, executableErr
-		}
-		args = append(args, executable) // 0th argument is the command itself
-		args = append(args, jvmOpts...)
-		args = append(args, "-classpath", classpath)
-		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.Type == "executable" {
 		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
 		if executableErr != nil {

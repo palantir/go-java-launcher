@@ -186,6 +186,36 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	assert.Equal(t, wantArgs, cmd.Args)
 }
 
+func TestGetNativeArgsFromJVMOpts(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "all allowed options",
+			input:    []string{"-Djava.io.tmpdir=/tmp", "-Djna.tmpdir=/jna", "-Dsun.net.inetaddr.ttl=60"},
+			expected: []string{"-Djava.io.tmpdir=/tmp", "-Djna.tmpdir=/jna", "-Dsun.net.inetaddr.ttl=60"},
+		},
+		{
+			name:     "mixed allowed and not allowed",
+			input:    []string{"-Djava.io.tmpdir=/tmp", "-Xmx2g", "-Djna.tmpdir=/jna"},
+			expected: []string{"-Djava.io.tmpdir=/tmp", "-Djna.tmpdir=/jna"},
+		},
+		{
+			name:     "none allowed",
+			input:    []string{"-Xmx2g", "-Xms1g"},
+			expected: []string{},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := getNativeArgsFromJVMOpts(tc.input)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "nativeExeHP")
 	require.NoError(t, err)

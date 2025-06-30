@@ -35,6 +35,16 @@ const (
 	BytesInMebibyte        = 1048576
 )
 
+var (
+	// Adapted from: https://github.com/palantir/sls-packaging/blob/develop/gradle-sls-packaging/src/main/java/com/palantir/gradle/dist/service/tasks/LaunchConfig.java
+	// Not all JVM options are supported by native image
+	AllowedNativeImageJVMOptions = []string{
+		"-Djava.io.tmpdir=",
+		"-Djna.tmpdir=",
+		"-Dsun.net.inetaddr.ttl=",
+	}
+)
+
 type ServiceCmds struct {
 	Primary      *exec.Cmd
 	SubProcesses map[string]*exec.Cmd
@@ -87,6 +97,10 @@ func compileCmdFromConfig(
 	var executableErr error
 
 	if staticConfig.Type == "java" {
+		var combinedJvmOpts []string
+		combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
+		combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
+
 		// Handle experimental nativeImage execution mode before standard processing
 		if customConfig.Experimental.ExecutionMode == ExecutionModeNative {
 			executable, executableErr = verifyPathIsSafeForExec(customConfig.Experimental.NativeImageExecutablePath)
@@ -94,9 +108,11 @@ func compileCmdFromConfig(
 				return nil, executableErr
 			}
 			args = append(args, executable) // 0th argument is the command itself
-			for _, nativeArg := range customConfig.Experimental.NativeImageArguments {
-				args = append(args, nativeArg)
-			}
+
+			args = append(args, getNativeArgsFromJVMOpts(combinedJvmOpts)...)
+
+			args = append(args, customConfig.Experimental.NativeImageArguments...)
+
 			// If MaximumHeapSizePercent is not present in NativeImageArguments, use heapPercentage.
 			if customConfig.HeapPercentage != nil {
 				hasFlag := false
@@ -121,10 +137,6 @@ func compileCmdFromConfig(
 			classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
 				staticConfig.JavaConfig.Classpath))
 			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
-
-			var combinedJvmOpts []string
-			combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
-			combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
 
 			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
 
@@ -391,6 +403,18 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64) ([]string, err
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
 	}
 	return filtered, nil
+}
+
+func getNativeArgsFromJVMOpts(jvmOpts []string) []string {
+	var nativeArgs []string
+	for _, arg := range jvmOpts {
+		for _, allowed := range AllowedNativeImageJVMOptions {
+			if strings.HasPrefix(arg, allowed) {
+				nativeArgs = append(nativeArgs, arg)
+			}
+		}
+	}
+	return nativeArgs
 }
 
 func hasMaxRAMOverride(args []string) bool {

@@ -15,7 +15,6 @@
 package launchlib
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -52,27 +51,6 @@ func TestGetNativeArgsFromJVMOpts(t *testing.T) {
 }
 
 func TestGetNativeArgs(t *testing.T) {
-	withEnv := func(t *testing.T, vars map[string]string) {
-		oldVals := make(map[string]*string)
-		for k, v := range vars {
-			if old, existed := lookupEnv(k); existed {
-				oldCopy := old
-				oldVals[k] = &oldCopy
-			} else {
-				oldVals[k] = nil
-			}
-			_ = setenv(k, v)
-		}
-		t.Cleanup(func() {
-			for k, old := range oldVals {
-				if old != nil {
-					_ = setenv(k, *old)
-				} else {
-					_ = unsetenv(k)
-				}
-			}
-		})
-	}
 
 	heap60 := 60.0
 	tests := []struct {
@@ -119,9 +97,9 @@ func TestGetNativeArgs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup env
 			if tc.envContainer {
-				withEnv(t, map[string]string{"CONTAINER": "1"})
+				t.Setenv("CONTAINER", "1")
 			} else {
-				withEnv(t, map[string]string{"CONTAINER": ""})
+				t.Setenv("CONTAINER", "")
 			}
 
 			cfg := &CustomLauncherConfig{
@@ -132,32 +110,4 @@ func TestGetNativeArgs(t *testing.T) {
 			assert.ElementsMatch(t, tc.expected, result)
 		})
 	}
-}
-
-// --- helpers for env ---
-func setenv(key, value string) error {
-	return testSetEnv(key, value)
-}
-func unsetenv(key string) error {
-	return testUnsetEnv(key)
-}
-func lookupEnv(key string) (string, bool) {
-	return testLookupEnv(key)
-}
-
-// These are wrappers so we can mock os env in tests if needed.
-var (
-	testSetEnv    = func(key, value string) error { return setEnvReal(key, value) }
-	testUnsetEnv  = func(key string) error { return unsetEnvReal(key) }
-	testLookupEnv = func(key string) (string, bool) { return lookupEnvReal(key) }
-)
-
-func setEnvReal(key, value string) error {
-	return os.Setenv(key, value)
-}
-func unsetEnvReal(key string) error {
-	return os.Unsetenv(key)
-}
-func lookupEnvReal(key string) (string, bool) {
-	return os.LookupEnv(key)
 }

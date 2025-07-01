@@ -55,24 +55,22 @@ func getNativeArgsFromJVMOpts(jvmOpts []string) []string {
 
 // getNativeArgs filters out any heap-related options that are not supported by the current mode (container mode enabled/disabled), and adds -XX:MaximumHeapSizePercent using heapPercentage if applicable
 func getNativeArgs(nativeArgs []string, customConfig *CustomLauncherConfig) []string {
-	var args []string
+	var filteredArgs []string
 
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport {
 		// If container mode is enabled, filter out any heap size arguments (-Xmx, -Xms), if present
-		filteredArgs := filterNativeHeapSizeArgs(nativeArgs)
-		args = append(args, filteredArgs...)
+		filteredArgs = filterNativeHeapSizeArgs(nativeArgs)
 
 		// If MaximumHeapSizePercent is not present in NativeImageArguments and container mode is not disabled, use heapPercentage for -XX:MaximumHeapSizePercent
 		if !hasMaximumHeapSizePercentOverride(nativeArgs) && customConfig.HeapPercentage != nil {
 			maxHeapSizeFlag := fmt.Sprintf("-XX:MaximumHeapSizePercent=%.2f", *customConfig.HeapPercentage)
-			args = append(args, maxHeapSizeFlag)
+			filteredArgs = append(filteredArgs, maxHeapSizeFlag)
 		}
 	} else {
 		// If container mode is disabled, filter out any heap percentage arguments (-XX:MaximumHeapSizePercent), if present
-		filteredArgs := filterNativeHeapPercentageArgs(nativeArgs)
-		args = append(args, filteredArgs...)
+		filteredArgs = filterNativeHeapPercentageArgs(nativeArgs)
 	}
-	return args
+	return filteredArgs
 }
 
 func filterNativeHeapSizeArgs(nativeArgs []string) []string {

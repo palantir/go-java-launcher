@@ -99,8 +99,9 @@ func compileCmdFromConfig(
 			}
 			args = append(args, executable) // 0th argument is the command itself
 
+			// Filter out any heap-related options that are not supported by the current mode (container mode enabled/disabled), and adds -XX:MaximumHeapSizePercent using heapPercentage if applicable
+			// If multiple arguments are present with the same key, the last one will be used
 			args = append(args, getNativeArgsFromJVMOpts(combinedJvmOpts)...)
-
 			args = append(args, getNativeArgs(customConfig.Experimental.NativeImageArguments, customConfig)...)
 
 		} else {

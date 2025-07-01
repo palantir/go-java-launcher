@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	// Adapted from: https://github.com/palantir/sls-packaging/blob/develop/gradle-sls-packaging/src/main/java/com/palantir/gradle/dist/service/tasks/LaunchConfig.java
+	// AllowedNativeImageJVMOptions is adapted from: https://github.com/palantir/sls-packaging/blob/develop/gradle-sls-packaging/src/main/java/com/palantir/gradle/dist/service/tasks/LaunchConfig.java
 	// Not all JVM options are supported by native image
 	AllowedNativeImageJVMOptions = []string{
 		"-Djava.io.tmpdir=",

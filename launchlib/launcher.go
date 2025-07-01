@@ -35,16 +35,6 @@ const (
 	BytesInMebibyte        = 1048576
 )
 
-var (
-	// Adapted from: https://github.com/palantir/sls-packaging/blob/develop/gradle-sls-packaging/src/main/java/com/palantir/gradle/dist/service/tasks/LaunchConfig.java
-	// Not all JVM options are supported by native image
-	AllowedNativeImageJVMOptions = []string{
-		"-Djava.io.tmpdir=",
-		"-Djna.tmpdir=",
-		"-Dsun.net.inetaddr.ttl=",
-	}
-)
-
 type ServiceCmds struct {
 	Primary      *exec.Cmd
 	SubProcesses map[string]*exec.Cmd
@@ -111,22 +101,8 @@ func compileCmdFromConfig(
 
 			args = append(args, getNativeArgsFromJVMOpts(combinedJvmOpts)...)
 
-			args = append(args, customConfig.Experimental.NativeImageArguments...)
+			args = append(args, getNativeArgs(customConfig.Experimental.NativeImageArguments, customConfig)...)
 
-			// If MaximumHeapSizePercent is not present in NativeImageArguments, use heapPercentage.
-			if customConfig.HeapPercentage != nil {
-				hasFlag := false
-				for _, arg := range customConfig.Experimental.NativeImageArguments {
-					if strings.HasPrefix(arg, "-XX:MaximumHeapSizePercent=") {
-						hasFlag = true
-						break
-					}
-				}
-				if !hasFlag {
-					maxHeapSizeFlag := fmt.Sprintf("-XX:MaximumHeapSizePercent=%.2f", *customConfig.HeapPercentage)
-					args = append(args, maxHeapSizeFlag)
-				}
-			}
 		} else {
 			javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 			if javaHomeErr != nil {
@@ -403,18 +379,6 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64) ([]string, err
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
 	}
 	return filtered, nil
-}
-
-func getNativeArgsFromJVMOpts(jvmOpts []string) []string {
-	var nativeArgs []string
-	for _, arg := range jvmOpts {
-		for _, allowed := range AllowedNativeImageJVMOptions {
-			if strings.HasPrefix(arg, allowed) {
-				nativeArgs = append(nativeArgs, arg)
-			}
-		}
-	}
-	return nativeArgs
 }
 
 func hasMaxRAMOverride(args []string) bool {

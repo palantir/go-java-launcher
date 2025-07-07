@@ -99,11 +99,10 @@ func compileCmdFromConfig(
 			}
 			args = append(args, executable) // 0th argument is the command itself
 
-			// Filter out any heap-related options that are not supported by the current mode (container mode enabled/disabled), and adds -XX:MaximumHeapSizePercent using heapPercentage if applicable
-			// If multiple arguments are present with the same key, the last one will be used
+			// Add JVM options that are supported by native image (using the allowed list)
 			args = append(args, getNativeArgsFromJVMOpts(combinedJvmOpts)...)
+			// Filter out any heap-related options that are not supported by the current mode (container mode enabled/disabled). Add -XX:MaximumHeapSizePercent using heapPercentage if applicable
 			args = append(args, getNativeArgs(customConfig.Experimental.NativeImageArguments, customConfig)...)
-
 		} else {
 			javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
 			if javaHomeErr != nil {

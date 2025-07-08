@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"math"
 	"strings"
 )
 
@@ -63,7 +64,7 @@ func getNativeArgs(nativeArgs []string, customConfig *CustomLauncherConfig) []st
 
 		// If MaximumHeapSizePercent is not present in NativeImageArguments and container mode is not disabled, use heapPercentage for -XX:MaximumHeapSizePercent
 		if !hasMaximumHeapSizePercentOverride(nativeArgs) && customConfig.HeapPercentage != nil {
-			maxHeapSizeFlag := fmt.Sprintf("-XX:MaximumHeapSizePercent=%.2f", *customConfig.HeapPercentage)
+			maxHeapSizeFlag := fmt.Sprintf("-XX:MaximumHeapSizePercent=%d", int(math.Round(*customConfig.HeapPercentage)))
 			filteredArgs = append(filteredArgs, maxHeapSizeFlag)
 		}
 	} else {

@@ -67,7 +67,7 @@ func TestGetNativeArgs(t *testing.T) {
 			disableContainerSupport: false,
 			input:                   []string{"-Xmx2g", "-Xms1g", "-Dfoo=bar"},
 			heapPercentage:          &heap60,
-			expected:                []string{"-Dfoo=bar", "-XX:MaximumHeapSizePercent=60.00"},
+			expected:                []string{"-Dfoo=bar", "-XX:MaximumHeapSizePercent=60"},
 		},
 		{
 			name:                    "container mode enabled, MaximumHeapSizePercent opt already present",

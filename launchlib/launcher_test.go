@@ -197,7 +197,7 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 
 	t.Setenv("CONTAINER", "1")
 
-	heap := 60.0
+	heap := 60.1
 
 	staticCfg := StaticLauncherConfig{
 		TypedConfig: TypedConfig{Type: "java"},
@@ -219,5 +219,5 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 	cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
 	require.NoError(t, err)
 
-	assert.Contains(t, cmd.Args, "-XX:MaximumHeapSizePercent=60.00")
+	assert.Contains(t, cmd.Args, "-XX:MaximumHeapSizePercent=60")
 }

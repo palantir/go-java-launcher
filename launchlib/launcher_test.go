@@ -16,6 +16,7 @@ package launchlib
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"testing"
@@ -147,4 +148,76 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 		err = MkDirs([]string{dir}, os.Stdout)
 		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
 	}
+}
+
+func TestCompileCmdNativeExecutionMode(t *testing.T) {
+	// Create a temporary executable file
+	tmpFile, err := os.CreateTemp("", "my-service-native")
+	require.NoError(t, err)
+	tmpPath := tmpFile.Name()
+	require.NoError(t, tmpFile.Close())
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	t.Setenv("CONTAINER", "1")
+
+	staticCfg := StaticLauncherConfig{
+		TypedConfig: TypedConfig{Type: "java"}, // value irrelevant for native mode branch
+	}
+
+	customCfg := CustomLauncherConfig{
+		TypedConfig: TypedConfig{Type: "java"},
+		Experimental: ExperimentalLauncherConfig{
+			ExecutionMode:             ExecutionModeNative,
+			NativeImageExecutablePath: tmpPath,
+			NativeImageArguments:      []string{"-XX:MaximumHeapSizePercent=50"},
+		},
+	}
+
+	cgroups := map[string]string{}
+	createLogger := func() (io.WriteCloser, error) { return &NoopClosingWriter{io.Discard}, nil }
+
+	cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
+	require.NoError(t, err)
+
+	// Expect command path and arguments
+	wantArgs := []string{
+		tmpPath,
+		"-XX:MaximumHeapSizePercent=50",
+	}
+	assert.Equal(t, tmpPath, cmd.Path)
+	assert.Equal(t, wantArgs, cmd.Args)
+}
+
+func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "nativeExeHP")
+	require.NoError(t, err)
+	tmpPath := tmpFile.Name()
+	require.NoError(t, tmpFile.Close())
+	defer func() { _ = os.Remove(tmpPath) }()
+
+	t.Setenv("CONTAINER", "1")
+
+	heap := 60.1
+
+	staticCfg := StaticLauncherConfig{
+		TypedConfig: TypedConfig{Type: "java"},
+	}
+
+	customCfg := CustomLauncherConfig{
+		TypedConfig:    TypedConfig{Type: "java"},
+		HeapPercentage: &heap,
+		Experimental: ExperimentalLauncherConfig{
+			ExecutionMode:             ExecutionModeNative,
+			NativeImageExecutablePath: tmpPath,
+			NativeImageArguments:      []string{},
+		},
+	}
+
+	cgroups := map[string]string{}
+	createLogger := func() (io.WriteCloser, error) { return &NoopClosingWriter{io.Discard}, nil }
+
+	cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
+	require.NoError(t, err)
+
+	assert.Contains(t, cmd.Args, "-XX:MaximumHeapSizePercent=60")
 }

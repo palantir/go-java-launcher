@@ -342,6 +342,67 @@ env:
 				},
 			},
 		},
+		{
+			name: "nonexistent key",
+			data: `
+configType: executable
+configVersion: 1
+nonexistentKey: value
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "executable",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Experimental: ExperimentalLauncherConfig{},
+				},
+			},
+		},
+		{
+			name: "executionMode is parsed",
+			data: `
+configType: java
+configVersion: 1
+experimental:
+  executionMode: native
+  nativeImageExecutablePath: /service/bin/my-application-native
+  nativeImageArguments:
+    - arg1
+    - arg2
+env:
+  SOME_ENV_VAR: /etc/profile
+  OTHER_ENV_VAR: /etc/redhat-release
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Env: map[string]string{
+						"SOME_ENV_VAR":  "/etc/profile",
+						"OTHER_ENV_VAR": "/etc/redhat-release",
+					},
+					Experimental: ExperimentalLauncherConfig{
+						ExecutionMode:             ExecutionModeNative,
+						NativeImageExecutablePath: "/service/bin/my-application-native",
+						NativeImageArguments:      []string{"arg1", "arg2"},
+					},
+				},
+			},
+		},
 	} {
 		got, _ := parseCustomConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)

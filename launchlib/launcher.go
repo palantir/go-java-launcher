@@ -87,30 +87,44 @@ func compileCmdFromConfig(
 	var executableErr error
 
 	if staticConfig.Type == "java" {
-		javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
-		if javaHomeErr != nil {
-			return nil, javaHomeErr
-		}
-		_, _ = fmt.Fprintf(logger, "Using JAVA_HOME: %s\n", javaHome)
-
-		classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
-			staticConfig.JavaConfig.Classpath))
-		_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
-
 		var combinedJvmOpts []string
 		combinedJvmOpts = append(combinedJvmOpts, staticConfig.JavaConfig.JvmOpts...)
 		combinedJvmOpts = append(combinedJvmOpts, customConfig.JvmOpts...)
 
-		jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+		// Handle experimental nativeImage execution mode before standard processing
+		if customConfig.Experimental.ExecutionMode == ExecutionModeNative {
+			executable, executableErr = verifyPathIsSafeForExec(customConfig.Experimental.NativeImageExecutablePath)
+			if executableErr != nil {
+				return nil, executableErr
+			}
+			args = append(args, executable) // 0th argument is the command itself
 
-		executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
-		if executableErr != nil {
-			return nil, executableErr
+			// Add JVM options that are supported by native image (using the allowed list)
+			args = append(args, getNativeArgsFromJVMOpts(combinedJvmOpts)...)
+			// Filter out any heap-related options that are not supported by the current mode (container mode enabled/disabled). Add -XX:MaximumHeapSizePercent using heapPercentage if applicable
+			args = append(args, getNativeArgs(customConfig.Experimental.NativeImageArguments, customConfig)...)
+		} else {
+			javaHome, javaHomeErr := getJavaHome(staticConfig.JavaConfig.JavaHome)
+			if javaHomeErr != nil {
+				return nil, javaHomeErr
+			}
+			_, _ = fmt.Fprintf(logger, "Using JAVA_HOME: %s\n", javaHome)
+
+			classpath := joinClasspathEntries(absolutizeClasspathEntries(workingDir,
+				staticConfig.JavaConfig.Classpath))
+			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
+
+			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+
+			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+			if executableErr != nil {
+				return nil, executableErr
+			}
+			args = append(args, executable) // 0th argument is the command itself
+			args = append(args, jvmOpts...)
+			args = append(args, "-classpath", classpath)
+			args = append(args, staticConfig.JavaConfig.MainClass)
 		}
-		args = append(args, executable) // 0th argument is the command itself
-		args = append(args, jvmOpts...)
-		args = append(args, "-classpath", classpath)
-		args = append(args, staticConfig.JavaConfig.MainClass)
 	} else if staticConfig.Type == "executable" {
 		executable, executableErr = verifyPathIsSafeForExec(staticConfig.Executable)
 		if executableErr != nil {

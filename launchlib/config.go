@@ -73,6 +73,11 @@ type CustomLauncherConfig struct {
 }
 
 type ExperimentalLauncherConfig struct {
+	// Acceptable values are "native" and "jvm". If omitted, the default value is "jvm".
+	ExecutionMode ExecutionMode `yaml:"executionMode,omitempty"`
+	// NativeImageArguments specifies additional arguments that will be passed to the executable when running in native execution mode.
+	NativeImageArguments      []string `yaml:"nativeImageArguments"`
+	NativeImageExecutablePath string   `yaml:"nativeImageExecutablePath"`
 }
 
 type PrimaryCustomLauncherConfig struct {
@@ -98,6 +103,15 @@ var allowedLauncherConfigs = AllowedLauncherConfigValues{
 		"grafana-server": {},
 		"envoy":          {}},
 }
+
+type ExecutionMode string
+
+// ExecutionModeNative indicates that the application should be launched as a GraalVM native image executable. ExecutionModeJvm
+// indicates that the application should be launched as a JVM application.
+const (
+	ExecutionModeNative ExecutionMode = "native"
+	ExecutionModeJvm    ExecutionMode = "jvm"
+)
 
 func GetConfigsFromFiles(
 	staticConfigFile string, customConfigFile string, stdout io.Writer) (
@@ -267,6 +281,9 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 				"subProcess config %s", name)
 		}
 	}
+	if err := validateExecutionMode(config.Experimental.ExecutionMode); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
+	}
 	return config, nil
 }
 
@@ -323,4 +340,14 @@ func convertMap(intMap map[int]struct{}) map[string]struct{} {
 		stringMap[strconv.Itoa(k)] = v
 	}
 	return stringMap
+}
+
+func validateExecutionMode(mode ExecutionMode) error {
+	if mode == "" {
+		return nil
+	}
+	if mode != ExecutionModeNative && mode != ExecutionModeJvm {
+		return fmt.Errorf("experimental.executionMode must be one of {'%s', '%s'} (default '%s') found '%s'", ExecutionModeNative, ExecutionModeJvm, ExecutionModeJvm, mode)
+	}
+	return nil
 }

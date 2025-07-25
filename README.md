@@ -184,6 +184,23 @@ dangerousDisableContainerSupport: true
 Alternatively, the presence of ``-XX:MaxRAM=`` prefix in either static or custom jvm opts will also disable this
 behavior.
 
+### Graal Native Image support
+
+Go-java-launcher supports running a native image of a Java application. For example:
+
+```yaml
+experimental:
+  executionMode: native
+  nativeImageExecutablePath: service/bin/log-receiver-native
+```
+
+
+Not all JVM options are supported by native image, so go-java-launcher will attempt to copy over applicable options from `jvmOpts` to the native image executable. The list of respected options is in [AllowedNativeImageJVMOptions](https://github.com/palantir/go-java-launcher/blob/develop/launchlib/native.go).
+
+To add additional arguments (including native image options) to the native image executable, set `nativeImageArguments`.
+
+Like Java processes, native images launched by go-java-launcher will also respect the `heapPercentage` option, which will be used to calculate the heap size of the native image executable. 
+
 # go-init
 
 This repository also publishes a binary called `go-init` that supports the commands `start`, `status`, and `stop`, in

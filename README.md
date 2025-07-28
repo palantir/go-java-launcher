@@ -184,9 +184,10 @@ dangerousDisableContainerSupport: true
 Alternatively, the presence of ``-XX:MaxRAM=`` prefix in either static or custom jvm opts will also disable this
 behavior.
 
-### Graal Native Image support
+### [Experimental] Graal Native Image support
 
-NOTE: Support for native images is `experimental` and may be either removed or promoted in the future. Use at your own risk. 
+[!WARNING] 
+**WARNING: Support for native images is `experimental` and may be either removed or promoted in the future. Use at your own risk.**
 
 Go-java-launcher supports running a native image of a Java application. For example:
 

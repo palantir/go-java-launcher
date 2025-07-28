@@ -1,0 +1,5 @@
+type: improvement
+improvement:
+  description: Upgrade jdks-latest
+  links:
+  - https://github.com/palantir/go-java-launcher/pull/586

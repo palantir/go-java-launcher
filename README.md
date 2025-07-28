@@ -187,7 +187,7 @@ behavior.
 ### [Experimental] Graal Native Image support
 
 > [!WARNING] 
-> **WARNING: Support for native images is `experimental` and may be either removed or promoted in the future. Use at your own risk.**
+> Support for native images is experimental and may be either removed or promoted in the future. Use at your own risk.
 
 Go-java-launcher supports running GraalVM Native Images. For example:
 

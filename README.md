@@ -184,7 +184,7 @@ dangerousDisableContainerSupport: true
 Alternatively, the presence of ``-XX:MaxRAM=`` prefix in either static or custom jvm opts will also disable this
 behavior.
 
-### [Experimental] Graal Native Image support
+### Graal Native Image support
 
 > [!WARNING] 
 > Support for native images is experimental and may be either removed or promoted in the future. Use at your own risk.

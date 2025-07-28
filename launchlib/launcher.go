@@ -31,8 +31,9 @@ const (
 	TemplateDelimsOpen  = "{{"
 	TemplateDelimsClose = "}}"
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
-	ExecPathBlackListRegex = `[^\w.\/_\-]`
-	BytesInMebibyte        = 1048576
+	ExecPathBlackListRegex           = `[^\w.\/_\-]`
+	BytesInMebibyte                  = 1048576
+	defaultNativeImageExecutablePath = "service/bin/native-executable"
 )
 
 type ServiceCmds struct {
@@ -93,7 +94,11 @@ func compileCmdFromConfig(
 
 		// Handle experimental nativeImage execution mode before standard processing
 		if customConfig.Experimental.ExecutionMode == ExecutionModeNative {
-			executable, executableErr = verifyPathIsSafeForExec(customConfig.Experimental.NativeImageExecutablePath)
+			nativeImageExecutablePath := customConfig.Experimental.NativeImageExecutablePath
+			if nativeImageExecutablePath == "" {
+				nativeImageExecutablePath = defaultNativeImageExecutablePath
+			}
+			executable, executableErr = verifyPathIsSafeForExec(nativeImageExecutablePath)
 			if executableErr != nil {
 				return nil, executableErr
 			}

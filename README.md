@@ -186,6 +186,8 @@ behavior.
 
 ### Graal Native Image support
 
+NOTE: Support for native images is `experimental` and may be either removed or promoted in the future. Use at your own risk. 
+
 Go-java-launcher supports running a native image of a Java application. For example:
 
 ```yaml
@@ -194,7 +196,7 @@ experimental:
   nativeImageExecutablePath: service/bin/<native-image-executable>
 ```
 
-Note: This requires a native image to be built and available at the specified path.
+This requires a native image to be built and available at the specified path.
 
 Not all JVM options are supported by native image, so go-java-launcher will attempt to copy over applicable options from `jvmOpts` to the native image executable. The list of respected options is in [AllowedNativeImageJVMOptions](https://github.com/palantir/go-java-launcher/blob/develop/launchlib/native.go).
 

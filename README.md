@@ -196,7 +196,7 @@ experimental:
   executionMode: native
 ```
 
-This requires a native image executable to be available at the path specified by `nativeImageExecutablePath`, which defaults to `service/bin/native-image`.
+This requires a native image executable to be available at the path specified by `nativeImageExecutablePath`, which defaults to `service/bin/native-executable`.
 
 Not all JVM options are supported by native image, so go-java-launcher will attempt to copy over applicable options from `jvmOpts` to the native image executable. The list of respected options is in [AllowedNativeImageJVMOptions](https://github.com/palantir/go-java-launcher/blob/develop/launchlib/native.go).
 

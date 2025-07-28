@@ -33,7 +33,7 @@ const (
 	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
 	ExecPathBlackListRegex           = `[^\w.\/_\-]`
 	BytesInMebibyte                  = 1048576
-	defaultNativeImageExecutablePath = "service/bin/native-image"
+	defaultNativeImageExecutablePath = "service/bin/native-executable"
 )
 
 type ServiceCmds struct {

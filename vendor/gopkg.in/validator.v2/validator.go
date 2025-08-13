@@ -114,11 +114,11 @@ type ValidationFunc func(v interface{}, param string) error
 
 // Validator implements a validator
 type Validator struct {
-	// Tag name being used.
-	tagName string
 	// validationFuncs is a map of ValidationFuncs indexed
 	// by their name.
 	validationFuncs map[string]ValidationFunc
+	// Tag name being used.
+	tagName string
 	// printJSON set to true will make errors print with the
 	// name of their json field instead of their struct tag.
 	// If no json tag is present the name of the struct field is used.
@@ -304,21 +304,24 @@ func (mv *Validator) validateField(fieldDef reflect.StructField, fieldVal reflec
 	}
 
 	// no-op if field is not a struct, interface, array, slice or map
+	fn := mv.fieldName(fieldDef)
 	mv.deepValidateCollection(fieldVal, m, func() string {
-		return fieldDef.Name
+		return fn
 	})
 
 	if len(errs) > 0 {
-		n := fieldDef.Name
-
-		if mv.printJSON {
-			if jn := parseName(fieldDef.Tag.Get("json")); jn != "" {
-				n = jn
-			}
-		}
-		m[n] = errs
+		m[fn] = errs
 	}
 	return nil
+}
+
+func (mv *Validator) fieldName(fieldDef reflect.StructField) string {
+	if mv.printJSON {
+		if jsonTagValue, ok := fieldDef.Tag.Lookup("json"); ok {
+			return parseName(jsonTagValue)
+		}
+	}
+	return fieldDef.Name
 }
 
 func (mv *Validator) deepValidateCollection(f reflect.Value, m ErrorMap, fnameFn func() string) {

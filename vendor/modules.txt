@@ -4,8 +4,8 @@ github.com/davecgh/go-spew/spew
 # github.com/mitchellh/go-ps v1.0.0
 ## explicit; go 1.13
 github.com/mitchellh/go-ps
-# github.com/mitchellh/go-wordwrap v1.0.0
-## explicit
+# github.com/mitchellh/go-wordwrap v1.0.1
+## explicit; go 1.14
 github.com/mitchellh/go-wordwrap
 # github.com/palantir/godel/pkg/products/v2 v2.0.0
 ## explicit; go 1.13

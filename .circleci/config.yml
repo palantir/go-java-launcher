@@ -49,7 +49,7 @@ jobs:
             - gradle-v1-{{ checksum "gradlew" }}
       - go-jobs/restore_cache_with_mod_time:
           cache_dir: out/dist
-      - run: ./gradlew publish --parallel --stacktrace --continue
+      - run: ./gradlew publish --no-configuration-cache --parallel --stacktrace --continue
       - save_cache:
           name: "Save gradle cache"
           key: gradle-v1-{{ checksum "gradlew" }}

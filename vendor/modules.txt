@@ -1,4 +1,4 @@
-# github.com/davecgh/go-spew v1.1.1
+# github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 ## explicit
 github.com/davecgh/go-spew/spew
 # github.com/mitchellh/go-ps v1.0.0
@@ -13,15 +13,15 @@ github.com/palantir/godel/pkg/products/v2
 # github.com/palantir/pkg v1.1.0
 ## explicit; go 1.19
 github.com/palantir/pkg
-# github.com/palantir/pkg/cli v1.1.0
-## explicit; go 1.19
+# github.com/palantir/pkg/cli v1.2.0
+## explicit; go 1.25.0
 github.com/palantir/pkg/cli
 github.com/palantir/pkg/cli/completion
 github.com/palantir/pkg/cli/flag
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/pmezard/go-difflib v1.0.0
+# github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 ## explicit
 github.com/pmezard/go-difflib/difflib
 # github.com/stretchr/testify v1.11.1

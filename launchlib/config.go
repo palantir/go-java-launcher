@@ -289,7 +289,7 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 
 func getCustomConfigFromFile(customConfigFile string, stdout io.Writer) (PrimaryCustomLauncherConfig, error) {
 	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
-		_, _ = fmt.Fprintf(stdout, "Failed to read custom config file, assuming no custom config: %s\n",
+		_, _ = fmt.Fprintf(stdout, "No custom config file specified, proceeding with no custom config %s\n",
 			customConfigFile)
 		return PrimaryCustomLauncherConfig{}, nil
 	} else if customConfig, err := parseCustomConfig(customData); err != nil {

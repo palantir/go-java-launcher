@@ -234,8 +234,7 @@ func TestParseMemorySize(t *testing.T) {
 		{"512M", 512 * 1024 * 1024, false},
 		{"1024k", 1024 * 1024, false},
 		{"1024K", 1024 * 1024, false},
-		{"1073741824", 1073741824, false},       // raw bytes
-		{" 2g ", 2 * 1024 * 1024 * 1024, false}, // with whitespace
+		{"1073741824", 1073741824, false}, // raw bytes
 		{"", 0, true},
 		{"invalid", 0, true},
 		{"2x", 0, true},

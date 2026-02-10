@@ -446,7 +446,6 @@ func isAlwaysPreTouch(arg string) bool {
 // Examples: "2g", "512m", "1024k", "1t", "2147483648"
 // Returns the size in bytes.
 func ParseMemorySize(s string) (uint64, error) {
-	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0, errors.New("empty memory size")
 	}
@@ -469,7 +468,7 @@ func ParseMemorySize(s string) (uint64, error) {
 		numStr = s[:len(s)-1]
 	}
 
-	val, err := strconv.ParseUint(strings.TrimSpace(numStr), 10, 64)
+	val, err := strconv.ParseUint(numStr, 10, 64)
 	if err != nil {
 		return 0, errors.Wrapf(err, "invalid memory size: %s", s)
 	}

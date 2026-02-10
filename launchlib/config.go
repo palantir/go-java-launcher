@@ -78,6 +78,13 @@ type ExperimentalLauncherConfig struct {
 	// NativeImageArguments specifies additional arguments that will be passed to the executable when running in native execution mode.
 	NativeImageArguments      []string `yaml:"nativeImageArguments"`
 	NativeImageExecutablePath string   `yaml:"nativeImageExecutablePath"`
+	// ShrinkableHeapMaxSize sets an explicit max heap size (e.g., "2g", "512m") and enables heap shrinking.
+	// When set: -Xmx is set to this value, -Xms is set to 25% of this value, AlwaysPreTouch is disabled,
+	// and G1PeriodicGCInterval is set to 10 minutes to periodically return unused memory to the OS.
+	// This is intended for memory-oversubscribed environments where the container memory limit exceeds the request.
+	// Takes precedence over heapPercentage when set.
+	// Note: This option has no effect in native image execution mode.
+	ShrinkableHeapMaxSize string `yaml:"shrinkableHeapMaxSize,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

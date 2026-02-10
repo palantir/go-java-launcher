@@ -221,3 +221,94 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 
 	assert.Contains(t, cmd.Args, "-XX:MaximumHeapSizePercent=60")
 }
+
+func TestParseMemorySize(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected uint64
+		wantErr  bool
+	}{
+		{"1g", 1024 * 1024 * 1024, false},
+		{"2G", 2 * 1024 * 1024 * 1024, false},
+		{"512m", 512 * 1024 * 1024, false},
+		{"512M", 512 * 1024 * 1024, false},
+		{"1024k", 1024 * 1024, false},
+		{"1024K", 1024 * 1024, false},
+		{"1073741824", 1073741824, false},       // raw bytes
+		{" 2g ", 2 * 1024 * 1024 * 1024, false}, // with whitespace
+		{"", 0, true},
+		{"invalid", 0, true},
+		{"2x", 0, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			result, err := ParseMemorySize(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
+		})
+	}
+}
+
+func TestFilterHeapSizeArgsV2_ShrinkableHeap(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		experimental   ExperimentalLauncherConfig
+		wantXms        string
+		wantXmx        string
+		wantNoPreTouch bool
+	}{
+		{
+			name: "shrinkableHeapMaxSize sets Xms to 25% of Xmx",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				ShrinkableHeapMaxSize: "2g",
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", (2*1024*1024*1024)/4),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
+			wantNoPreTouch: true,
+		},
+		{
+			name: "shrinkableHeapMaxSize filters out existing AlwaysPreTouch",
+			args: []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			experimental: ExperimentalLauncherConfig{
+				ShrinkableHeapMaxSize: "1g",
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", (1024*1024*1024)/4),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 1024*1024*1024),
+			wantNoPreTouch: true,
+		},
+		{
+			name: "shrinkableHeapMaxSize filters out existing Xmx/Xms",
+			args: []string{"-Xmx4g", "-Xms2g", "-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				ShrinkableHeapMaxSize: "1g",
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", (1024*1024*1024)/4),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 1024*1024*1024),
+			wantNoPreTouch: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := filterHeapSizeArgsV2(tc.args, nil, tc.experimental)
+			require.NoError(t, err)
+
+			assert.Contains(t, result, tc.wantXms)
+			assert.Contains(t, result, tc.wantXmx)
+			if tc.wantNoPreTouch {
+				assert.Contains(t, result, "-XX:-AlwaysPreTouch")
+				assert.NotContains(t, result, "-XX:+AlwaysPreTouch")
+				assert.Contains(t, result, "-XX:G1PeriodicGCInterval=600000")
+			}
+			// Original args should be preserved (except filtered ones)
+			assert.Contains(t, result, "-Dfoo=bar")
+		})
+	}
+}

@@ -22,6 +22,7 @@ import (
 	"path"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -34,6 +35,8 @@ const (
 	ExecPathBlackListRegex           = `[^\w.\/_\-]`
 	BytesInMebibyte                  = 1048576
 	defaultNativeImageExecutablePath = "service/bin/native-executable"
+	shrinkableHeapMinFraction        = 0.25   // minHeap = maxHeap * shrinkableHeapMinFraction (25% of max)
+	shrinkableHeapGCIntervalMs       = 600000 // 10 minutes - G1 triggers periodic GC to return memory to OS
 )
 
 type ServiceCmds struct {
@@ -300,7 +303,7 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage)
+		jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, customConfig.Experimental)
 		if err != nil {
 			// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 			// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
@@ -352,19 +355,41 @@ func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 	return filtered
 }
 
-func filterHeapSizeArgsV2(args []string, heapPercentage *float64) ([]string, error) {
+func filterHeapSizeArgsV2(args []string, heapPercentage *float64, experimental ExperimentalLauncherConfig) ([]string, error) {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
+	shrinkableHeap := experimental.ShrinkableHeapMaxSize != ""
+
 	for _, arg := range args {
-		if !isHeapSizeArg(arg) {
-			filtered = append(filtered, arg)
+		// Filter out -Xmx/-Xms
+		if isHeapSizeArg(arg) {
+			continue
 		}
+		// Filter out AlwaysPreTouch when using shrinkable heap
+		if shrinkableHeap && isAlwaysPreTouch(arg) {
+			continue
+		}
+		filtered = append(filtered, arg)
 
 		if isMaxRAMPercentage(arg) {
 			hasMaxRAMPercentage = true
 		} else if isInitialRAMPercentage(arg) {
 			hasInitialRAMPercentage = true
 		}
+	}
+
+	// If shrinkableHeapMaxSize is set, use it (takes precedence over heapPercentage)
+	if shrinkableHeap {
+		maxHeapBytes, err := ParseMemorySize(experimental.ShrinkableHeapMaxSize)
+		if err != nil {
+			return filtered, errors.Wrap(err, "failed to parse shrinkableHeapMaxSize")
+		}
+		minHeapBytes := uint64(float64(maxHeapBytes) * shrinkableHeapMinFraction)
+		filtered = append(filtered, fmt.Sprintf("-Xms%d", minHeapBytes))
+		filtered = append(filtered, fmt.Sprintf("-Xmx%d", maxHeapBytes))
+		filtered = append(filtered, "-XX:-AlwaysPreTouch")
+		filtered = append(filtered, fmt.Sprintf("-XX:G1PeriodicGCInterval=%d", shrinkableHeapGCIntervalMs))
+		return filtered, nil
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
@@ -409,6 +434,47 @@ func isMaxRAMPercentage(arg string) bool {
 
 func isInitialRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:InitialRAMPercentage=")
+}
+
+func isAlwaysPreTouch(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:+AlwaysPreTouch")
+}
+
+// ParseMemorySize parses a memory size string in the same format as Java's -Xmx/-Xms flags.
+// Supports suffixes: k/K (kilobytes), m/M (megabytes), g/G (gigabytes), t/T (terabytes).
+// All units are binary (1024-based). No suffix means bytes.
+// Examples: "2g", "512m", "1024k", "1t", "2147483648"
+// Returns the size in bytes.
+func ParseMemorySize(s string) (uint64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, errors.New("empty memory size")
+	}
+
+	lower := strings.ToLower(s)
+	multiplier := uint64(1)
+	numStr := s
+
+	if strings.HasSuffix(lower, "t") {
+		multiplier = 1024 * 1024 * 1024 * 1024
+		numStr = s[:len(s)-1]
+	} else if strings.HasSuffix(lower, "g") {
+		multiplier = 1024 * 1024 * 1024
+		numStr = s[:len(s)-1]
+	} else if strings.HasSuffix(lower, "m") {
+		multiplier = 1024 * 1024
+		numStr = s[:len(s)-1]
+	} else if strings.HasSuffix(lower, "k") {
+		multiplier = 1024
+		numStr = s[:len(s)-1]
+	}
+
+	val, err := strconv.ParseUint(strings.TrimSpace(numStr), 10, 64)
+	if err != nil {
+		return 0, errors.Wrapf(err, "invalid memory size: %s", s)
+	}
+
+	return val * multiplier, nil
 }
 
 // ComputeJVMHeapSizeInBytes By default, compute the heap size to be 75% of the heap minus 3mb per processor, with a minimum value

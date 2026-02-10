@@ -55,6 +55,7 @@ func getNativeArgsFromJVMOpts(jvmOpts []string) []string {
 }
 
 // getNativeArgs filters out any heap-related options that are not supported by the current mode (container mode enabled/disabled), and adds -XX:MaximumHeapSizePercent using heapPercentage if applicable
+// Note: shrinkableHeapMaxSize is not supported for native images.
 func getNativeArgs(nativeArgs []string, customConfig *CustomLauncherConfig) []string {
 	var filteredArgs []string
 

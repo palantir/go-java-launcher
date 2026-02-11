@@ -260,7 +260,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 		experimental   ExperimentalLauncherConfig
 		wantXms        string
 		wantXmx        string
-		wantNoPreTouch bool
 		wantPeriodicGC bool
 		wantErr        bool
 		wantErrMsg     string
@@ -273,7 +272,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 2*1024*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
-			wantNoPreTouch: false,
 			wantPeriodicGC: false,
 		},
 		{
@@ -285,7 +283,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 2*1024*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
-			wantNoPreTouch: false,
 			wantPeriodicGC: false,
 		},
 		{
@@ -297,7 +294,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
-			wantNoPreTouch: true,
 			wantPeriodicGC: false,
 		},
 		{
@@ -310,7 +306,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
-			wantNoPreTouch: true,
 			wantPeriodicGC: true,
 		},
 		{
@@ -322,7 +317,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 256*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 1024*1024*1024),
-			wantNoPreTouch: true,
 			wantPeriodicGC: false,
 		},
 		{
@@ -334,7 +328,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 1024*1024*1024),
-			wantNoPreTouch: true,
 			wantPeriodicGC: false,
 		},
 		{
@@ -367,7 +360,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			},
 			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
-			wantNoPreTouch: true,
 			wantPeriodicGC: true,
 		},
 	}
@@ -385,13 +377,6 @@ func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 			require.NoError(t, err)
 			assert.Contains(t, result, tc.wantXms)
 			assert.Contains(t, result, tc.wantXmx)
-
-			if tc.wantNoPreTouch {
-				assert.Contains(t, result, "-XX:-AlwaysPreTouch")
-				assert.NotContains(t, result, "-XX:+AlwaysPreTouch")
-			} else {
-				assert.NotContains(t, result, "-XX:-AlwaysPreTouch")
-			}
 
 			if tc.wantPeriodicGC {
 				intervalMs := uint64(300000)

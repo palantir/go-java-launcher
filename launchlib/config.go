@@ -78,13 +78,25 @@ type ExperimentalLauncherConfig struct {
 	// NativeImageArguments specifies additional arguments that will be passed to the executable when running in native execution mode.
 	NativeImageArguments      []string `yaml:"nativeImageArguments"`
 	NativeImageExecutablePath string   `yaml:"nativeImageExecutablePath"`
-	// ShrinkableHeapMaxSize sets an explicit max heap size (e.g., "2g", "512m") and enables heap shrinking.
-	// When set: -Xmx is set to this value, -Xms is set to 25% of this value, AlwaysPreTouch is disabled,
-	// and G1PeriodicGCInterval is set to 10 minutes to periodically return unused memory to the OS.
-	// This is intended for memory-oversubscribed environments where the container memory limit exceeds the request.
+	// MaxHeapSize sets an explicit max heap size (e.g., "2g", "512m").
+	// When MaxHeapSize is set without MinHeapSize, MinHeapSize defaults to MaxHeapSize (no shrinking).
+	// When MaxHeapSize and MinHeapSize are both set to different values, heap shrinking is enabled:
+	// AlwaysPreTouch is disabled to allow the JVM to return memory to the OS.
 	// Takes precedence over heapPercentage when set.
 	// Note: This option has no effect in native image execution mode.
-	ShrinkableHeapMaxSize string `yaml:"shrinkableHeapMaxSize,omitempty"`
+	MaxHeapSize string `yaml:"maxHeapSize,omitempty"`
+	// MinHeapSize sets the minimum heap size (e.g., "512m", "1g").
+	// Requires MaxHeapSize to also be set. If MinHeapSize > MaxHeapSize, an error is returned.
+	// When different from MaxHeapSize, enables heap shrinking behavior.
+	MinHeapSize string `yaml:"minHeapSize,omitempty"`
+	// EnablePeriodicGC enables periodic GC to return unused memory to the OS.
+	// Only effective when shrinkable heap is enabled (MaxHeapSize != MinHeapSize).
+	// When enabled, adds -XX:G1PeriodicGCInterval for the G1 collector.
+	// ZGC has built-in uncommit behavior enabled by default, so no flag is needed.
+	EnablePeriodicGC bool `yaml:"enablePeriodicGC,omitempty"`
+	// PeriodicGCIntervalMs sets the periodic GC interval in milliseconds.
+	// Only used when EnablePeriodicGC is true. Defaults to 300000 (5 minutes).
+	PeriodicGCIntervalMs *uint64 `yaml:"periodicGCIntervalMs,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

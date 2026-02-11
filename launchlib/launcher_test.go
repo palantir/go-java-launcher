@@ -253,7 +253,7 @@ func TestParseMemorySize(t *testing.T) {
 	}
 }
 
-func TestFilterHeapSizeArgsV2_ShrinkableHeap(t *testing.T) {
+func TestFilterHeapSizeArgsV2_MaxMinHeapSize(t *testing.T) {
 	tests := []struct {
 		name           string
 		args           []string
@@ -261,53 +261,169 @@ func TestFilterHeapSizeArgsV2_ShrinkableHeap(t *testing.T) {
 		wantXms        string
 		wantXmx        string
 		wantNoPreTouch bool
+		wantPeriodicGC bool
+		wantErr        bool
+		wantErrMsg     string
 	}{
 		{
-			name: "shrinkableHeapMaxSize sets Xms to 25% of Xmx",
+			name: "maxHeapSize only sets min equal to max (no shrinking)",
 			args: []string{"-Dfoo=bar"},
 			experimental: ExperimentalLauncherConfig{
-				ShrinkableHeapMaxSize: "2g",
+				MaxHeapSize: "2g",
 			},
-			wantXms:        fmt.Sprintf("-Xms%d", (2*1024*1024*1024)/4),
+			wantXms:        fmt.Sprintf("-Xms%d", 2*1024*1024*1024),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
+			wantNoPreTouch: false,
+			wantPeriodicGC: false,
+		},
+		{
+			name: "maxHeapSize and minHeapSize same value (no shrinking)",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				MaxHeapSize: "2g",
+				MinHeapSize: "2g",
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", 2*1024*1024*1024),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
+			wantNoPreTouch: false,
+			wantPeriodicGC: false,
+		},
+		{
+			name: "maxHeapSize and minHeapSize different enables shrinking but no periodic GC",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				MaxHeapSize: "2g",
+				MinHeapSize: "512m",
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
 			wantNoPreTouch: true,
+			wantPeriodicGC: false,
 		},
 		{
-			name: "shrinkableHeapMaxSize filters out existing AlwaysPreTouch",
+			name: "shrinkable heap with EnablePeriodicGC adds all GC interval flags",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				MaxHeapSize:      "2g",
+				MinHeapSize:      "512m",
+				EnablePeriodicGC: true,
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
+			wantNoPreTouch: true,
+			wantPeriodicGC: true,
+		},
+		{
+			name: "shrinkable heap filters out existing AlwaysPreTouch",
 			args: []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
 			experimental: ExperimentalLauncherConfig{
-				ShrinkableHeapMaxSize: "1g",
+				MaxHeapSize: "1g",
+				MinHeapSize: "256m",
 			},
-			wantXms:        fmt.Sprintf("-Xms%d", (1024*1024*1024)/4),
+			wantXms:        fmt.Sprintf("-Xms%d", 256*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 1024*1024*1024),
 			wantNoPreTouch: true,
+			wantPeriodicGC: false,
 		},
 		{
-			name: "shrinkableHeapMaxSize filters out existing Xmx/Xms",
+			name: "explicit heap sizes filter out existing Xmx/Xms",
 			args: []string{"-Xmx4g", "-Xms2g", "-Dfoo=bar"},
 			experimental: ExperimentalLauncherConfig{
-				ShrinkableHeapMaxSize: "1g",
+				MaxHeapSize: "1g",
+				MinHeapSize: "512m",
 			},
-			wantXms:        fmt.Sprintf("-Xms%d", (1024*1024*1024)/4),
+			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
 			wantXmx:        fmt.Sprintf("-Xmx%d", 1024*1024*1024),
 			wantNoPreTouch: true,
+			wantPeriodicGC: false,
+		},
+		{
+			name: "minHeapSize without maxHeapSize returns error",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				MinHeapSize: "512m",
+			},
+			wantErr:    true,
+			wantErrMsg: "minHeapSize requires maxHeapSize to be set",
+		},
+		{
+			name: "minHeapSize greater than maxHeapSize returns error",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				MaxHeapSize: "512m",
+				MinHeapSize: "2g",
+			},
+			wantErr:    true,
+			wantErrMsg: "minHeapSize cannot be greater than maxHeapSize",
+		},
+		{
+			name: "custom PeriodicGCIntervalMs",
+			args: []string{"-Dfoo=bar"},
+			experimental: ExperimentalLauncherConfig{
+				MaxHeapSize:          "2g",
+				MinHeapSize:          "512m",
+				EnablePeriodicGC:     true,
+				PeriodicGCIntervalMs: ptrUint64(600000),
+			},
+			wantXms:        fmt.Sprintf("-Xms%d", 512*1024*1024),
+			wantXmx:        fmt.Sprintf("-Xmx%d", 2*1024*1024*1024),
+			wantNoPreTouch: true,
+			wantPeriodicGC: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := filterHeapSizeArgsV2(tc.args, nil, tc.experimental)
-			require.NoError(t, err)
 
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
 			assert.Contains(t, result, tc.wantXms)
 			assert.Contains(t, result, tc.wantXmx)
+
 			if tc.wantNoPreTouch {
 				assert.Contains(t, result, "-XX:-AlwaysPreTouch")
 				assert.NotContains(t, result, "-XX:+AlwaysPreTouch")
-				assert.Contains(t, result, "-XX:G1PeriodicGCInterval=600000")
+			} else {
+				assert.NotContains(t, result, "-XX:-AlwaysPreTouch")
 			}
+
+			if tc.wantPeriodicGC {
+				intervalMs := uint64(300000)
+				if tc.experimental.PeriodicGCIntervalMs != nil {
+					intervalMs = *tc.experimental.PeriodicGCIntervalMs
+				}
+				assert.Contains(t, result, fmt.Sprintf("-XX:G1PeriodicGCInterval=%d", intervalMs))
+			} else {
+				assert.NotContains(t, result, "-XX:G1PeriodicGCInterval=")
+			}
+
 			// Original args should be preserved (except filtered ones)
 			assert.Contains(t, result, "-Dfoo=bar")
 		})
 	}
+}
+
+func TestFilterHeapSizeArgsV2_MaxHeapSizePrecedence(t *testing.T) {
+	// MaxHeapSize should take precedence over heapPercentage
+	heapPercentage := 50.0
+	experimental := ExperimentalLauncherConfig{
+		MaxHeapSize: "1g",
+	}
+
+	result, err := filterHeapSizeArgsV2([]string{"-Dfoo=bar"}, &heapPercentage, experimental)
+	require.NoError(t, err)
+
+	// Should use MaxHeapSize, not heapPercentage
+	assert.Contains(t, result, fmt.Sprintf("-Xms%d", 1024*1024*1024))
+	assert.Contains(t, result, fmt.Sprintf("-Xmx%d", 1024*1024*1024))
+}
+
+func ptrUint64(v uint64) *uint64 {
+	return &v
 }

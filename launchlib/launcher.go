@@ -35,8 +35,7 @@ const (
 	ExecPathBlackListRegex           = `[^\w.\/_\-]`
 	BytesInMebibyte                  = 1048576
 	defaultNativeImageExecutablePath = "service/bin/native-executable"
-	shrinkableHeapMinFraction        = 0.25   // minHeap = maxHeap * shrinkableHeapMinFraction (25% of max)
-	shrinkableHeapGCIntervalMs       = 600000 // 10 minutes - G1 triggers periodic GC to return memory to OS
+	defaultPeriodicGCIntervalMs      = 300000 // 5 minutes - default interval for periodic GC
 )
 
 type ServiceCmds struct {
@@ -358,7 +357,40 @@ func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 func filterHeapSizeArgsV2(args []string, heapPercentage *float64, experimental ExperimentalLauncherConfig) ([]string, error) {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
-	shrinkableHeap := experimental.ShrinkableHeapMaxSize != ""
+
+	// Validate MinHeapSize requires MaxHeapSize
+	if experimental.MinHeapSize != "" && experimental.MaxHeapSize == "" {
+		return nil, errors.New("minHeapSize requires maxHeapSize to be set")
+	}
+
+	// Determine if explicit heap sizes are configured
+	hasExplicitHeapConfig := experimental.MaxHeapSize != ""
+
+	// Parse and validate heap sizes if configured
+	var maxHeapBytes, minHeapBytes uint64
+	var shrinkableHeap bool
+	if hasExplicitHeapConfig {
+		var err error
+		maxHeapBytes, err = ParseMemorySize(experimental.MaxHeapSize)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse maxHeapSize")
+		}
+
+		if experimental.MinHeapSize != "" {
+			minHeapBytes, err = ParseMemorySize(experimental.MinHeapSize)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to parse minHeapSize")
+			}
+			if minHeapBytes > maxHeapBytes {
+				return nil, errors.New("minHeapSize cannot be greater than maxHeapSize")
+			}
+		} else {
+			// If MinHeapSize not set, default to MaxHeapSize (no shrinking)
+			minHeapBytes = maxHeapBytes
+		}
+
+		shrinkableHeap = minHeapBytes != maxHeapBytes
+	}
 
 	for _, arg := range args {
 		// Filter out -Xmx/-Xms
@@ -378,17 +410,23 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, experimental E
 		}
 	}
 
-	// If shrinkableHeapMaxSize is set, use it (takes precedence over heapPercentage)
-	if shrinkableHeap {
-		maxHeapBytes, err := ParseMemorySize(experimental.ShrinkableHeapMaxSize)
-		if err != nil {
-			return filtered, errors.Wrap(err, "failed to parse shrinkableHeapMaxSize")
-		}
-		minHeapBytes := uint64(float64(maxHeapBytes) * shrinkableHeapMinFraction)
+	// If MaxHeapSize is set, use explicit heap sizes (takes precedence over heapPercentage)
+	if hasExplicitHeapConfig {
 		filtered = append(filtered, fmt.Sprintf("-Xms%d", minHeapBytes))
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", maxHeapBytes))
-		filtered = append(filtered, "-XX:-AlwaysPreTouch")
-		filtered = append(filtered, fmt.Sprintf("-XX:G1PeriodicGCInterval=%d", shrinkableHeapGCIntervalMs))
+
+		if shrinkableHeap {
+			filtered = append(filtered, "-XX:-AlwaysPreTouch")
+
+			// Add periodic GC flag only if EnablePeriodicGC is true
+			if experimental.EnablePeriodicGC {
+				intervalMs := uint64(defaultPeriodicGCIntervalMs)
+				if experimental.PeriodicGCIntervalMs != nil {
+					intervalMs = *experimental.PeriodicGCIntervalMs
+				}
+				filtered = append(filtered, fmt.Sprintf("-XX:G1PeriodicGCInterval=%d", intervalMs))
+			}
+		}
 		return filtered, nil
 	}
 

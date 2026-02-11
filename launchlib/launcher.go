@@ -416,8 +416,6 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, experimental E
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", maxHeapBytes))
 
 		if shrinkableHeap {
-			filtered = append(filtered, "-XX:-AlwaysPreTouch")
-
 			// Add periodic GC flag only if EnablePeriodicGC is true
 			if experimental.EnablePeriodicGC {
 				intervalMs := uint64(defaultPeriodicGCIntervalMs)

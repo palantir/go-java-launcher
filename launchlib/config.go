@@ -92,7 +92,8 @@ type ExperimentalLauncherConfig struct {
 	// EnablePeriodicGC enables periodic GC to return unused memory to the OS.
 	// Only effective when shrinkable heap is enabled (MaxHeapSize != MinHeapSize).
 	// When enabled, adds -XX:G1PeriodicGCInterval for the G1 collector.
-	// ZGC has built-in uncommit behavior enabled by default, so no flag is needed.
+	// Note: This flag is G1-specific and will be ignored (or error) on other collectors like ZGC.
+	// ZGC has built-in uncommit behavior enabled by default, so no additional flag is needed.
 	EnablePeriodicGC bool `yaml:"enablePeriodicGC,omitempty"`
 	// PeriodicGCIntervalMs sets the periodic GC interval in milliseconds.
 	// Only used when EnablePeriodicGC is true. Defaults to 300000 (5 minutes).

@@ -369,6 +369,28 @@ env:
 			},
 		},
 		{
+			name: "allowHeapShrink is parsed",
+			data: `
+configType: java
+configVersion: 1
+experimental:
+  allowHeapShrink: true
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Experimental: ExperimentalLauncherConfig{
+						AllowHeapShrink: true,
+					},
+				},
+			},
+		},
+		{
 			name: "executionMode is parsed",
 			data: `
 configType: java

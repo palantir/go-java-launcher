@@ -19,6 +19,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -147,6 +148,103 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	for _, dir := range badCases {
 		err = MkDirs([]string{dir}, os.Stdout)
 		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
+	}
+}
+
+func TestFilterHeapSizeArgs(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		heapPercentage  *float64
+		allowHeapShrink bool
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:            "allowHeapShrink false sets both InitialRAMPercentage and MaxRAMPercentage",
+			args:            []string{"-Dfoo=bar"},
+			allowHeapShrink: false,
+			wantContains:    []string{"-Dfoo=bar", "-XX:InitialRAMPercentage=75.0", "-XX:MaxRAMPercentage=75.0"},
+		},
+		{
+			name:            "allowHeapShrink true omits InitialRAMPercentage",
+			args:            []string{"-Dfoo=bar"},
+			allowHeapShrink: true,
+			wantContains:    []string{"-Dfoo=bar", "-XX:MaxRAMPercentage=75.0"},
+			wantNotContains: []string{"-XX:InitialRAMPercentage=75.0"},
+		},
+		{
+			name:            "allowHeapShrink true with custom heapPercentage",
+			args:            []string{"-Dfoo=bar"},
+			heapPercentage:  toPointer(60.0),
+			allowHeapShrink: true,
+			wantContains:    []string{"-XX:MaxRAMPercentage=60.0"},
+			wantNotContains: []string{"-XX:InitialRAMPercentage=60.0"},
+		},
+		{
+			name:            "existing RAMPercentage args are preserved regardless of allowHeapShrink",
+			args:            []string{"-XX:MaxRAMPercentage=80.0", "-XX:InitialRAMPercentage=50.0"},
+			allowHeapShrink: true,
+			wantContains:    []string{"-XX:MaxRAMPercentage=80.0", "-XX:InitialRAMPercentage=50.0"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := filterHeapSizeArgs(tc.args, tc.heapPercentage, tc.allowHeapShrink)
+			for _, want := range tc.wantContains {
+				assert.Contains(t, result, want)
+			}
+			for _, notWant := range tc.wantNotContains {
+				assert.NotContains(t, result, notWant)
+			}
+		})
+	}
+}
+
+func TestFilterHeapSizeArgsV2(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		heapPercentage  *float64
+		allowHeapShrink bool
+		wantXmsPresent  bool
+		wantXmxPresent  bool
+	}{
+		{
+			name:            "allowHeapShrink false sets both Xms and Xmx",
+			args:            []string{"-Dfoo=bar"},
+			allowHeapShrink: false,
+			wantXmsPresent:  true,
+			wantXmxPresent:  true,
+		},
+		{
+			name:            "allowHeapShrink true omits Xms",
+			args:            []string{"-Dfoo=bar"},
+			allowHeapShrink: true,
+			wantXmsPresent:  false,
+			wantXmxPresent:  true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.allowHeapShrink)
+			// filterHeapSizeArgsV2 reads cgroup files, which won't exist in test env
+			if err != nil {
+				t.Skipf("skipping: cgroup files not available: %v", err)
+			}
+			hasXms := false
+			hasXmx := false
+			for _, arg := range result {
+				if strings.HasPrefix(arg, "-Xms") {
+					hasXms = true
+				}
+				if strings.HasPrefix(arg, "-Xmx") {
+					hasXmx = true
+				}
+			}
+			assert.Equal(t, tc.wantXmsPresent, hasXms, "Xms presence")
+			assert.Equal(t, tc.wantXmxPresent, hasXmx, "Xmx presence")
+		})
 	}
 }
 

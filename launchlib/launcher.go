@@ -301,15 +301,18 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		cgroupMemoryLimitInBytes, err := getCGroupMemoryLimitInBytes()
-		if err != nil || cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
+		if err != nil {
 			// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 			// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
 			// by all platforms using Java.
-			// Also, when the memory limit is unusually high (defined to be over 1TB), we revert to the
-			// percentage-based heap sizing. This is to handle the edge case where the cgroups memory limit is set
-			// to be an arbitrary large value.
-			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
-			return combinedJvmOpts
+			_, _ = fmt.Fprintf(logger, "Failed to get cgroup memory limit, falling back to percentage-based heap sizing: %v\n", err)
+			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
+		}
+		if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
+			// When the memory limit is unusually high (defined to be over 1TB), revert to percentage-based heap
+			// sizing. This handles the edge case where the cgroups memory limit is set to an arbitrary large value.
+			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
+			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		}
 		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, customConfig.Experimental.AllowHeapShrink)
 	}

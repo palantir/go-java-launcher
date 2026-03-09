@@ -187,10 +187,49 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 				"-XX:+AlwaysPreTouch",
 			},
 		},
+		{
+			name:            "allowHeapShrink false preserves AlwaysPreTouch",
+			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
+			allowHeapShrink: false,
+			wantContains: []string{
+				"-Dfoo=bar",
+				"-XX:+AlwaysPreTouch",
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
+		{
+			name:            "existing RAMPercentage overrides are preserved",
+			args:            []string{"-Dfoo=bar", "-XX:InitialRAMPercentage=50.0", "-XX:MaxRAMPercentage=80.0"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
+			allowHeapShrink: true,
+			wantContains: []string{
+				"-Dfoo=bar",
+				"-XX:InitialRAMPercentage=50.0",
+				"-XX:MaxRAMPercentage=80.0",
+			},
+			wantNotContains: []string{
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
+		{
+			name:           "returns error for unusually high cgroup memory limit",
+			args:           []string{"-Dfoo=bar"},
+			cgroupMemory:   1_000_001 * BytesInMebibyte,
+			heapPercentage: toPointer(10.0),
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, tc.allowHeapShrink)
+			if tc.name == "returns error for unusually high cgroup memory limit" {
+				require.EqualError(t, err, "cgroups memory limit is unusually high. Not setting JVM heap size options")
+				return
+			}
 			require.NoError(t, err)
 			for _, want := range tc.wantContains {
 				assert.Contains(t, result, want)

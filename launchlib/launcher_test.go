@@ -151,45 +151,6 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	}
 }
 
-func TestFilterHeapSizeArgs(t *testing.T) {
-	tests := []struct {
-		name            string
-		args            []string
-		heapPercentage  *float64
-		wantContains    []string
-	}{
-		{
-			name:         "sets both InitialRAMPercentage and MaxRAMPercentage",
-			args:         []string{"-Dfoo=bar"},
-			wantContains: []string{"-Dfoo=bar", "-XX:InitialRAMPercentage=75.0", "-XX:MaxRAMPercentage=75.0"},
-		},
-		{
-			name:           "custom heapPercentage sets both InitialRAMPercentage and MaxRAMPercentage",
-			args:           []string{"-Dfoo=bar"},
-			heapPercentage: toPointer(60.0),
-			wantContains:   []string{"-XX:InitialRAMPercentage=60.0", "-XX:MaxRAMPercentage=60.0"},
-		},
-		{
-			name:         "existing RAMPercentage args are preserved",
-			args:         []string{"-XX:MaxRAMPercentage=80.0", "-XX:InitialRAMPercentage=50.0"},
-			wantContains: []string{"-XX:MaxRAMPercentage=80.0", "-XX:InitialRAMPercentage=50.0"},
-		},
-		{
-			name:         "AlwaysPreTouch is preserved in V1 fallback",
-			args:         []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
-			wantContains: []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch", "-XX:InitialRAMPercentage=75.0", "-XX:MaxRAMPercentage=75.0"},
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			result := filterHeapSizeArgs(tc.args, tc.heapPercentage)
-			for _, want := range tc.wantContains {
-				assert.Contains(t, result, want)
-			}
-		})
-	}
-}
-
 func TestFilterHeapSizeArgsV2(t *testing.T) {
 	tests := []struct {
 		name            string

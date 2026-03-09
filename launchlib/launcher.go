@@ -330,10 +330,9 @@ func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
-		if isHeapSizeArg(arg) {
-			continue
+		if !isHeapSizeArg(arg) {
+			filtered = append(filtered, arg)
 		}
-		filtered = append(filtered, arg)
 
 		if isMaxRAMPercentage(arg) {
 			hasMaxRAMPercentage = true

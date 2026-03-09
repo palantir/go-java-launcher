@@ -187,6 +187,19 @@ func TestFilterHeapSizeArgs(t *testing.T) {
 			allowHeapShrink: true,
 			wantContains:    []string{"-XX:MaxRAMPercentage=80.0", "-XX:InitialRAMPercentage=50.0"},
 		},
+		{
+			name:            "allowHeapShrink true removes AlwaysPreTouch",
+			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			allowHeapShrink: true,
+			wantContains:    []string{"-Dfoo=bar", "-XX:MaxRAMPercentage=75.0"},
+			wantNotContains: []string{"-XX:+AlwaysPreTouch", "-XX:InitialRAMPercentage=75.0"},
+		},
+		{
+			name:            "allowHeapShrink false preserves AlwaysPreTouch",
+			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			allowHeapShrink: false,
+			wantContains:    []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch", "-XX:InitialRAMPercentage=75.0", "-XX:MaxRAMPercentage=75.0"},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

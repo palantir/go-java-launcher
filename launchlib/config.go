@@ -78,8 +78,8 @@ type ExperimentalLauncherConfig struct {
 	// NativeImageArguments specifies additional arguments that will be passed to the executable when running in native execution mode.
 	NativeImageArguments      []string `yaml:"nativeImageArguments"`
 	NativeImageExecutablePath string   `yaml:"nativeImageExecutablePath"`
-	// AllowHeapShrink, when true, omits the minimum heap size flag (-Xms or -XX:InitialRAMPercentage),
-	// allowing the JVM to start with a small heap and grow/shrink dynamically.
+	// AllowHeapShrink, when true, omits the minimum heap size flag (-Xms or -XX:InitialRAMPercentage)
+	// and removes -XX:+AlwaysPreTouch, allowing the JVM to start with a small heap and grow/shrink dynamically.
 	// Only takes effect in container mode (CONTAINER env var set and dangerousDisableContainerSupport is false).
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
 }

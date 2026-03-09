@@ -330,9 +330,13 @@ func filterHeapSizeArgs(args []string, heapPercentage *float64, allowHeapShrink 
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
-		if !isHeapSizeArg(arg) {
-			filtered = append(filtered, arg)
+		if isHeapSizeArg(arg) {
+			continue
 		}
+		if allowHeapShrink && isAlwaysPreTouch(arg) {
+			continue
+		}
+		filtered = append(filtered, arg)
 
 		if isMaxRAMPercentage(arg) {
 			hasMaxRAMPercentage = true
@@ -358,9 +362,13 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, allowHeapShrin
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
-		if !isHeapSizeArg(arg) {
-			filtered = append(filtered, arg)
+		if isHeapSizeArg(arg) {
+			continue
 		}
+		if allowHeapShrink && isAlwaysPreTouch(arg) {
+			continue
+		}
+		filtered = append(filtered, arg)
 
 		if isMaxRAMPercentage(arg) {
 			hasMaxRAMPercentage = true
@@ -405,6 +413,10 @@ func isMaxRAM(arg string) bool {
 
 func isHeapSizeArg(arg string) bool {
 	return strings.HasPrefix(arg, "-Xmx") || strings.HasPrefix(arg, "-Xms")
+}
+
+func isAlwaysPreTouch(arg string) bool {
+	return arg == "-XX:+AlwaysPreTouch"
 }
 
 func isMaxRAMPercentage(arg string) bool {

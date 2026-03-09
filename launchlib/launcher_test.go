@@ -19,7 +19,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,45 +154,50 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 	tests := []struct {
 		name            string
 		args            []string
+		cgroupMemory    uint64
 		heapPercentage  *float64
 		allowHeapShrink bool
-		wantXmsPresent  bool
-		wantXmxPresent  bool
+		wantContains    []string
+		wantNotContains []string
 	}{
 		{
 			name:            "allowHeapShrink false sets both Xms and Xmx",
 			args:            []string{"-Dfoo=bar"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
 			allowHeapShrink: false,
-			wantXmsPresent:  true,
-			wantXmxPresent:  true,
+			wantContains: []string{
+				"-Dfoo=bar",
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
 		},
 		{
-			name:            "allowHeapShrink true omits Xms",
-			args:            []string{"-Dfoo=bar"},
+			name:            "allowHeapShrink true omits Xms and strips AlwaysPreTouch",
+			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
 			allowHeapShrink: true,
-			wantXmsPresent:  false,
-			wantXmxPresent:  true,
+			wantContains: []string{
+				"-Dfoo=bar",
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+			wantNotContains: []string{
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				"-XX:+AlwaysPreTouch",
+			},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.allowHeapShrink)
-			// filterHeapSizeArgsV2 reads cgroup files, which won't exist in test env
-			if err != nil {
-				t.Skipf("skipping: cgroup files not available: %v", err)
+			result, err := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, tc.allowHeapShrink)
+			require.NoError(t, err)
+			for _, want := range tc.wantContains {
+				assert.Contains(t, result, want)
 			}
-			hasXms := false
-			hasXmx := false
-			for _, arg := range result {
-				if strings.HasPrefix(arg, "-Xms") {
-					hasXms = true
-				}
-				if strings.HasPrefix(arg, "-Xmx") {
-					hasXmx = true
-				}
+			for _, notWant := range tc.wantNotContains {
+				assert.NotContains(t, result, notWant)
 			}
-			assert.Equal(t, tc.wantXmsPresent, hasXms, "Xms presence")
-			assert.Equal(t, tc.wantXmxPresent, hasXmx, "Xmx presence")
 		})
 	}
 }

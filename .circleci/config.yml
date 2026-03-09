@@ -36,8 +36,27 @@ requires_jobs: &requires_jobs
   - verify
   - test
   - dist
+  - trial-publish
 
 jobs:
+  trial-publish:
+    working_directory: /home/circleci/go/src/github.com/palantir/go-java-launcher
+    docker:
+      - image: cimg/openjdk:11.0
+    steps:
+      - checkout
+      - restore_cache:
+          name: "Restore gradle cache"
+          keys:
+            - gradle-v1-{{ checksum "gradlew" }}
+      - go-jobs/restore_cache_with_mod_time:
+          cache_dir: out/dist
+      - run: ./gradlew publishToMavenLocal --no-configuration-cache --parallel --stacktrace --continue
+      - save_cache:
+          name: "Save gradle cache"
+          key: gradle-v1-{{ checksum "gradlew" }}
+          paths:
+            - ~/.gradle
   publish:
     working_directory: /home/circleci/go/src/github.com/palantir/go-java-launcher
     docker:
@@ -83,6 +102,12 @@ workflows:
           executor: "standard-executor"
           requires:
             - build
+          <<: *all-tags-filter
+      - trial-publish:
+          requires:
+            - verify
+            - test
+            - dist
           <<: *all-tags-filter
       - publish:
           requires:

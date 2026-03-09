@@ -383,7 +383,7 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLi
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		jvmHeapSizeInBytes, _ := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes, heapPercentage)
+		jvmHeapSizeInBytes := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes, heapPercentage)
 		if !allowHeapShrink {
 			filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		}
@@ -423,17 +423,14 @@ func isInitialRAMPercentage(arg string) bool {
 
 // ComputeJVMHeapSizeInBytes By default, compute the heap size to be 75% of the heap minus 3mb per processor, with a minimum value
 // of 50% of the heap. If heapPercentage is provided, use that percentage instead with no processor adjustment.
-func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64, heapPercentage *float64) (uint64, error) {
-	if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
-		return 0, errors.New("cgroups memory limit is unusually high. Not computing JVM heap size")
-	}
+func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64, heapPercentage *float64) uint64 {
 	var memoryLimit = float64(cgroupMemoryLimitInBytes)
 
 	if heapPercentage != nil {
-		return uint64(*heapPercentage / 100 * memoryLimit), nil
+		return uint64(*heapPercentage / 100 * memoryLimit)
 	}
 
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
-	return uint64(computedHeapSize), nil
+	return uint64(computedHeapSize)
 }

@@ -150,6 +150,86 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	}
 }
 
+func TestFilterHeapSizeArgsV2(t *testing.T) {
+	tests := []struct {
+		name            string
+		args            []string
+		cgroupMemory    uint64
+		heapPercentage  *float64
+		allowHeapShrink bool
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:            "allowHeapShrink false sets both Xms and Xmx",
+			args:            []string{"-Dfoo=bar"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
+			allowHeapShrink: false,
+			wantContains: []string{
+				"-Dfoo=bar",
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
+		{
+			name:            "allowHeapShrink true omits Xms and strips AlwaysPreTouch",
+			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
+			allowHeapShrink: true,
+			wantContains: []string{
+				"-Dfoo=bar",
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+			wantNotContains: []string{
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				"-XX:+AlwaysPreTouch",
+			},
+		},
+		{
+			name:            "allowHeapShrink false preserves AlwaysPreTouch",
+			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
+			allowHeapShrink: false,
+			wantContains: []string{
+				"-Dfoo=bar",
+				"-XX:+AlwaysPreTouch",
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
+		{
+			name:            "existing RAMPercentage overrides are preserved",
+			args:            []string{"-Dfoo=bar", "-XX:InitialRAMPercentage=50.0", "-XX:MaxRAMPercentage=80.0"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  toPointer(10.0),
+			allowHeapShrink: true,
+			wantContains: []string{
+				"-Dfoo=bar",
+				"-XX:InitialRAMPercentage=50.0",
+				"-XX:MaxRAMPercentage=80.0",
+			},
+			wantNotContains: []string{
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, tc.allowHeapShrink)
+			for _, want := range tc.wantContains {
+				assert.Contains(t, result, want)
+			}
+			for _, notWant := range tc.wantNotContains {
+				assert.NotContains(t, result, notWant)
+			}
+		})
+	}
+}
+
 func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	// Create a temporary executable file
 	tmpFile, err := os.CreateTemp("", "my-service-native")

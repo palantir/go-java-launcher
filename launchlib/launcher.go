@@ -300,19 +300,21 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		jvmOptsWithUpdatedHeapSizeArgs, err := filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage)
+		cgroupMemoryLimitInBytes, err := getCGroupMemoryLimitInBytes()
 		if err != nil {
 			// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 			// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
 			// by all platforms using Java.
-			// Also, when the memory limit is unusually high (defined to be over 1TB), we revert to the
-			// percentage-based heap sizing. This is to handle the edge case where the cgroups memory limit is set
-			// to be an arbitrary large value.
-			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
-		} else {
-			combinedJvmOpts = jvmOptsWithUpdatedHeapSizeArgs
+			_, _ = fmt.Fprintf(logger, "Failed to get cgroup memory limit, falling back to percentage-based heap sizing: %v\n", err)
+			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		}
-		return combinedJvmOpts
+		if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
+			// When the memory limit is unusually high (defined to be over 1TB), revert to percentage-based heap
+			// sizing. This handles the edge case where the cgroups memory limit is set to an arbitrary large value.
+			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
+			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
+		}
+		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, customConfig.Experimental.AllowHeapShrink)
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -352,13 +354,29 @@ func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 	return filtered
 }
 
-func filterHeapSizeArgsV2(args []string, heapPercentage *float64) ([]string, error) {
+func getCGroupMemoryLimitInBytes() (uint64, error) {
+	memoryLimit, err := NewCGroupMemoryLimit(os.DirFS("/"))
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get cgroup memory limit")
+	}
+	cgroupMemoryLimitInBytes, err := memoryLimit.MemoryLimitInBytes()
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get cgroup memory limit")
+	}
+	return cgroupMemoryLimitInBytes, nil
+}
+
+func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLimitInBytes uint64, allowHeapShrink bool) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
-		if !isHeapSizeArg(arg) {
-			filtered = append(filtered, arg)
+		if isHeapSizeArg(arg) {
+			continue
 		}
+		if allowHeapShrink && isAlwaysPreTouch(arg) {
+			continue
+		}
+		filtered = append(filtered, arg)
 
 		if isMaxRAMPercentage(arg) {
 			hasMaxRAMPercentage = true
@@ -368,22 +386,13 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64) ([]string, err
 	}
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
-		memoryLimit, err := NewCGroupMemoryLimit(os.DirFS("/"))
-		if err != nil {
-			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
+		jvmHeapSizeInBytes := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes, heapPercentage)
+		if !allowHeapShrink {
+			filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		}
-		cgroupMemoryLimitInBytes, err := memoryLimit.MemoryLimitInBytes()
-		if err != nil {
-			return filtered, errors.Wrap(err, "failed to get cgroup memory limit")
-		}
-		jvmHeapSizeInBytes, err := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes, heapPercentage)
-		if err != nil {
-			return filtered, errors.New("cgroups memory limit is unusually high. Not setting JVM heap size options")
-		}
-		filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
 	}
-	return filtered, nil
+	return filtered
 }
 
 func hasMaxRAMOverride(args []string) bool {
@@ -403,6 +412,10 @@ func isHeapSizeArg(arg string) bool {
 	return strings.HasPrefix(arg, "-Xmx") || strings.HasPrefix(arg, "-Xms")
 }
 
+func isAlwaysPreTouch(arg string) bool {
+	return arg == "-XX:+AlwaysPreTouch"
+}
+
 func isMaxRAMPercentage(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:MaxRAMPercentage=")
 }
@@ -413,17 +426,14 @@ func isInitialRAMPercentage(arg string) bool {
 
 // ComputeJVMHeapSizeInBytes By default, compute the heap size to be 75% of the heap minus 3mb per processor, with a minimum value
 // of 50% of the heap. If heapPercentage is provided, use that percentage instead with no processor adjustment.
-func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64, heapPercentage *float64) (uint64, error) {
-	if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
-		return 0, errors.New("cgroups memory limit is unusually high. Not computing JVM heap size")
-	}
+func ComputeJVMHeapSizeInBytes(hostProcessorCount int, cgroupMemoryLimitInBytes uint64, heapPercentage *float64) uint64 {
 	var memoryLimit = float64(cgroupMemoryLimitInBytes)
 
 	if heapPercentage != nil {
-		return uint64(*heapPercentage / 100 * memoryLimit), nil
+		return uint64(*heapPercentage / 100 * memoryLimit)
 	}
 
 	var processorAdjustment = 3 * BytesInMebibyte * float64(hostProcessorCount)
 	var computedHeapSize = max(0.5*memoryLimit, 0.75*memoryLimit-processorAdjustment)
-	return uint64(computedHeapSize), nil
+	return uint64(computedHeapSize)
 }

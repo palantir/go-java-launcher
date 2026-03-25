@@ -1,4 +1,4 @@
 version: 3
 schedules:
   timer:
-    time_since_last_release: 4 days
+    time_since_last_release: 2 days

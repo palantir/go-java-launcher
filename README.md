@@ -171,6 +171,32 @@ Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage``
 together with ``-Xmx|-Xms`` overrides safely: ``-Xmx/-Xms`` overrides ALWAYS take precedence and will be filtered out
 when running inside a container, as per logic detailed above.
 
+### Off-heap memory reservation
+
+Services that allocate significant off-heap memory (e.g., Apache Arrow buffers) can set `offHeapMemoryBytes` in
+`launcher-custom.yml` to subtract a fixed reservation from the container memory limit before computing the JVM heap
+size. This allows services to use the default 75% heap percentage while accounting for known off-heap memory usage.
+
+For example, a service with a 2 GiB Arrow allocation limit:
+
+```yaml
+configType: java
+offHeapMemoryBytes: 2147483648
+```
+
+With this configuration, the heap is computed as:
+
+```
+heap = (containerMemoryLimit - offHeapMemoryBytes) * heapPercentage
+```
+
+where `heapPercentage` defaults to 75% (with per-processor adjustment) if not explicitly set. This is preferable to
+manually setting a lower `heapPercentage`, because the heap size adapts correctly when the container memory limit
+changes.
+
+`offHeapMemoryBytes` only takes effect in the cgroup-based heap sizing path (container mode with readable cgroup memory
+limits). If cgroup detection falls back to percentage-based sizing, a warning is logged.
+
 ### Disabling container support
 
 This behavior can be disabled by setting the following in ``launcher-custom.yml``:

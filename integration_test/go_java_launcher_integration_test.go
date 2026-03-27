@@ -186,6 +186,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 		numHostProcessors   int
 		memoryLimit         uint64
 		heapPercentage      *float64
+		offHeapMemoryBytes  *uint64
 		expectedMaxHeapSize uint64
 	}{
 		{
@@ -219,9 +220,41 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			heapPercentage:      toPointer(10.0),
 			expectedMaxHeapSize: 1 * launchlib.BytesInMebibyte,
 		},
+		{
+			name:                "offHeapMemoryBytes subtracts from memory before percentage",
+			numHostProcessors:   1,
+			memoryLimit:         100 * launchlib.BytesInMebibyte,
+			heapPercentage:      toPointer(75.0),
+			offHeapMemoryBytes:  toPointer[uint64](20 * launchlib.BytesInMebibyte),
+			expectedMaxHeapSize: 60 * launchlib.BytesInMebibyte, // 75% * (100 - 20) = 60
+		},
+		{
+			name:                "offHeapMemoryBytes with default percentage and processor adjustment",
+			numHostProcessors:   1,
+			memoryLimit:         100 * launchlib.BytesInMebibyte,
+			heapPercentage:      nil,
+			offHeapMemoryBytes:  toPointer[uint64](20 * launchlib.BytesInMebibyte),
+			expectedMaxHeapSize: 57 * launchlib.BytesInMebibyte, // 75% * (100 - 20) - 3*1 = 57
+		},
+		{
+			name:                "offHeapMemoryBytes larger than memory yields zero heap",
+			numHostProcessors:   1,
+			memoryLimit:         10 * launchlib.BytesInMebibyte,
+			heapPercentage:      toPointer(75.0),
+			offHeapMemoryBytes:  toPointer[uint64](20 * launchlib.BytesInMebibyte),
+			expectedMaxHeapSize: 0,
+		},
+		{
+			name:                "nil offHeapMemoryBytes preserves existing behavior",
+			numHostProcessors:   1,
+			memoryLimit:         16 * launchlib.BytesInMebibyte,
+			heapPercentage:      nil,
+			offHeapMemoryBytes:  nil,
+			expectedMaxHeapSize: 9 * launchlib.BytesInMebibyte, // 75% * 16 - 3*1 = 9
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			heapSizeInBytes := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit, tc.heapPercentage)
+			heapSizeInBytes := launchlib.ComputeJVMHeapSizeInBytes(tc.numHostProcessors, tc.memoryLimit, tc.heapPercentage, tc.offHeapMemoryBytes)
 			assert.Equal(t, heapSizeInBytes, tc.expectedMaxHeapSize)
 		})
 	}

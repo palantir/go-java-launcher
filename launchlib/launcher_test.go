@@ -152,13 +152,14 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 
 func TestFilterHeapSizeArgsV2(t *testing.T) {
 	tests := []struct {
-		name            string
-		args            []string
-		cgroupMemory    uint64
-		heapPercentage  *float64
-		allowHeapShrink bool
-		wantContains    []string
-		wantNotContains []string
+		name               string
+		args               []string
+		cgroupMemory       uint64
+		heapPercentage     *float64
+		allowHeapShrink    bool
+		offHeapMemoryBytes *uint64
+		wantContains       []string
+		wantNotContains    []string
 	}{
 		{
 			name:            "allowHeapShrink false sets both Xms and Xmx",
@@ -216,10 +217,33 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
 			},
 		},
+		{
+			name:               "offHeapMemoryBytes subtracts from container memory",
+			args:               []string{"-Dfoo=bar"},
+			cgroupMemory:       10 * BytesInMebibyte,
+			heapPercentage:     toPointer(50.0),
+			offHeapMemoryBytes: toPointer[uint64](2 * BytesInMebibyte),
+			// heap = 50% * (10 MiB - 2 MiB) = 4 MiB
+			wantContains: []string{
+				fmt.Sprintf("-Xms%d", 4*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 4*BytesInMebibyte),
+			},
+		},
+		{
+			name:           "nil offHeapMemoryBytes uses full container memory",
+			args:           []string{"-Dfoo=bar"},
+			cgroupMemory:   10 * BytesInMebibyte,
+			heapPercentage: toPointer(50.0),
+			// heap = 50% * 10 MiB = 5 MiB
+			wantContains: []string{
+				fmt.Sprintf("-Xms%d", 5*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 5*BytesInMebibyte),
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, tc.allowHeapShrink)
+			result := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, tc.allowHeapShrink, tc.offHeapMemoryBytes)
 			for _, want := range tc.wantContains {
 				assert.Contains(t, result, want)
 			}
@@ -229,6 +253,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 		})
 	}
 }
+
 
 func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	// Create a temporary executable file

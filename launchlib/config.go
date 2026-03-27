@@ -70,6 +70,11 @@ type CustomLauncherConfig struct {
 	Experimental            ExperimentalLauncherConfig `yaml:"experimental"`
 	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
 	HeapPercentage          *float64                   `yaml:"heapPercentage" validate:"gt=0,lte=100"`
+	// OffHeapMemoryBytes specifies a fixed off-heap memory reservation (in bytes) that should be subtracted from the
+	// container memory limit before computing the JVM heap size. This is useful for services that allocate significant
+	// off-heap memory (e.g., Apache Arrow buffers) that the launcher's heap sizing would otherwise not account for.
+	// Only takes effect in container mode (CONTAINER env var set and dangerousDisableContainerSupport is false).
+	OffHeapMemoryBytes *uint64 `yaml:"offHeapMemoryBytes"`
 }
 
 type ExperimentalLauncherConfig struct {

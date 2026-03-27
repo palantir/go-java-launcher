@@ -254,7 +254,6 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 	}
 }
 
-
 func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	// Create a temporary executable file
 	tmpFile, err := os.CreateTemp("", "my-service-native")

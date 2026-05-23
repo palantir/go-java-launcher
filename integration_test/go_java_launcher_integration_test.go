@@ -216,7 +216,7 @@ func TestComputeJVMHeapSize(t *testing.T) {
 			name:                "computes heap as 10% of memory limit using heapPercentage",
 			numHostProcessors:   3,
 			memoryLimit:         10 * launchlib.BytesInMebibyte,
-			heapPercentage:      toPointer(10.0),
+			heapPercentage:      new(10.0),
 			expectedMaxHeapSize: 1 * launchlib.BytesInMebibyte,
 		},
 	} {
@@ -260,7 +260,7 @@ func runMultiProcess(t *testing.T, cmd *exec.Cmd) map[string]int {
 	require.NoError(t, err)
 
 	children := map[string]int{}
-	for _, child := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+	for child := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
 		parts := strings.SplitN(strings.TrimSpace(child), " ", 2)
 		cpid, err := strconv.Atoi(parts[0])
 		cmdline := strings.TrimSpace(parts[1])
@@ -309,6 +309,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+//go:fix inline
 func toPointer[T any](t T) *T {
-	return &t
+	return new(t)
 }

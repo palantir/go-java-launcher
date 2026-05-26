@@ -391,6 +391,25 @@ experimental:
 			},
 		},
 		{
+			name: "top-level allowHeapShrink is parsed",
+			data: `
+configType: java
+configVersion: 1
+allowHeapShrink: true
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					AllowHeapShrink: true,
+				},
+			},
+		},
+		{
 			name: "executionMode is parsed",
 			data: `
 configType: java

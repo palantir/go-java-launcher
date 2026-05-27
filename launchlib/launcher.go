@@ -314,7 +314,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
 			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		}
-		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, customConfig.Experimental.AllowHeapShrink)
+		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink)
 	}
 
 	if isEnvVarSet("CONTAINER") {

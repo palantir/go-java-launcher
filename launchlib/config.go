@@ -70,6 +70,12 @@ type CustomLauncherConfig struct {
 	Experimental            ExperimentalLauncherConfig `yaml:"experimental"`
 	DisableContainerSupport bool                       `yaml:"dangerousDisableContainerSupport"`
 	HeapPercentage          *float64                   `yaml:"heapPercentage" validate:"gt=0,lte=100"`
+	// AllowHeapShrink, when true, omits the launcher-generated -Xms flag in the cgroup-based heap sizing path
+	// and removes -XX:+AlwaysPreTouch, allowing the JVM to start with a small heap and grow/shrink dynamically.
+	// Only takes effect in container mode (CONTAINER env var set and dangerousDisableContainerSupport is false).
+	// The equivalent field under experimental is retained for backwards compatibility with existing overrides;
+	// either setting being true enables the behavior.
+	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
 }
 
 type ExperimentalLauncherConfig struct {
@@ -78,9 +84,8 @@ type ExperimentalLauncherConfig struct {
 	// NativeImageArguments specifies additional arguments that will be passed to the executable when running in native execution mode.
 	NativeImageArguments      []string `yaml:"nativeImageArguments"`
 	NativeImageExecutablePath string   `yaml:"nativeImageExecutablePath"`
-	// AllowHeapShrink, when true, omits the launcher-generated -Xms flag in the cgroup-based heap sizing path
-	// and removes -XX:+AlwaysPreTouch, allowing the JVM to start with a small heap and grow/shrink dynamically.
-	// Only takes effect in container mode (CONTAINER env var set and dangerousDisableContainerSupport is false).
+	// Deprecated: use the top-level allowHeapShrink field on CustomLauncherConfig instead. This field is retained
+	// for backwards compatibility with existing overrides that set it under experimental.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
 }
 

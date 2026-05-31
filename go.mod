@@ -2,6 +2,8 @@ module github.com/palantir/go-java-launcher
 
 go 1.26.0
 
+toolchain go1.26.3
+
 require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/palantir/godel/pkg/products/v2 v2.0.0

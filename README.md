@@ -171,6 +171,22 @@ Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage``
 together with ``-Xmx|-Xms`` overrides safely: ``-Xmx/-Xms`` overrides ALWAYS take precedence and will be filtered out
 when running inside a container, as per logic detailed above.
 
+### Allowing the heap to shrink
+
+By default, the cgroup-based heap sizing sets ``-Xms`` equal to ``-Xmx`` so the heap is fixed and never shrinks. To
+instead let the JVM start with a small heap and grow or shrink it on demand, set the following in ``launcher-custom.yml``:
+
+```yaml
+configType: java
+...
+allowHeapShrink: true
+```
+
+When enabled, the launcher omits the generated ``-Xms`` flag (only ``-Xmx`` is set) and strips any
+``-XX:+AlwaysPreTouch`` from the JVM options, since pre-touching commits the full heap up front and defeats the purpose.
+This only takes effect in container mode (i.e. when the cgroup-based heap sizing path above is active); it has no effect
+when container support is disabled or a ``-XX:MaxRAM=`` override is present.
+
 ### Disabling container support
 
 This behavior can be disabled by setting the following in ``launcher-custom.yml``:

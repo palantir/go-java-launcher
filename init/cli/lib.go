@@ -16,7 +16,7 @@ package cli
 
 import (
 	"fmt"
-	"io/ioutil"
+
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -95,7 +95,7 @@ func getServiceStatus(ctx cli.Context, loggers launchlib.ServiceLoggers) (*servi
 }
 
 func getCmdProcess(name string) (*int, *os.Process, error) {
-	pidBytes, err := ioutil.ReadFile(fmt.Sprintf(pidfileFormat, name))
+	pidBytes, err := os.ReadFile(fmt.Sprintf(pidfileFormat, name))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil, nil

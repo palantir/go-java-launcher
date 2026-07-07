@@ -123,7 +123,7 @@ func compileCmdFromConfig(
 
 			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
 
-			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, javaExecutablePath))
 			if executableErr != nil {
 				return nil, executableErr
 			}

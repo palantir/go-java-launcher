@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -108,7 +109,7 @@ func TestInitStart_TruncatesStartupLogFile(t *testing.T) {
 	stringThatShouldDisappear := "this should disappear from the log file after starting"
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
-	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0644))
+	require.NoError(t, os.WriteFile(primaryOutputFile, []byte(stringThatShouldDisappear), 0644))
 	result := runInit(t, "start")
 
 	assert.NotContains(t, result.startupLog, stringThatShouldDisappear)
@@ -280,7 +281,7 @@ func TestInitStart_TwoConfiguredZeroWrittenZeroRunning(t *testing.T) {
 	startupLog := readStartupLog(t)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
-	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	sidecarStartupLogBytes, err := os.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
@@ -310,7 +311,7 @@ func TestInitStart_TwoConfiguredOneWrittenZeroRunning(t *testing.T) {
 	startupLog := readStartupLog(t)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
-	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	sidecarStartupLogBytes, err := os.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
@@ -337,7 +338,7 @@ func TestInitStart_TwoConfiguredOneWrittenOneRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
-	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	sidecarStartupLogBytes, err := os.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
@@ -365,7 +366,7 @@ func TestInitStart_TwoConfiguredTwoWrittenZeroRunning(t *testing.T) {
 	startupLog := readStartupLog(t)
 	assert.Contains(t, startupLog, "Using JAVA_HOME")
 	assert.Contains(t, startupLog, "main method")
-	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	sidecarStartupLogBytes, err := os.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
@@ -392,7 +393,7 @@ func TestInitStart_TwoConfiguredTwoWrittenOneRunning(t *testing.T) {
 
 	assert.Equal(t, 0, result.exitCode)
 	time.Sleep(time.Second)
-	sidecarStartupLogBytes, err := ioutil.ReadFile(subProcessOutputFile)
+	sidecarStartupLogBytes, err := os.ReadFile(subProcessOutputFile)
 	require.NoError(t, err)
 	sidecarStartupLog := string(sidecarStartupLogBytes)
 	assert.Contains(t, sidecarStartupLog, "Using JAVA_HOME")
@@ -418,7 +419,7 @@ func TestInitStatus_DoesNotTruncateStartupLogFile(t *testing.T) {
 	stringThatShouldRemain := "this should remain in the log file after running"
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
-	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
+	require.NoError(t, os.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
 	result := runInit(t, "status")
 
 	assert.Contains(t, result.startupLog, stringThatShouldRemain)
@@ -593,7 +594,7 @@ func TestInitStop_DoesNotTruncateStartupLogFile(t *testing.T) {
 	stringThatShouldRemain := "this should remain in the log file after running"
 
 	require.NoError(t, os.MkdirAll(filepath.Dir(primaryOutputFile), 0755))
-	require.NoError(t, ioutil.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
+	require.NoError(t, os.WriteFile(primaryOutputFile, []byte(stringThatShouldRemain), 0644))
 	result := runInit(t, "stop")
 
 	assert.Contains(t, result.startupLog, stringThatShouldRemain)
@@ -859,7 +860,7 @@ func runInitWithClock(t *testing.T, clock time2.Clock, args ...string) <-chan in
 }
 
 func readStartupLog(t *testing.T) string {
-	startupLogBytes, err := ioutil.ReadFile(primaryOutputFile)
+	startupLogBytes, err := os.ReadFile(primaryOutputFile)
 	require.NoError(t, err)
 	return string(startupLogBytes)
 }
@@ -867,7 +868,7 @@ func readStartupLog(t *testing.T) string {
 func writePids(t *testing.T, pids servicePids) {
 	require.NoError(t, os.MkdirAll(pidfolder, 0755))
 	for name, pid := range pids {
-		require.NoError(t, ioutil.WriteFile(fmt.Sprintf(pidfileFormat, name), []byte(strconv.Itoa(pid)), 0644))
+		require.NoError(t, os.WriteFile(fmt.Sprintf(pidfileFormat, name), []byte(strconv.Itoa(pid)), 0644))
 	}
 }
 
@@ -887,7 +888,7 @@ func readPids(t *testing.T) servicePids {
 		require.Len(t, parts, 2, "invalid pidfile format, does not have only a name and extension")
 		require.Equal(t, parts[1], "pid", "invalid pidfile format, does not end with .pid")
 
-		pidBytes, err := ioutil.ReadFile(path)
+		pidBytes, err := os.ReadFile(path)
 		require.NoError(t, err, "failed to read pidfile %s", path)
 		pid, err := strconv.Atoi(string(pidBytes))
 		require.NoError(t, err, "pidfile '%s', did not contain an integer", path)

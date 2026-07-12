@@ -16,7 +16,6 @@ package cli
 
 import (
 	"fmt"
-
 	"os"
 	"os/exec"
 	"path/filepath"

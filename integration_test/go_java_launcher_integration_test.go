@@ -308,8 +308,3 @@ func TestMain(m *testing.M) {
 	}
 	os.Exit(m.Run())
 }
-
-//go:fix inline
-func toPointer[T any](t T) *T {
-	return new(t)
-}

@@ -16,8 +16,6 @@ package cli
 
 import (
 	"fmt"
-	"io/fs"
-
 	"os"
 	"path/filepath"
 	"strconv"

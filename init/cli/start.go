@@ -16,7 +16,6 @@ package cli
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,7 +58,7 @@ func startService(ctx cli.Context, notRunningCmds map[string]CommandContext) err
 			return errors.Wrapf(err, "unable to create pidfile directory.")
 		}
 
-		if err := ioutil.WriteFile(pidfile, []byte(strconv.Itoa(cmd.Command.Process.Pid)), 0644); err != nil {
+		if err := os.WriteFile(pidfile, []byte(strconv.Itoa(cmd.Command.Process.Pid)), 0644); err != nil {
 			return errors.Wrapf(err, "failed to save pid to file for command '%s'", name)
 		}
 	}

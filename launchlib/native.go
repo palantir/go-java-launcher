@@ -17,6 +17,7 @@ package launchlib
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -31,12 +32,7 @@ var (
 )
 
 func hasMaximumHeapSizePercentOverride(args []string) bool {
-	for _, arg := range args {
-		if isMaximumHeapSizePercent(arg) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(args, isMaximumHeapSizePercent)
 }
 func isMaximumHeapSizePercent(arg string) bool {
 	return strings.HasPrefix(arg, "-XX:MaximumHeapSizePercent=")

@@ -17,7 +17,7 @@ package launchlib
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"path"
 	"regexp"
 	"strconv"
@@ -227,7 +227,7 @@ func validateStaticConfig(config *StaticLauncherConfig) error {
 }
 
 func getStaticConfigFromFile(staticConfigFile string) (PrimaryStaticLauncherConfig, error) {
-	if staticData, err := ioutil.ReadFile(staticConfigFile); err != nil {
+	if staticData, err := os.ReadFile(staticConfigFile); err != nil {
 		return PrimaryStaticLauncherConfig{},
 			errors.Wrap(err, "Failed to read static config file: "+staticConfigFile)
 	} else if staticConfig, err := parseStaticConfig(staticData); err != nil {
@@ -297,7 +297,7 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 }
 
 func getCustomConfigFromFile(customConfigFile string, stdout io.Writer) (PrimaryCustomLauncherConfig, error) {
-	if customData, err := ioutil.ReadFile(customConfigFile); err != nil {
+	if customData, err := os.ReadFile(customConfigFile); err != nil {
 		_, _ = fmt.Fprintf(stdout, "Failed to read custom config file, assuming no custom config: %s\n",
 			customConfigFile)
 		return PrimaryCustomLauncherConfig{}, nil

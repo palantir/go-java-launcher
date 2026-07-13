@@ -17,11 +17,13 @@ package launchlib
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -278,12 +280,8 @@ func merge(origMap, overrideMap map[string]string) map[string]string {
 	}
 
 	returnMap := make(map[string]string)
-	for key, value := range origMap {
-		returnMap[key] = value
-	}
-	for key, value := range overrideMap {
-		returnMap[key] = value
-	}
+	maps.Copy(returnMap, origMap)
+	maps.Copy(returnMap, overrideMap)
 	return returnMap
 }
 
@@ -396,12 +394,7 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLi
 }
 
 func hasMaxRAMOverride(args []string) bool {
-	for _, arg := range args {
-		if isMaxRAM(arg) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(args, isMaxRAM)
 }
 
 func isMaxRAM(arg string) bool {

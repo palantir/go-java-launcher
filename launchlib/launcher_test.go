@@ -164,7 +164,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			name:            "allowHeapShrink false sets both Xms and Xmx",
 			args:            []string{"-Dfoo=bar"},
 			cgroupMemory:    10 * BytesInMebibyte,
-			heapPercentage:  toPointer(10.0),
+			heapPercentage:  new(10.0),
 			allowHeapShrink: false,
 			wantContains: []string{
 				"-Dfoo=bar",
@@ -176,7 +176,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			name:            "allowHeapShrink true omits Xms and strips AlwaysPreTouch",
 			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
 			cgroupMemory:    10 * BytesInMebibyte,
-			heapPercentage:  toPointer(10.0),
+			heapPercentage:  new(10.0),
 			allowHeapShrink: true,
 			wantContains: []string{
 				"-Dfoo=bar",
@@ -191,7 +191,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			name:            "allowHeapShrink false preserves AlwaysPreTouch",
 			args:            []string{"-Dfoo=bar", "-XX:+AlwaysPreTouch"},
 			cgroupMemory:    10 * BytesInMebibyte,
-			heapPercentage:  toPointer(10.0),
+			heapPercentage:  new(10.0),
 			allowHeapShrink: false,
 			wantContains: []string{
 				"-Dfoo=bar",
@@ -204,7 +204,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			name:            "existing RAMPercentage overrides are preserved",
 			args:            []string{"-Dfoo=bar", "-XX:InitialRAMPercentage=50.0", "-XX:MaxRAMPercentage=80.0"},
 			cgroupMemory:    10 * BytesInMebibyte,
-			heapPercentage:  toPointer(10.0),
+			heapPercentage:  new(10.0),
 			allowHeapShrink: true,
 			wantContains: []string{
 				"-Dfoo=bar",

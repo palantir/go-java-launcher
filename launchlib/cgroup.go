@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -68,7 +69,7 @@ func (c CGroupV1Pather) Path(name CGroupName) (string, error) {
 	}
 
 	// iterate over mount points, filtering to entries which contain the path of our subsystem and the name of our subsystem
-	for _, entry := range bytes.Split(mountinfo, []byte("\n")) {
+	for entry := range bytes.SplitSeq(mountinfo, []byte("\n")) {
 		fields := bytes.Fields(entry)
 		if len(fields) < 10 {
 			continue
@@ -80,7 +81,7 @@ func (c CGroupV1Pather) Path(name CGroupName) (string, error) {
 			continue
 		}
 		// options and mount points may contain multiple cgroup types within them, separated by commas (e.g. cpu,cpuacct)
-		for _, option := range bytes.Split(options, []byte(",")) {
+		for option := range bytes.SplitSeq(options, []byte(",")) {
 			if bytes.Equal(option, []byte(name)) {
 				mountBases := strings.Split(filepath.Base(string(mount)), ",")
 				if len(mountBases) == 1 {
@@ -105,10 +106,8 @@ func (c CGroupV1Pather) getCGroupPath(r io.Reader, name CGroupName) (string, err
 			continue
 		}
 		cgroupNames := cgroupParts[1]
-		for _, subgroup := range strings.Split(cgroupNames, ",") {
-			if subgroup == string(name) {
-				return cgroupParts[2], nil
-			}
+		if slices.Contains(strings.Split(cgroupNames, ","), string(name)) {
+			return cgroupParts[2], nil
 		}
 	}
 	return "", errors.Errorf("unable to find cgroup mount path for module %s in cgroup entries", name)

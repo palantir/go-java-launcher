@@ -174,18 +174,26 @@ when running inside a container, as per logic detailed above.
 ### Allowing the heap to shrink
 
 By default, the cgroup-based heap sizing sets ``-Xms`` equal to ``-Xmx`` so the heap is fixed and never shrinks. To
-instead let the JVM start with a small heap and grow or shrink it on demand, set the following in ``launcher-custom.yml``:
+instead let the JVM start with a small heap and grow or shrink it on demand, set ``allowHeapShrink`` in
+``launcher-custom.yml``. The optional heap free ratios tune when the heap expands or shrinks:
 
 ```yaml
 configType: java
 ...
 allowHeapShrink: true
+minHeapFreeRatio: 20
+maxHeapFreeRatio: 40
 ```
 
 When enabled, the launcher omits the generated ``-Xms`` flag (only ``-Xmx`` is set) and strips any
-``-XX:+AlwaysPreTouch`` from the JVM options, since pre-touching commits the full heap up front and defeats the purpose.
-This only takes effect in container mode (i.e. when the cgroup-based heap sizing path above is active); it has no effect
-when container support is disabled or a ``-XX:MaxRAM=`` override is present.
+``-XX:+AlwaysPreTouch`` from the JVM options. Each ratio is an integer in ``[0, 100]`` and independently replaces only
+the matching ``jvmOpts`` entries, allowing installation-level ratio overrides without replacing product-level
+``jvmOpts``. The JVM defaults are 40 for minimum and 70 for maximum. When both dedicated settings are present, the
+launcher requires ``minHeapFreeRatio <= maxHeapFreeRatio``; the JVM validates pairs that mix a dedicated setting with
+``jvmOpts``.
+
+These settings only take effect in the cgroup-based heap sizing path. They have no effect when container support is
+disabled or a ``-XX:MaxRAM=`` override is present.
 
 ### Disabling container support
 

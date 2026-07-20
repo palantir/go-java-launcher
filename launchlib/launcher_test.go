@@ -152,13 +152,15 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 
 func TestFilterHeapSizeArgsV2(t *testing.T) {
 	tests := []struct {
-		name            string
-		args            []string
-		cgroupMemory    uint64
-		heapPercentage  *float64
-		allowHeapShrink bool
-		wantContains    []string
-		wantNotContains []string
+		name             string
+		args             []string
+		cgroupMemory     uint64
+		heapPercentage   *float64
+		allowHeapShrink  bool
+		minHeapFreeRatio *int
+		maxHeapFreeRatio *int
+		wantContains     []string
+		wantNotContains  []string
 	}{
 		{
 			name:            "allowHeapShrink false sets both Xms and Xmx",
@@ -216,10 +218,95 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
 			},
 		},
+		{
+			name:             "min and max heap free ratio are appended when set",
+			args:             []string{"-Dfoo=bar"},
+			cgroupMemory:     10 * BytesInMebibyte,
+			heapPercentage:   new(10.0),
+			allowHeapShrink:  true,
+			minHeapFreeRatio: new(20),
+			maxHeapFreeRatio: new(40),
+			wantContains: []string{
+				"-Dfoo=bar",
+				"-XX:MinHeapFreeRatio=20",
+				"-XX:MaxHeapFreeRatio=40",
+			},
+		},
+		{
+			name:             "configured ratio overrides value present in jvmOpts",
+			args:             []string{"-Dfoo=bar", "-XX:MaxHeapFreeRatio=90", "-XX:MinHeapFreeRatio=5"},
+			cgroupMemory:     10 * BytesInMebibyte,
+			heapPercentage:   new(10.0),
+			minHeapFreeRatio: new(20),
+			maxHeapFreeRatio: new(40),
+			wantContains: []string{
+				"-XX:MinHeapFreeRatio=20",
+				"-XX:MaxHeapFreeRatio=40",
+			},
+			wantNotContains: []string{
+				"-XX:MaxHeapFreeRatio=90",
+				"-XX:MinHeapFreeRatio=5",
+			},
+		},
+		{
+			name:             "configured min ratio preserves max ratio in jvmOpts",
+			args:             []string{"-XX:MinHeapFreeRatio=5", "-XX:MaxHeapFreeRatio=90"},
+			cgroupMemory:     10 * BytesInMebibyte,
+			heapPercentage:   new(10.0),
+			minHeapFreeRatio: new(20),
+			wantContains: []string{
+				"-XX:MinHeapFreeRatio=20",
+				"-XX:MaxHeapFreeRatio=90",
+			},
+			wantNotContains: []string{"-XX:MinHeapFreeRatio=5"},
+		},
+		{
+			name:             "configured max ratio preserves min ratio in jvmOpts",
+			args:             []string{"-XX:MinHeapFreeRatio=5", "-XX:MaxHeapFreeRatio=90"},
+			cgroupMemory:     10 * BytesInMebibyte,
+			heapPercentage:   new(10.0),
+			maxHeapFreeRatio: new(40),
+			wantContains: []string{
+				"-XX:MinHeapFreeRatio=5",
+				"-XX:MaxHeapFreeRatio=40",
+			},
+			wantNotContains: []string{"-XX:MaxHeapFreeRatio=90"},
+		},
+		{
+			name:           "ratio present in jvmOpts is preserved when option is unset",
+			args:           []string{"-Dfoo=bar", "-XX:MaxHeapFreeRatio=90"},
+			cgroupMemory:   10 * BytesInMebibyte,
+			heapPercentage: new(10.0),
+			wantContains: []string{
+				"-XX:MaxHeapFreeRatio=90",
+			},
+		},
+		{
+			name:             "heap free ratio appended alongside RAMPercentage overrides",
+			args:             []string{"-XX:InitialRAMPercentage=50.0", "-XX:MaxRAMPercentage=80.0"},
+			cgroupMemory:     10 * BytesInMebibyte,
+			heapPercentage:   new(10.0),
+			minHeapFreeRatio: new(30),
+			maxHeapFreeRatio: new(60),
+			wantContains: []string{
+				"-XX:InitialRAMPercentage=50.0",
+				"-XX:MaxRAMPercentage=80.0",
+				"-XX:MinHeapFreeRatio=30",
+				"-XX:MaxHeapFreeRatio=60",
+			},
+			wantNotContains: []string{
+				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
+				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, tc.allowHeapShrink)
+			result := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, heapSizeOptions{
+				allowHeapShrink:  tc.allowHeapShrink,
+				minHeapFreeRatio: tc.minHeapFreeRatio,
+				maxHeapFreeRatio: tc.maxHeapFreeRatio,
+			})
 			for _, want := range tc.wantContains {
 				assert.Contains(t, result, want)
 			}

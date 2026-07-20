@@ -410,6 +410,27 @@ allowHeapShrink: true
 			},
 		},
 		{
+			name: "min and max heap free ratio are parsed",
+			data: `
+configType: java
+configVersion: 1
+minHeapFreeRatio: 20
+maxHeapFreeRatio: 40
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					MinHeapFreeRatio: new(20),
+					MaxHeapFreeRatio: new(40),
+				},
+			},
+		},
+		{
 			name: "executionMode is parsed",
 			data: `
 configType: java
@@ -613,4 +634,44 @@ subProcesses:
 		assert.Regexp(t, currCase.msg, err.Error(), "Case %d: %s had the wrong error message", i, currCase.name)
 	}
 
+}
+
+func TestValidateHeapFreeRatio(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		data string
+		msg  string
+	}{
+		{
+			name: "minHeapFreeRatio below range",
+			data: "configType: java\nconfigVersion: 1\nminHeapFreeRatio: -1\n",
+			msg:  "minHeapFreeRatio must be in \\[0, 100\\], found -1",
+		},
+		{
+			name: "maxHeapFreeRatio above range",
+			data: "configType: java\nconfigVersion: 1\nmaxHeapFreeRatio: 101\n",
+			msg:  "maxHeapFreeRatio must be in \\[0, 100\\], found 101",
+		},
+		{
+			name: "min greater than max",
+			data: "configType: java\nconfigVersion: 1\nminHeapFreeRatio: 80\nmaxHeapFreeRatio: 40\n",
+			msg:  "minHeapFreeRatio \\(80\\) must be less than or equal to maxHeapFreeRatio \\(40\\)",
+		},
+		{
+			name: "invalid ratio in subProcess",
+			data: "configType: java\nconfigVersion: 1\nsubProcesses:\n  sidecar:\n    configType: java\n    maxHeapFreeRatio: 200\n",
+			msg:  "invalid heap free ratio config in custom subProcess config sidecar: maxHeapFreeRatio must be in \\[0, 100\\], found 200",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCustomConfig([]byte(tc.data))
+			assert.Error(t, err, "%s expected an error", tc.name)
+			assert.Regexp(t, tc.msg, err.Error(), "%s had the wrong error message", tc.name)
+		})
+	}
+}
+
+func TestValidateHeapFreeRatioAllowsOneValue(t *testing.T) {
+	assert.NoError(t, validateHeapFreeRatio(CustomLauncherConfig{MinHeapFreeRatio: new(80)}))
+	assert.NoError(t, validateHeapFreeRatio(CustomLauncherConfig{MaxHeapFreeRatio: new(20)}))
 }

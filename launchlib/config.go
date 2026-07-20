@@ -76,6 +76,15 @@ type CustomLauncherConfig struct {
 	// The equivalent field under experimental is retained for backwards compatibility with existing overrides;
 	// either setting being true enables the behavior.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
+	// MinHeapFreeRatio and MaxHeapFreeRatio, when set, add -XX:MinHeapFreeRatio and -XX:MaxHeapFreeRatio to the JVM
+	// options in the cgroup-based heap sizing path, replacing any equivalents already present in jvmOpts. Both are
+	// integer percentages in [0, 100] and the JVM requires MinHeapFreeRatio <= MaxHeapFreeRatio. They only influence
+	// the JVM once the heap is allowed to resize (e.g. with allowHeapShrink: true); with a fixed heap (-Xms == -Xmx)
+	// they have no effect. Only takes effect in container mode (CONTAINER env var set and dangerousDisableContainerSupport
+	// is false). Exposed as dedicated options so installation-level heap ratio overrides do not replace the product-level
+	// jvmOpts list.
+	MinHeapFreeRatio *int `yaml:"minHeapFreeRatio,omitempty"`
+	MaxHeapFreeRatio *int `yaml:"maxHeapFreeRatio,omitempty"`
 }
 
 type ExperimentalLauncherConfig struct {
@@ -289,11 +298,38 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid launch config in custom "+
 				"subProcess config %s", name)
 		}
+
+		if err := validateHeapFreeRatio(subProcess); err != nil {
+			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid heap free ratio config in custom "+
+				"subProcess config %s", name)
+		}
 	}
 	if err := validateExecutionMode(config.Experimental.ExecutionMode); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
 	}
+	if err := validateHeapFreeRatio(config.CustomLauncherConfig); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
+	}
 	return config, nil
+}
+
+// validateHeapFreeRatio validates the bounds of each dedicated heap free ratio setting and compares them when both
+// are set. It does not inspect jvmOpts, so the JVM validates pairs that combine a dedicated setting with a jvmOpts
+// entry for the other ratio. These checks are performed directly because CustomLauncherConfig is not passed to
+// validator.Validate.
+func validateHeapFreeRatio(config CustomLauncherConfig) error {
+	if config.MinHeapFreeRatio != nil && (*config.MinHeapFreeRatio < 0 || *config.MinHeapFreeRatio > 100) {
+		return errors.Errorf("minHeapFreeRatio must be in [0, 100], found %d", *config.MinHeapFreeRatio)
+	}
+	if config.MaxHeapFreeRatio != nil && (*config.MaxHeapFreeRatio < 0 || *config.MaxHeapFreeRatio > 100) {
+		return errors.Errorf("maxHeapFreeRatio must be in [0, 100], found %d", *config.MaxHeapFreeRatio)
+	}
+	if config.MinHeapFreeRatio != nil && config.MaxHeapFreeRatio != nil &&
+		*config.MinHeapFreeRatio > *config.MaxHeapFreeRatio {
+		return errors.Errorf("minHeapFreeRatio (%d) must be less than or equal to maxHeapFreeRatio (%d)",
+			*config.MinHeapFreeRatio, *config.MaxHeapFreeRatio)
+	}
+	return nil
 }
 
 func getCustomConfigFromFile(customConfigFile string, stdout io.Writer) (PrimaryCustomLauncherConfig, error) {

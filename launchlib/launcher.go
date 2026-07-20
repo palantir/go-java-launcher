@@ -312,7 +312,11 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
 			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		}
-		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink)
+		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, heapSizeOptions{
+			allowHeapShrink:  customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink,
+			minHeapFreeRatio: customConfig.MinHeapFreeRatio,
+			maxHeapFreeRatio: customConfig.MaxHeapFreeRatio,
+		})
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -364,14 +368,29 @@ func getCGroupMemoryLimitInBytes() (uint64, error) {
 	return cgroupMemoryLimitInBytes, nil
 }
 
-func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLimitInBytes uint64, allowHeapShrink bool) []string {
+// heapSizeOptions carries the launcher-managed heap tuning flags derived from the custom launcher config. Dedicated
+// fields allow installation-level heap ratio overrides without replacing the product-level jvmOpts list.
+type heapSizeOptions struct {
+	allowHeapShrink  bool
+	minHeapFreeRatio *int
+	maxHeapFreeRatio *int
+}
+
+func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLimitInBytes uint64, opts heapSizeOptions) []string {
 	var filtered []string
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
 		if isHeapSizeArg(arg) {
 			continue
 		}
-		if allowHeapShrink && isAlwaysPreTouch(arg) {
+		if opts.allowHeapShrink && isAlwaysPreTouch(arg) {
+			continue
+		}
+		// When a ratio is configured, drop any equivalent from jvmOpts so the config value wins.
+		if opts.minHeapFreeRatio != nil && isMinHeapFreeRatio(arg) {
+			continue
+		}
+		if opts.maxHeapFreeRatio != nil && isMaxHeapFreeRatio(arg) {
 			continue
 		}
 		filtered = append(filtered, arg)
@@ -385,10 +404,19 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLi
 
 	if !hasInitialRAMPercentage && !hasMaxRAMPercentage {
 		jvmHeapSizeInBytes := ComputeJVMHeapSizeInBytes(runtime.NumCPU(), cgroupMemoryLimitInBytes, heapPercentage)
-		if !allowHeapShrink {
+		if !opts.allowHeapShrink {
 			filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		}
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
+	}
+
+	// Heap free ratios are orthogonal to the heap sizing method, so append them regardless of whether the RAM
+	// percentage overrides above are present.
+	if opts.minHeapFreeRatio != nil {
+		filtered = append(filtered, fmt.Sprintf("-XX:MinHeapFreeRatio=%d", *opts.minHeapFreeRatio))
+	}
+	if opts.maxHeapFreeRatio != nil {
+		filtered = append(filtered, fmt.Sprintf("-XX:MaxHeapFreeRatio=%d", *opts.maxHeapFreeRatio))
 	}
 	return filtered
 }
@@ -407,6 +435,14 @@ func isHeapSizeArg(arg string) bool {
 
 func isAlwaysPreTouch(arg string) bool {
 	return arg == "-XX:+AlwaysPreTouch"
+}
+
+func isMinHeapFreeRatio(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:MinHeapFreeRatio=")
+}
+
+func isMaxHeapFreeRatio(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:MaxHeapFreeRatio=")
 }
 
 func isMaxRAMPercentage(arg string) bool {

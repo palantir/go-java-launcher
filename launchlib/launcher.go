@@ -328,13 +328,15 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 
 func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 	var filtered []string
-	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
+	var hasMinRAMPercentage, hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
 		if !isHeapSizeArg(arg) {
 			filtered = append(filtered, arg)
 		}
 
-		if isMaxRAMPercentage(arg) {
+		if isMinRAMPercentage(arg) {
+			hasMinRAMPercentage = true
+		} else if isMaxRAMPercentage(arg) {
 			hasMaxRAMPercentage = true
 		} else if isInitialRAMPercentage(arg) {
 			hasInitialRAMPercentage = true
@@ -345,6 +347,9 @@ func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {
 		percentage := 75.0
 		if heapPercentage != nil {
 			percentage = *heapPercentage
+		}
+		if !hasMinRAMPercentage {
+			filtered = append(filtered, fmt.Sprintf("-XX:MinRAMPercentage=%.1f", percentage))
 		}
 		filtered = append(filtered, fmt.Sprintf("-XX:InitialRAMPercentage=%.1f", percentage))
 		filtered = append(filtered, fmt.Sprintf("-XX:MaxRAMPercentage=%.1f", percentage))
@@ -407,6 +412,10 @@ func isHeapSizeArg(arg string) bool {
 
 func isAlwaysPreTouch(arg string) bool {
 	return arg == "-XX:+AlwaysPreTouch"
+}
+
+func isMinRAMPercentage(arg string) bool {
+	return strings.HasPrefix(arg, "-XX:MinRAMPercentage=")
 }
 
 func isMaxRAMPercentage(arg string) bool {

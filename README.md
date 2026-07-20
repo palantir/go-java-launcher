@@ -159,6 +159,9 @@ variable):
 This will cause the JVM 11+ to discover the ``MaxRAM`` value using Linux cgroups, and calculate the heap sizes as the specified
 percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage``.
 
+When falling back to percentage-based heap sizing, the launcher sets ``MinRAMPercentage`` to the same value as
+``InitialRAMPercentage`` and ``MaxRAMPercentage`` so the configured percentage is also used for small memory limits.
+
 ### Overriding default values
 
 To override the heap percentage, developers can set `heapPercentage` in ``launcher-custom.yml``. This will use the cgroups memory limit to calculate the ``-Xmx|-Xms`` values, without the per processor adjustment. Setting ``-Xmx`` and ``-Xms`` to the same value ensures the heap will never shrink. 

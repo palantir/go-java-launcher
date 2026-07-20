@@ -150,6 +150,56 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	}
 }
 
+func TestFilterHeapSizeArgs(t *testing.T) {
+	tests := []struct {
+		name           string
+		args           []string
+		heapPercentage *float64
+		want           []string
+	}{
+		{
+			name: "sets default RAM percentages",
+			args: []string{"-Dfoo=bar", "-Xms1g", "-Xmx1g"},
+			want: []string{
+				"-Dfoo=bar",
+				"-XX:MinRAMPercentage=75.0",
+				"-XX:InitialRAMPercentage=75.0",
+				"-XX:MaxRAMPercentage=75.0",
+			},
+		},
+		{
+			name:           "sets configured RAM percentages",
+			args:           []string{"-Dfoo=bar"},
+			heapPercentage: new(10.0),
+			want: []string{
+				"-Dfoo=bar",
+				"-XX:MinRAMPercentage=10.0",
+				"-XX:InitialRAMPercentage=10.0",
+				"-XX:MaxRAMPercentage=10.0",
+			},
+		},
+		{
+			name: "preserves MinRAMPercentage override",
+			args: []string{"-XX:MinRAMPercentage=20.0"},
+			want: []string{
+				"-XX:MinRAMPercentage=20.0",
+				"-XX:InitialRAMPercentage=75.0",
+				"-XX:MaxRAMPercentage=75.0",
+			},
+		},
+		{
+			name: "preserves existing RAMPercentage overrides without setting defaults",
+			args: []string{"-XX:InitialRAMPercentage=50.0", "-XX:MaxRAMPercentage=80.0"},
+			want: []string{"-XX:InitialRAMPercentage=50.0", "-XX:MaxRAMPercentage=80.0"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, filterHeapSizeArgs(tc.args, tc.heapPercentage))
+		})
+	}
+}
+
 func TestFilterHeapSizeArgsV2(t *testing.T) {
 	tests := []struct {
 		name            string

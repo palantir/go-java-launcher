@@ -3,4 +3,4 @@
 
 package launchlib
 
-const javaExecutablePath = "bin/java.exe"
+const javaExecutablePath = "bin/java"

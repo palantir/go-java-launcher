@@ -150,7 +150,7 @@ func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (m
 func isPidRunning(pid int) (bool, *os.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		return false, nil, err
+		return false, nil, nil
 	}
 	running, err := isProcRunning(proc)
 	if err != nil {

@@ -187,7 +187,7 @@ func verifyPathIsSafeForExec(execPath string) (string, error) {
 	} else if _, statErr := os.Stat(execPath); statErr != nil {
 		return "", statErr
 	}
-
+	fmt.Printf("Using exec path: %q ", execPath)
 	return execPath, nil
 }
 
@@ -241,7 +241,7 @@ func absolutizeClasspathEntries(workingDir string, relativeClasspathEntries []st
 }
 
 func joinClasspathEntries(classpathEntries []string) string {
-	return strings.Join(classpathEntries, ":")
+	return strings.Join(classpathEntries, string(os.PathListSeparator))
 }
 
 func createCmd(executable string, args []string, customEnv map[string]string) (*exec.Cmd, error) {

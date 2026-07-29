@@ -1,5 +1,5 @@
-//go:build !windows
-// +build !windows
+//go:build unix
+// +build unix
 
 package cli
 
@@ -9,6 +9,19 @@ import (
 
 	ps "github.com/mitchellh/go-ps"
 )
+
+func isPidRunning(pid int) (bool, *os.Process, error) {
+	// in unix systems os.FindProcess never fails
+	proc, _ := os.FindProcess(pid)
+	running, err := isProcRunning(proc)
+	if err != nil {
+		return false, nil, err
+	}
+	if running {
+		return true, proc, nil
+	}
+	return false, nil, nil
+}
 
 func isProcRunning(proc *os.Process) (bool, error) {
 	// This is the way to check if a process exists: https://linux.die.net/man/2/kill.

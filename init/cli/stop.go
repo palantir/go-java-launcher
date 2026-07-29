@@ -76,7 +76,6 @@ func stop(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
 	return nil
 }
 
-
 func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 	const numSecondsToWait = 240
 	timer := Clock.NewTimer(numSecondsToWait * time.Second)

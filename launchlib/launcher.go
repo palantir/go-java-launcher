@@ -187,7 +187,6 @@ func verifyPathIsSafeForExec(execPath string) (string, error) {
 	} else if _, statErr := os.Stat(execPath); statErr != nil {
 		return "", statErr
 	}
-	fmt.Printf("Using exec path: %q ", execPath)
 	return execPath, nil
 }
 

@@ -20,7 +20,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -123,7 +123,7 @@ func compileCmdFromConfig(
 
 			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
 
-			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, javaExecutablePath))
+			executable, executableErr = verifyPathIsSafeForExec(filepath.Join(javaHome, javaExecutablePath))
 			if executableErr != nil {
 				return nil, executableErr
 			}
@@ -234,7 +234,7 @@ func getWorkingDir() string {
 func absolutizeClasspathEntries(workingDir string, relativeClasspathEntries []string) []string {
 	absoluteClasspathEntries := make([]string, len(relativeClasspathEntries))
 	for i, entry := range relativeClasspathEntries {
-		absoluteClasspathEntries[i] = path.Join(workingDir, entry)
+		absoluteClasspathEntries[i] = filepath.Join(workingDir, entry)
 	}
 	return absoluteClasspathEntries
 }

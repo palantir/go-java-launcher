@@ -23,12 +23,20 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 			return errors.Wrapf(err, "failed to open '%s' process for termination", name)
 		}
 
-		err = syscall.TerminateProcess(handle, 1)
-		syscall.CloseHandle(handle)
-		if err != nil {
-			// If the process already exited, that's fine - continue to next process
+		defer syscall.CloseHandle(handle)
+		if syscall.TerminateProcess(handle, 1) != nil {
+			// Windows might return an access denied when attempting to terminate a process that
+			// has already finished.
 			if err == windows.ERROR_ACCESS_DENIED {
-				// Process may have already exited, continue
+				var exitCode uint32
+				// If the exit code equals status pending the process has not exited
+				// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess#remarks
+				if errCode := syscall.GetExitCodeProcess(handle, &exitCode); errCode != nil || windows.NTStatus(exitCode) == windows.STATUS_PENDING {
+					// We could not terminate the process due to access denied
+					return errors.Wrapf(err, "failed to terminate '%s' process", name)
+				}
+
+				// We got denied from exiting a process that already finsished
 				continue
 			}
 			return errors.Wrapf(err, "failed to terminate '%s' process", name)

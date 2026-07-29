@@ -12,10 +12,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const (
-	stillActive = 259
-)
-
 func isPidRunning(pid int) (bool, *os.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
@@ -52,6 +48,7 @@ func isProcRunning(proc *os.Process) (bool, error) {
 	if err := syscall.GetExitCodeProcess(handle, &exitCode); err != nil {
 		return false, err
 	}
-
-	return exitCode == stillActive, nil
+	// If the exit code equals status pending the process has not exited
+	// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess#remarks
+	return windows.NTStatus(exitCode) == windows.STATUS_PENDING, nil
 }

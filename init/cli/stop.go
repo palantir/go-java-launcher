@@ -17,8 +17,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"strings"
-	"syscall"
 	"time"
 
 	time2 "github.com/palantir/go-java-launcher/init/cli/time"
@@ -78,20 +76,6 @@ func stop(ctx cli.Context, loggers launchlib.ServiceLoggers) error {
 	return nil
 }
 
-func stopService(ctx cli.Context, procs map[string]*os.Process) error {
-	for name, proc := range procs {
-		if err := proc.Signal(syscall.SIGTERM); err != nil && !strings.Contains(err.Error(),
-			"os: process already finished") {
-			return errors.Wrapf(err, "failed to stop '%s' process", name)
-		}
-	}
-
-	if err := waitForServiceToStop(ctx, procs); err != nil {
-		return errors.Wrap(err, "failed to stop at least one process")
-	}
-
-	return nil
-}
 
 func waitForServiceToStop(ctx cli.Context, procs map[string]*os.Process) error {
 	const numSecondsToWait = 240

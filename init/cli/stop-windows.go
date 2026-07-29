@@ -9,6 +9,7 @@ import (
 
 	"github.com/palantir/pkg/cli"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 func stopService(ctx cli.Context, procs map[string]*os.Process) error {
@@ -16,7 +17,7 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 		handle, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(proc.Pid))
 		if err != nil {
 			// If the process is not found, it's already stopped
-			if err == syscall.ERROR_PROC_NOT_FOUND {
+			if err == windows.ERROR_INVALID_PARAMETER {
 				continue
 			}
 			return errors.Wrapf(err, "failed to open '%s' process for termination", name)

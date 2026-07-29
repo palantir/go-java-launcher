@@ -4,8 +4,12 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"syscall"
+
+	"github.com/pkg/errors"
+	"golang.org/x/sys/windows"
 )
 
 const (
@@ -15,14 +19,15 @@ const (
 func isPidRunning(pid int) (bool, *os.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		return false, nil, nil
+		// If the process is not found, treat it as not running
+		fmt.Errorf("isPidRunning: %s", err)
+		if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
+			return false, nil, nil
+		}
+		return false, nil, err
 	}
 	running, err := isProcRunning(proc)
 	if err != nil {
-		// If the process is not found, treat it as not running
-		if err == syscall.ERROR_PROC_NOT_FOUND {
-			return false, nil, nil
-		}
 		return false, nil, err
 	}
 	if running {
@@ -35,7 +40,8 @@ func isProcRunning(proc *os.Process) (bool, error) {
 	handle, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION, false, uint32(proc.Pid))
 	if err != nil {
 		// If the process is not found, treat it as not running
-		if err == syscall.ERROR_PROC_NOT_FOUND {
+		fmt.Errorf("isProcRunning: %s", err)
+		if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
 			return false, nil
 		}
 		return false, err

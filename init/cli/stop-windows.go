@@ -26,6 +26,11 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 		err = syscall.TerminateProcess(handle, 1)
 		syscall.CloseHandle(handle)
 		if err != nil {
+			// If the process already exited, that's fine - continue to next process
+			if err == windows.ERROR_ACCESS_DENIED {
+				// Process may have already exited, continue
+				continue
+			}
 			return errors.Wrapf(err, "failed to terminate '%s' process", name)
 		}
 	}

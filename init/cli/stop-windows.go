@@ -22,9 +22,10 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 			}
 			return errors.Wrapf(err, "failed to open '%s' process for termination", name)
 		}
-		defer syscall.CloseHandle(handle)
 
-		if err := syscall.TerminateProcess(handle, 1); err != nil {
+		err = syscall.TerminateProcess(handle, 1)
+		syscall.CloseHandle(handle)
+		if err != nil {
 			return errors.Wrapf(err, "failed to terminate '%s' process", name)
 		}
 	}

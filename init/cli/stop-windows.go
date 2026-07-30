@@ -27,7 +27,7 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 		if err := syscall.TerminateProcess(handle, 1); err != nil {
 			// Windows might return an access denied when attempting to terminate a process that
 			// has already finished.
-			if err == windows.ERROR_ACCESS_DENIED {
+			if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
 				var exitCode uint32
 				// If the exit code equals status pending the process has not exited
 				// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess#remarks

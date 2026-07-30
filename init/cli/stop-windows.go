@@ -31,12 +31,12 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 				var exitCode uint32
 				// If the exit code equals status pending the process has not exited
 				// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess#remarks
-				if errCode := syscall.GetExitCodeProcess(handle, &exitCode); errCode != nil || windows.NTStatus(exitCode) == windows.STATUS_PENDING {
+				if errCode := syscall.GetExitCodeProcess(handle, &exitCode); errCode != nil || windows.NTStatus(exitCode) != windows.STATUS_PENDING {
 					// We could not terminate the process due to access denied
 					return errors.Wrapf(err, "failed to terminate '%s' process", name)
 				}
 
-				// We got denied from exiting a process that already finsished
+				// We got denied from terminating a process that already finsished
 				continue
 			}
 			return errors.Wrapf(err, "failed to terminate '%s' process", name)

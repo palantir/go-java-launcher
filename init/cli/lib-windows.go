@@ -4,7 +4,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 
@@ -16,7 +15,6 @@ func isPidRunning(pid int) (bool, *os.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		// If the process is not found, treat it as not running
-		fmt.Errorf("isPidRunning: %s", err)
 		if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
 			return false, nil, nil
 		}
@@ -36,7 +34,6 @@ func isProcRunning(proc *os.Process) (bool, error) {
 	handle, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION, false, uint32(proc.Pid))
 	if err != nil {
 		// If the process is not found, treat it as not running
-		fmt.Errorf("isProcRunning: %s", err)
 		if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
 			return false, nil
 		}

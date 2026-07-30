@@ -14,7 +14,7 @@ import (
 
 func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 	for name, proc := range procs {
-		handle, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE, false, uint32(proc.Pid))
+		handle, err := syscall.OpenProcess(syscall.PROCESS_TERMINATE|syscall.PROCESS_QUERY_INFORMATION, false, uint32(proc.Pid))
 		if err != nil {
 			// If the process is not found, it's already stopped
 			if err == windows.ERROR_INVALID_PARAMETER {
@@ -31,7 +31,7 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 				var exitCode uint32
 				// If the exit code equals status pending the process has not exited
 				// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess#remarks
-				if errCode := syscall.GetExitCodeProcess(handle, &exitCode); errCode != nil || windows.NTStatus(exitCode) != windows.STATUS_PENDING {
+				if errCode := syscall.GetExitCodeProcess(handle, &exitCode); errCode != nil || windows.NTStatus(exitCode) == windows.STATUS_PENDING {
 					// We could not terminate the process due to access denied
 					return errors.Wrapf(err, "failed to terminate '%s' process", name)
 				}

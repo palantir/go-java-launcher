@@ -24,7 +24,7 @@ func stopService(ctx cli.Context, procs map[string]*os.Process) error {
 		}
 
 		defer syscall.CloseHandle(handle)
-		if syscall.TerminateProcess(handle, 1) != nil {
+		if err := syscall.TerminateProcess(handle, 1); err != nil {
 			// Windows might return an access denied when attempting to terminate a process that
 			// has already finished.
 			if err == windows.ERROR_ACCESS_DENIED {

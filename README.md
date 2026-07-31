@@ -245,7 +245,7 @@ used to denote that status is not defined and subsequently subject to change wit
 
 ## Windows support
 
-When running on windows go-init will not attempt to gracefully shutdown the process, due to signal limiations on detached processes.
+When running on windows go-init will not attempt to gracefully shutdown the process, due to signal limitations on detached processes.
 
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

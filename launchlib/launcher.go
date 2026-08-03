@@ -20,7 +20,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"slices"
@@ -30,10 +30,8 @@ import (
 )
 
 const (
-	TemplateDelimsOpen  = "{{"
-	TemplateDelimsClose = "}}"
-	// ExecPathBlackListRegex matches characters disallowed in paths we allow to be passed to exec()
-	ExecPathBlackListRegex           = `[^\w.\/_\-]`
+	TemplateDelimsOpen               = "{{"
+	TemplateDelimsClose              = "}}"
 	BytesInMebibyte                  = 1048576
 	defaultNativeImageExecutablePath = "service/bin/native-executable"
 )
@@ -123,7 +121,7 @@ func compileCmdFromConfig(
 
 			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
 
-			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
+			executable, executableErr = verifyPathIsSafeForExec(filepath.Join(javaHome, javaExecutablePath))
 			if executableErr != nil {
 				return nil, executableErr
 			}
@@ -178,16 +176,15 @@ func MkDirs(dirs []string, stdout io.Writer) error {
 	return nil
 }
 
-// Returns true iff the given path is safe to be passed to exec(): must not contain funky characters and be a valid file
+// Returns true iff the given path is safe to be passed as the executable: must not contain funky characters and be a valid file
 func verifyPathIsSafeForExec(execPath string) (string, error) {
-	if unsafe, err := regexp.MatchString(ExecPathBlackListRegex, execPath); err != nil {
+	if unsafe, err := regexp.MatchString(pathBlackListRegex, execPath); err != nil {
 		return "", err
 	} else if unsafe {
 		return "", fmt.Errorf("Unsafe execution path: %q ", execPath)
 	} else if _, statErr := os.Stat(execPath); statErr != nil {
 		return "", statErr
 	}
-
 	return execPath, nil
 }
 
@@ -235,13 +232,13 @@ func getWorkingDir() string {
 func absolutizeClasspathEntries(workingDir string, relativeClasspathEntries []string) []string {
 	absoluteClasspathEntries := make([]string, len(relativeClasspathEntries))
 	for i, entry := range relativeClasspathEntries {
-		absoluteClasspathEntries[i] = path.Join(workingDir, entry)
+		absoluteClasspathEntries[i] = filepath.Join(workingDir, entry)
 	}
 	return absoluteClasspathEntries
 }
 
 func joinClasspathEntries(classpathEntries []string) string {
-	return strings.Join(classpathEntries, ":")
+	return strings.Join(classpathEntries, string(os.PathListSeparator))
 }
 
 func createCmd(executable string, args []string, customEnv map[string]string) (*exec.Cmd, error) {

@@ -243,5 +243,9 @@ primary process.
 Note that while the specification states that the `status` command prints the status of the service, the exact wording
 used to denote that status is not defined and subsequently subject to change without warning.
 
+## Windows support
+
+When running on windows go-init will not attempt to gracefully shutdown the process, due to signal limitations on detached processes.
+
 # License
 This repository is made available under the [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).

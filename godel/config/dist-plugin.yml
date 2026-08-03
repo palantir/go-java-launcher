@@ -9,6 +9,8 @@ products:
         arch: amd64
       - os: linux
         arch: arm64
+      - os: windows
+        arch: amd64
     dist:
       disters:
         bin:

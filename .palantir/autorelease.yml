@@ -11,3 +11,7 @@ options:
 # asset uploads to a release once it has been published.
 github_releases:
   draft: true
+
+schedules:
+  timer:
+    time_since_last_release: 4 days

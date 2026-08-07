@@ -126,7 +126,6 @@ func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (m
 		return nil, errors.Wrap(err, "failed to compile commands from static and custom configurations")
 	}
 
-	setAttrToRunInBackground(serviceCmds.Primary)
 	cmds := make(map[string]CommandContext)
 	cmds[staticConfig.ServiceName] = CommandContext{
 		serviceCmds.Primary,
@@ -139,7 +138,6 @@ func getConfiguredCommands(ctx cli.Context, loggers launchlib.ServiceLoggers) (m
 			return nil, errors.Errorf("command given for non-existent subProcess '%s'", name)
 		}
 
-		setAttrToRunInBackground(subProc)
 		cmds[name] = CommandContext{
 			subProc,
 			loggers.SubProcessLogger(name),

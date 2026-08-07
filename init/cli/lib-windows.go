@@ -5,7 +5,6 @@ package cli
 
 import (
 	"os"
-	"os/exec"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -49,13 +48,4 @@ func isProcRunning(proc *os.Process) (bool, error) {
 	// If the exit code equals status pending the process has not exited
 	// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess#remarks
 	return windows.NTStatus(exitCode) == windows.STATUS_PENDING, nil
-}
-
-func setAttrToRunInBackground(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		// CREATE_NEW_PROCESS_GROUP: prevents the parent's signals from propagating, which lets the application survice the
-		// closure of the consule that started the process
-		// DETACHED_PROCESS: do not create a console for the process
-		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS,
-	}
 }

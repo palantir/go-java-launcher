@@ -5,7 +5,6 @@ package cli
 
 import (
 	"os"
-	"os/exec"
 	"syscall"
 
 	ps "github.com/mitchellh/go-ps"
@@ -44,8 +43,4 @@ func isProcRunning(proc *os.Process) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-func setAttrToRunInBackground(cmd *exec.Cmd) {
-	// Not necessary for unix
 }

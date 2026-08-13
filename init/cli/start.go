@@ -81,6 +81,7 @@ func startCommand(ctx cli.Context, cmdCtx CommandContext) error {
 	}()
 	cmdCtx.Command.Stdout = logger
 	cmdCtx.Command.Stderr = logger
+	setAttrToRunInBackground(cmdCtx.Command)
 	if err := cmdCtx.Command.Start(); err != nil {
 		return errors.Wrap(err, "failed to start command")
 	}

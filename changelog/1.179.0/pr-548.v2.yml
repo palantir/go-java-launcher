@@ -1,5 +1,0 @@
-type: fix
-fix:
-  description: Handle CGroupv2
-  links:
-  - https://github.com/palantir/go-java-launcher/pull/548

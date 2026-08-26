@@ -1,5 +1,0 @@
-type: feature
-feature:
-  description: Add support for native image execution mode
-  links:
-  - https://github.com/palantir/go-java-launcher/pull/571

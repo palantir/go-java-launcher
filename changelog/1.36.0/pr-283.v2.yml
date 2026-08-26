@@ -1,5 +1,0 @@
-type: improvement
-improvement:
-  description: Create autorelease.yml
-  links:
-  - https://github.com/palantir/go-java-launcher/pull/283

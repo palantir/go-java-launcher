@@ -121,6 +121,9 @@ type ExperimentalLauncherConfig struct {
 	// cgroup-based heap sizing path, and an existing glibc.malloc.mmap_threshold setting is left alone. Can also be set
 	// with envvar LAUNCHER_EXPERIMENTAL_PIN_MALLOC_MMAP_THRESHOLD; a non-empty value overrides this setting.
 	PinMallocMmapThreshold bool `yaml:"pinMallocMmapThreshold,omitempty"`
+	// ZGCCanaryHostnameSuffix replaces the SLS Packaging GC profile options on the host whose name has the
+	// configured suffix.
+	ZGCCanaryHostnameSuffix string `yaml:"zgcCanaryHostnameSuffix,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

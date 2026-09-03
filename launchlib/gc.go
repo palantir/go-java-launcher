@@ -46,12 +46,14 @@ func applyZGCCanaryJvmOpts(
 }
 
 func useSLSPackagingZGCProfile(jvmOpts []string) []string {
-	filtered := make([]string, 0, len(jvmOpts)+3)
+	filtered := make([]string, 0, len(jvmOpts)+4)
 	for _, opt := range jvmOpts {
 		if !isReplacedGCProfileJvmOpt(opt) {
 			filtered = append(filtered, opt)
 		}
 	}
+
+	filtered = append(filtered, "-XX:-UseG1GC")
 
 	// Keep these aligned with the JDK 21+ response-time profile in sls-packaging's GcProfile.ResponseTime:
 	// https://github.com/palantir/sls-packaging/blob/develop/gradle-sls-packaging/src/main/java/com/palantir/gradle/dist/service/gc/GcProfile.java

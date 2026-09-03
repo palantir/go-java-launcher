@@ -36,6 +36,7 @@ func TestApplyZGCCanaryJvmOpts(t *testing.T) {
 	zgcOpts := []string{
 		"-Xmx4g",
 		"-Dfoo=bar",
+		"-XX:-UseG1GC",
 		"-XX:+UseZGC",
 		"-XX:+ZGenerational",
 		"-XX:+ExplicitGCInvokesConcurrent",
@@ -96,6 +97,7 @@ func TestUseSLSPackagingZGCProfileRemovesOtherCollectorSelectors(t *testing.T) {
 	})
 
 	assert.Equal(t, []string{
+		"-XX:-UseG1GC",
 		"-XX:+UseZGC",
 		"-XX:+ZGenerational",
 		"-XX:+ExplicitGCInvokesConcurrent",

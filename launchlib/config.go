@@ -96,6 +96,9 @@ type ExperimentalLauncherConfig struct {
 	// Deprecated: use the top-level allowHeapShrink field on CustomLauncherConfig instead. This field is retained
 	// for backwards compatibility with existing overrides that set it under experimental.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
+	// ZGCCanaryHostnameSuffix replaces the SLS Packaging GC profile options on the host whose name has the
+	// configured suffix.
+	ZGCCanaryHostnameSuffix string `yaml:"zgcCanaryHostnameSuffix,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

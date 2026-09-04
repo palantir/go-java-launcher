@@ -465,6 +465,28 @@ env:
 				},
 			},
 		},
+		{
+			name: "ZGC canary is parsed",
+			data: `
+configType: java
+configVersion: 1
+experimental:
+  zgcCanaryHostnameSuffix: "-1-0"
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Experimental: ExperimentalLauncherConfig{
+						ZGCCanaryHostnameSuffix: "-1-0",
+					},
+				},
+			},
+		},
 	} {
 		got, _ := parseCustomConfig([]byte(currCase.data))
 		assert.Equal(t, currCase.want, got, "Case %d: %s", i, currCase.name)

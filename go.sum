@@ -12,8 +12,8 @@ github.com/mitchellh/go-wordwrap v1.0.1 h1:TLuKupo69TCn6TQSyGxwI1EblZZEsQ0vMlAFQ
 github.com/mitchellh/go-wordwrap v1.0.1/go.mod h1:R62XHJLzvMFRBbcrT7m7WgmE1eOyTSsCt+hzestvNj0=
 github.com/palantir/godel/pkg/products/v2 v2.0.0 h1:E3DuAEA1yotLLDQt7vIrYRapRwXRyW6u8Yuq2p/qyLs=
 github.com/palantir/godel/pkg/products/v2 v2.0.0/go.mod h1:SaLUycZLVP5qV6mL9MWG3jkX4dS23lJnzpubTGAV4FU=
-github.com/palantir/pkg v1.1.0 h1:0EhrSUP8oeeh3MUvk7V/UU7WmsN1UiJNTvNj0sN9Cpo=
-github.com/palantir/pkg v1.1.0/go.mod h1:KC9srP/9ssWRxBxFCIqhUGC4Jt7OJkWRz0Iqehup1/c=
+github.com/palantir/pkg v1.2.0 h1:GxXiXLcayV/JNptEyBIDvUrd1NRzI+TwpsL64sufrd8=
+github.com/palantir/pkg v1.2.0/go.mod h1:y8Dt3/qSZjq+0pLBeCsxXDqzby3G08bw85gZmJm5mwA=
 github.com/palantir/pkg/cli v1.2.0 h1:3hhSbQaOB3UkkbzSNTWXdhgjlhZ6EsaaLJHg2deA5W8=
 github.com/palantir/pkg/cli v1.2.0/go.mod h1:ryQWEfrNkLg6/GDASYPmjTfu8yN1ebThPXk1bFR3ivk=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=

@@ -152,9 +152,7 @@ func GetConfigsFromFiles(
 			}
 
 			customConfig.SubProcesses[name] = CustomLauncherConfig{
-				TypedConfig: TypedConfig{
-					Type: static.Type,
-				},
+				Type: static.Type,
 			}
 		}
 	}

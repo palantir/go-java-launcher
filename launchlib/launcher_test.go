@@ -328,11 +328,11 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 	t.Setenv("CONTAINER", "1")
 
 	staticCfg := StaticLauncherConfig{
-		TypedConfig: TypedConfig{Type: "java"}, // value irrelevant for native mode branch
+		Type: "java", // value irrelevant for native mode branch
 	}
 
 	customCfg := CustomLauncherConfig{
-		TypedConfig: TypedConfig{Type: "java"},
+		Type: "java",
 		Experimental: ExperimentalLauncherConfig{
 			ExecutionMode:             ExecutionModeNative,
 			NativeImageExecutablePath: tmpPath,
@@ -367,11 +367,11 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 	heap := 60.1
 
 	staticCfg := StaticLauncherConfig{
-		TypedConfig: TypedConfig{Type: "java"},
+		Type: "java",
 	}
 
 	customCfg := CustomLauncherConfig{
-		TypedConfig:    TypedConfig{Type: "java"},
+		Type:           "java",
 		HeapPercentage: &heap,
 		Experimental: ExperimentalLauncherConfig{
 			ExecutionMode:             ExecutionModeNative,

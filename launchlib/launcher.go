@@ -119,6 +119,8 @@ func compileCmdFromConfig(
 				staticConfig.JavaConfig.Classpath))
 			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
+			combinedJvmOpts = applyZGCCanaryJvmOpts(
+				combinedJvmOpts, customConfig.Experimental.ZGCCanaryHostnameSuffix, os.Hostname, logger)
 			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
 
 			executable, executableErr = verifyPathIsSafeForExec(filepath.Join(javaHome, javaExecutablePath))

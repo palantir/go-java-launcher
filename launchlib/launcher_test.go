@@ -160,8 +160,8 @@ func TestEnsureG1GCThreads(t *testing.T) {
 	}{
 		{
 			name: "adds G1 and preserves other options",
-			args: []string{"-Dfoo=bar", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=1"},
-			want: []string{"-Dfoo=bar", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=1", "-XX:+UseG1GC"},
+			args: []string{"-Dfoo=bar"},
+			want: []string{"-Dfoo=bar", "-XX:+UseG1GC"},
 		},
 		{
 			name:      "later G1 disable wins",
@@ -197,6 +197,21 @@ func TestEnsureG1GCThreads(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestEnsureG1GCThreads_PreservesExplicitThreads(t *testing.T) {
+	args := []string{
+		"-XX:+UseG1GC", "-XX:ParallelGCThreads=1", "-XX:ParallelGCThreads=3",
+		"-XX:ConcGCThreads=4", "-XX:ConcGCThreads=3",
+	}
+	got, err := ensureG1GCThreads(args)
+	require.NoError(t, err)
+	assert.Equal(t, args, got)
+}
+
+func TestEnsureG1GCThreads_ConcurrentThreadsExceedParallel(t *testing.T) {
+	_, err := ensureG1GCThreads([]string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"})
+	require.ErrorContains(t, err, "ConcGCThreads (4) must not exceed ParallelGCThreads (3)")
 }
 
 func TestFilterHeapSizeArgsV2(t *testing.T) {

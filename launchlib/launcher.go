@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -346,7 +347,13 @@ func ensureG1GCThreads(args []string) ([]string, error) {
 		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
 	}
 	enabled := make(map[string]bool)
+	var parallelGCThreadsArg, concGCThreadsArg string
 	for _, arg := range args {
+		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") {
+			parallelGCThreadsArg = arg
+		} else if strings.HasPrefix(arg, "-XX:ConcGCThreads=") {
+			concGCThreadsArg = arg
+		}
 		for _, collector := range collectors {
 			switch arg {
 			case "-XX:+" + collector:
@@ -365,6 +372,22 @@ func ensureG1GCThreads(args []string) ([]string, error) {
 		return nil, errors.New("limitG1GcThreads conflicts with -XX:-UseG1GC")
 	} else if !g1 {
 		args = append(args, "-XX:+UseG1GC")
+	}
+	if parallelGCThreadsArg != "" {
+		if concGCThreadsArg != "" {
+			parallelThreads, err := strconv.Atoi(strings.TrimPrefix(parallelGCThreadsArg, "-XX:ParallelGCThreads="))
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid ParallelGCThreads value")
+			}
+			concurrentThreads, err := strconv.Atoi(strings.TrimPrefix(concGCThreadsArg, "-XX:ConcGCThreads="))
+			if err != nil {
+				return nil, errors.Wrap(err, "invalid ConcGCThreads value")
+			}
+			if concurrentThreads > parallelThreads {
+				return nil, errors.Errorf("ConcGCThreads (%d) must not exceed ParallelGCThreads (%d)", concurrentThreads, parallelThreads)
+			}
+		}
+		return args, nil
 	}
 	return args, nil
 }

@@ -17,6 +17,7 @@ package launchlib
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
@@ -304,7 +305,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		if customConfig.Experimental.LimitG1GCThreads {
 			var err error
-			combinedJvmOpts, err = ensureG1GCThreads(combinedJvmOpts)
+			combinedJvmOpts, err = ensureG1GCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU())
 			if err != nil {
 				return nil, err
 			}
@@ -341,7 +342,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts, nil
 }
 
-func ensureG1GCThreads(args []string) ([]string, error) {
+func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int) ([]string, error) {
 	collectors := []string{
 		"UseG1GC", "UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
 		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
@@ -373,23 +374,40 @@ func ensureG1GCThreads(args []string) ([]string, error) {
 	} else if !g1 {
 		args = append(args, "-XX:+UseG1GC")
 	}
+	var parallelThreads int
 	if parallelGCThreadsArg != "" {
-		if concGCThreadsArg != "" {
-			parallelThreads, err := strconv.Atoi(strings.TrimPrefix(parallelGCThreadsArg, "-XX:ParallelGCThreads="))
-			if err != nil {
-				return nil, errors.Wrap(err, "invalid ParallelGCThreads value")
-			}
-			concurrentThreads, err := strconv.Atoi(strings.TrimPrefix(concGCThreadsArg, "-XX:ConcGCThreads="))
-			if err != nil {
-				return nil, errors.Wrap(err, "invalid ConcGCThreads value")
-			}
-			if concurrentThreads > parallelThreads {
-				return nil, errors.Errorf("ConcGCThreads (%d) must not exceed ParallelGCThreads (%d)", concurrentThreads, parallelThreads)
-			}
+		var err error
+		parallelThreads, err = strconv.Atoi(strings.TrimPrefix(parallelGCThreadsArg, "-XX:ParallelGCThreads="))
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid ParallelGCThreads value")
 		}
-		return args, nil
+	} else {
+		counter, err := NewCGroupProcessorCounter(filesystem)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get cgroup CPU request")
+		}
+		requestedCores, err := counter.ProcessorCount()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get cgroup CPU request")
+		}
+		parallelThreads = computeG1ParallelGCThreads(requestedCores, hostProcessors)
+		args = append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads))
+	}
+	if concGCThreadsArg != "" {
+		concurrentThreads, err := strconv.Atoi(strings.TrimPrefix(concGCThreadsArg, "-XX:ConcGCThreads="))
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid ConcGCThreads value")
+		}
+		if concurrentThreads > parallelThreads {
+			return nil, errors.Errorf("ConcGCThreads (%d) must not exceed ParallelGCThreads (%d)", concurrentThreads, parallelThreads)
+		}
 	}
 	return args, nil
+}
+
+func computeG1ParallelGCThreads(requestedCores uint, hostProcessors int) int {
+	adjustedCores := int(min(requestedCores*8, uint(hostProcessors)))
+	return 8 + (adjustedCores-8)*5/8
 }
 
 func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {

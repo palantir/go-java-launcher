@@ -66,7 +66,7 @@ func TestProcessorCounter_CGroupV1(t *testing.T) {
 			expectedError: errors.New("unable to convert cpu.shares value to expected type"),
 		},
 		{
-			name: "truncates requests below one core without a minimum clamp",
+			name: "rounds requests below one core up to one",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
 					Data: CGroupContent,
@@ -78,7 +78,7 @@ func TestProcessorCounter_CGroupV1(t *testing.T) {
 					Data: lowCPUSharesContent,
 				},
 			},
-			expectedProcessorCount: 0,
+			expectedProcessorCount: 1,
 		},
 		{
 			name: "returns whole requested cores without host clamping",
@@ -118,7 +118,7 @@ func TestProcessorCounter_CGroupV2(t *testing.T) {
 		want      uint
 		wantError string
 	}{
-		{name: "minimum weight has no core clamp", weight: "1\n", want: 0},
+		{name: "minimum weight requests at least one core", weight: "1\n", want: 1},
 		{name: "weight is converted to shares", weight: "100\n", want: 2},
 		{name: "maximum weight is not capped to host cores", weight: "10000\n", want: 256},
 		{name: "invalid weight is rejected", weight: "10001\n", wantError: "invalid cpu.weight value"},

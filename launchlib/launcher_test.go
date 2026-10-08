@@ -20,6 +20,7 @@ import (
 	"os"
 	"sort"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,6 +153,10 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 
 func TestEnsureG1GCThreads(t *testing.T) {
 	t.Setenv("CONTAINER", "true")
+	filesystem := fstest.MapFS{
+		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("100\n")},
+	}
 	for _, tc := range []struct {
 		name      string
 		args      []string
@@ -159,9 +164,9 @@ func TestEnsureG1GCThreads(t *testing.T) {
 		wantError string
 	}{
 		{
-			name: "adds G1 and preserves other options",
-			args: []string{"-Dfoo=bar"},
-			want: []string{"-Dfoo=bar", "-XX:+UseG1GC"},
+			name: "adds G1 and parallel threads preserving other options",
+			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2"},
+			want: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2", "-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
 		},
 		{
 			name:      "later G1 disable wins",
@@ -175,7 +180,7 @@ func TestEnsureG1GCThreads(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureG1GCThreads(tc.args)
+			got, err := ensureG1GCThreads(tc.args, filesystem, 16)
 			if tc.wantError != "" {
 				require.ErrorContains(t, err, tc.wantError)
 				staticCfg := StaticLauncherConfig{
@@ -199,19 +204,56 @@ func TestEnsureG1GCThreads(t *testing.T) {
 	}
 }
 
+func TestComputeG1ParallelGCThreads(t *testing.T) {
+	for _, tc := range []struct {
+		hostProcessors int
+		wantThreads    []int // CPU requests start at 1; the final value holds for all larger requests.
+	}{
+		{hostProcessors: 48, wantThreads: []int{8, 13, 18, 23, 28, 33}},
+		{hostProcessors: 64, wantThreads: []int{8, 13, 18, 23, 28, 33, 38, 43}},
+		{hostProcessors: 128, wantThreads: []int{8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58, 63, 68, 73, 78, 83}},
+	} {
+		t.Run(fmt.Sprintf("%d_host_cores", tc.hostProcessors), func(t *testing.T) {
+			for requestedCores := 1; requestedCores <= tc.hostProcessors; requestedCores++ {
+				want := tc.wantThreads[min(requestedCores, len(tc.wantThreads))-1]
+				assert.Equal(t, want, computeG1ParallelGCThreads(uint(requestedCores), tc.hostProcessors),
+					"CPU request: %d cores", requestedCores)
+			}
+		})
+	}
+}
+
 func TestEnsureG1GCThreads_PreservesExplicitThreads(t *testing.T) {
 	args := []string{
 		"-XX:+UseG1GC", "-XX:ParallelGCThreads=1", "-XX:ParallelGCThreads=3",
 		"-XX:ConcGCThreads=4", "-XX:ConcGCThreads=3",
 	}
-	got, err := ensureG1GCThreads(args)
+	got, err := ensureG1GCThreads(args, fstest.MapFS{}, 1)
 	require.NoError(t, err)
 	assert.Equal(t, args, got)
 }
 
 func TestEnsureG1GCThreads_ConcurrentThreadsExceedParallel(t *testing.T) {
-	_, err := ensureG1GCThreads([]string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"})
-	require.ErrorContains(t, err, "ConcGCThreads (4) must not exceed ParallelGCThreads (3)")
+	filesystem := fstest.MapFS{
+		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("100\n")},
+	}
+	for _, tc := range []struct {
+		args      []string
+		wantError string
+	}{
+		{
+			args:      []string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"},
+			wantError: "ConcGCThreads (4) must not exceed ParallelGCThreads (3)",
+		},
+		{
+			args:      []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14"},
+			wantError: "ConcGCThreads (14) must not exceed ParallelGCThreads (13)",
+		},
+	} {
+		_, err := ensureG1GCThreads(tc.args, filesystem, 16)
+		require.ErrorContains(t, err, tc.wantError)
+	}
 }
 
 func TestFilterHeapSizeArgsV2(t *testing.T) {

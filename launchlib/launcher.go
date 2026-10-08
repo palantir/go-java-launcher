@@ -305,7 +305,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		if customConfig.Experimental.LimitG1GCThreads {
 			var err error
-			combinedJvmOpts, err = ensureG1GCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU())
+			combinedJvmOpts, err = ensureG1GCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), logger)
 			if err != nil {
 				return nil, err
 			}
@@ -342,7 +342,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts, nil
 }
 
-func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int) ([]string, error) {
+func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int, logger io.Writer) ([]string, error) {
 	collectors := []string{
 		"UseG1GC", "UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
 		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
@@ -382,14 +382,18 @@ func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int) ([]s
 			return nil, errors.Wrap(err, "invalid ParallelGCThreads value")
 		}
 	} else {
-		requestedCores := uint(hostProcessors)
+		var requestedCores uint
 		counter, err := NewCGroupProcessorCounter(filesystem)
 		if err == nil {
-			if cores, err := counter.ProcessorCount(); err == nil {
-				requestedCores = cores
-			}
+			requestedCores, err = counter.ProcessorCount()
+		}
+		if err != nil {
+			requestedCores = uint(hostProcessors)
 		}
 		parallelThreads = computeG1ParallelGCThreads(requestedCores, hostProcessors)
+		if err != nil {
+			_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to host-core GC thread sizing (%d cores, ParallelGCThreads=%d): %v\n", hostProcessors, parallelThreads, err)
+		}
 		args = append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads))
 	}
 	if concGCThreadsArg != "" {

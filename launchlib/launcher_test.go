@@ -15,6 +15,7 @@
 package launchlib
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -180,7 +181,7 @@ func TestEnsureG1GCThreads(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureG1GCThreads(tc.args, filesystem, 16)
+			got, err := ensureG1GCThreads(tc.args, filesystem, 16, io.Discard)
 			if tc.wantError != "" {
 				require.ErrorContains(t, err, tc.wantError)
 				staticCfg := StaticLauncherConfig{
@@ -226,9 +227,11 @@ func TestEnsureG1GCThreads_CGroupFailureUsesHostCores(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureG1GCThreads(nil, tc.filesystem, 48)
+			var log bytes.Buffer
+			got, err := ensureG1GCThreads(nil, tc.filesystem, 48, &log)
 			require.NoError(t, err)
 			assert.Equal(t, []string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=33"}, got)
+			assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to host-core GC thread sizing (48 cores, ParallelGCThreads=33): ")
 		})
 	}
 }
@@ -257,7 +260,7 @@ func TestEnsureG1GCThreads_PreservesExplicitThreads(t *testing.T) {
 		"-XX:+UseG1GC", "-XX:ParallelGCThreads=1", "-XX:ParallelGCThreads=3",
 		"-XX:ConcGCThreads=4", "-XX:ConcGCThreads=3",
 	}
-	got, err := ensureG1GCThreads(args, fstest.MapFS{}, 1)
+	got, err := ensureG1GCThreads(args, fstest.MapFS{}, 1, io.Discard)
 	require.NoError(t, err)
 	assert.Equal(t, args, got)
 }
@@ -280,7 +283,7 @@ func TestEnsureG1GCThreads_ConcurrentThreadsExceedParallel(t *testing.T) {
 			wantError: "ConcGCThreads (14) must not exceed ParallelGCThreads (13)",
 		},
 	} {
-		_, err := ensureG1GCThreads(tc.args, filesystem, 16)
+		_, err := ensureG1GCThreads(tc.args, filesystem, 16, io.Discard)
 		require.ErrorContains(t, err, tc.wantError)
 	}
 }

@@ -121,7 +121,10 @@ func compileCmdFromConfig(
 				staticConfig.JavaConfig.Classpath))
 			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
-			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+			jvmOpts, err := createJvmOpts(combinedJvmOpts, customConfig, logger)
+			if err != nil {
+				return nil, err
+			}
 
 			executable, executableErr = verifyPathIsSafeForExec(path.Join(javaHome, "/bin/java"))
 			if executableErr != nil {
@@ -295,28 +298,35 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
+		if customConfig.Experimental.LimitG1GCThreads {
+			var err error
+			combinedJvmOpts, err = ensureG1GCThreads(combinedJvmOpts)
+			if err != nil {
+				return nil, err
+			}
+		}
 		cgroupMemoryLimitInBytes, err := getCGroupMemoryLimitInBytes()
 		if err != nil {
 			// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 			// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
 			// by all platforms using Java.
 			_, _ = fmt.Fprintf(logger, "Failed to get cgroup memory limit, falling back to percentage-based heap sizing: %v\n", err)
-			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
+			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage), nil
 		}
 		if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
 			// When the memory limit is unusually high (defined to be over 1TB), revert to percentage-based heap
 			// sizing. This handles the edge case where the cgroups memory limit is set to an arbitrary large value.
 			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
-			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
+			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage), nil
 		}
 		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, heapSizeOptions{
 			allowHeapShrink:  customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink,
 			minHeapFreeRatio: customConfig.MinHeapFreeRatio,
 			maxHeapFreeRatio: customConfig.MaxHeapFreeRatio,
-		})
+		}), nil
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -327,7 +337,36 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		}
 	}
 
-	return combinedJvmOpts
+	return combinedJvmOpts, nil
+}
+
+func ensureG1GCThreads(args []string) ([]string, error) {
+	collectors := []string{
+		"UseG1GC", "UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
+		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
+	}
+	enabled := make(map[string]bool)
+	for _, arg := range args {
+		for _, collector := range collectors {
+			switch arg {
+			case "-XX:+" + collector:
+				enabled[collector] = true
+			case "-XX:-" + collector:
+				enabled[collector] = false
+			}
+		}
+	}
+	for _, collector := range collectors[1:] {
+		if enabled[collector] {
+			return nil, errors.Errorf("limitG1GcThreads requires G1, but -XX:+%s is enabled", collector)
+		}
+	}
+	if g1, explicit := enabled["UseG1GC"]; explicit && !g1 {
+		return nil, errors.New("limitG1GcThreads conflicts with -XX:-UseG1GC")
+	} else if !g1 {
+		args = append(args, "-XX:+UseG1GC")
+	}
+	return args, nil
 }
 
 func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {

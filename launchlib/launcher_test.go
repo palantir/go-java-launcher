@@ -150,6 +150,55 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	}
 }
 
+func TestEnsureG1GCThreads(t *testing.T) {
+	t.Setenv("CONTAINER", "true")
+	for _, tc := range []struct {
+		name      string
+		args      []string
+		want      []string
+		wantError string
+	}{
+		{
+			name: "adds G1 and preserves other options",
+			args: []string{"-Dfoo=bar", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=1"},
+			want: []string{"-Dfoo=bar", "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=1", "-XX:+UseG1GC"},
+		},
+		{
+			name:      "later G1 disable wins",
+			args:      []string{"-XX:+UseG1GC", "-XX:-UseG1GC"},
+			wantError: "conflicts with -XX:-UseG1GC",
+		},
+		{
+			name:      "later non-G1 enable wins",
+			args:      []string{"-XX:-UseSerialGC", "-XX:+UseSerialGC", "-XX:+UseG1GC"},
+			wantError: "-XX:+UseSerialGC is enabled",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ensureG1GCThreads(tc.args)
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				staticCfg := StaticLauncherConfig{
+					TypedConfig: TypedConfig{Type: "java"},
+					JavaConfig:  JavaConfig{JavaHome: "/unused", JvmOpts: tc.args[:1]},
+				}
+				customCfg := CustomLauncherConfig{
+					JvmOpts:      tc.args[1:],
+					Experimental: ExperimentalLauncherConfig{LimitG1GCThreads: true},
+				}
+				cgroups := map[string]string{}
+				createLogger := func() (io.WriteCloser, error) { return &NoopClosingWriter{io.Discard}, nil }
+				cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
+				require.ErrorContains(t, err, tc.wantError)
+				assert.Nil(t, cmd)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestFilterHeapSizeArgsV2(t *testing.T) {
 	tests := []struct {
 		name             string

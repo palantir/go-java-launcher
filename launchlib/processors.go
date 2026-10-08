@@ -97,5 +97,5 @@ func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 		// Reverse the container runtime conversion from shares [2, 262144] to weight [1, 10000].
 		cpuShares = 2 + (cpuShares-1)*262142/9999
 	}
-	return uint(cpuShares / 1024), nil
+	return uint(max(1, cpuShares/1024)), nil
 }

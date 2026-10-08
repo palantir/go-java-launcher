@@ -244,21 +244,24 @@ func TestEnsureG1GCThreads(t *testing.T) {
 	}
 }
 
-func TestEnsureG1GCThreads_CGroupFailureUsesHostCores(t *testing.T) {
+func TestEnsureG1GCThreads_CGroupFailureUsesJVMDefaults(t *testing.T) {
 	mountInfo := []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")
 	for _, tc := range []struct {
 		name       string
+		args       []string
 		filesystem fstest.MapFS
 	}{
 		{name: "missing mount information", filesystem: fstest.MapFS{}},
 		{
 			name: "missing CPU request",
+			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=100"},
 			filesystem: fstest.MapFS{
 				"proc/self/mountinfo": &fstest.MapFile{Data: mountInfo},
 			},
 		},
 		{
 			name: "invalid CPU request",
+			args: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=100"},
 			filesystem: fstest.MapFS{
 				"proc/self/mountinfo":      &fstest.MapFile{Data: mountInfo},
 				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("invalid\n")},
@@ -267,10 +270,10 @@ func TestEnsureG1GCThreads_CGroupFailureUsesHostCores(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var log bytes.Buffer
-			got, err := ensureG1GCThreads(nil, tc.filesystem, 48, &log)
+			got, err := ensureG1GCThreads(tc.args, tc.filesystem, 48, &log)
 			require.NoError(t, err)
-			assert.Equal(t, []string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=33"}, got)
-			assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to host-core GC thread sizing (48 cores, ParallelGCThreads=33): ")
+			assert.Equal(t, tc.args, got)
+			assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to JVM defaults: ")
 		})
 	}
 }

@@ -371,8 +371,6 @@ func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int, logg
 	}
 	if g1, explicit := enabled["UseG1GC"]; explicit && !g1 {
 		return nil, errors.New("limitG1GcThreads conflicts with -XX:-UseG1GC")
-	} else if !g1 {
-		args = append(args, "-XX:+UseG1GC")
 	}
 	var parallelThreads int
 	if parallelGCThreadsArg != "" {
@@ -388,13 +386,10 @@ func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int, logg
 			requestedCores, err = counter.ProcessorCount()
 		}
 		if err != nil {
-			requestedCores = uint(hostProcessors)
+			_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
+			return args, nil
 		}
 		parallelThreads = computeG1ParallelGCThreads(requestedCores, hostProcessors)
-		if err != nil {
-			_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to host-core GC thread sizing (%d cores, ParallelGCThreads=%d): %v\n", hostProcessors, parallelThreads, err)
-		}
-		args = append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads))
 	}
 	if concGCThreadsArg != "" {
 		concurrentThreads, err := strconv.Atoi(strings.TrimPrefix(concGCThreadsArg, "-XX:ConcGCThreads="))
@@ -404,6 +399,12 @@ func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int, logg
 		if concurrentThreads > parallelThreads {
 			return nil, errors.Errorf("ConcGCThreads (%d) must not exceed ParallelGCThreads (%d)", concurrentThreads, parallelThreads)
 		}
+	}
+	if !enabled["UseG1GC"] {
+		args = append(args, "-XX:+UseG1GC")
+	}
+	if parallelGCThreadsArg == "" {
+		args = append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads))
 	}
 	return args, nil
 }

@@ -152,6 +152,45 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	}
 }
 
+func TestCreateJvmOpts_G1ActivationGates(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		enabled          bool
+		container        bool
+		disableContainer bool
+		maxRAMOverride   bool
+		wantError        bool
+	}{
+		{name: "active", enabled: true, container: true, wantError: true},
+		{name: "flag disabled", container: true},
+		{name: "outside container", enabled: true},
+		{name: "container support disabled", enabled: true, container: true, disableContainer: true},
+		{name: "MaxRAM override", enabled: true, container: true, maxRAMOverride: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("CONTAINER", "")
+			if !tc.container {
+				require.NoError(t, os.Unsetenv("CONTAINER"))
+			}
+			args := []string{"-XX:+UseSerialGC", "-XX:MaxRAMPercentage=75.0"}
+			if tc.maxRAMOverride {
+				args = append(args, "-XX:MaxRAM=1024")
+			}
+			config := CustomLauncherConfig{
+				DisableContainerSupport: tc.disableContainer,
+				Experimental:            ExperimentalLauncherConfig{LimitG1GCThreads: tc.enabled},
+			}
+			got, err := createJvmOpts(args, &config, &NoopClosingWriter{io.Discard})
+			if tc.wantError {
+				require.ErrorContains(t, err, "-XX:+UseSerialGC is enabled")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, args, got)
+		})
+	}
+}
+
 func TestEnsureG1GCThreads(t *testing.T) {
 	t.Setenv("CONTAINER", "true")
 	filesystem := fstest.MapFS{
@@ -475,6 +514,7 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 			ExecutionMode:             ExecutionModeNative,
 			NativeImageExecutablePath: tmpPath,
 			NativeImageArguments:      []string{"-XX:MaximumHeapSizePercent=50"},
+			LimitG1GCThreads:          true,
 		},
 	}
 

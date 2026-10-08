@@ -204,6 +204,35 @@ func TestEnsureG1GCThreads(t *testing.T) {
 	}
 }
 
+func TestEnsureG1GCThreads_CGroupFailureUsesHostCores(t *testing.T) {
+	mountInfo := []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")
+	for _, tc := range []struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		{name: "missing mount information", filesystem: fstest.MapFS{}},
+		{
+			name: "missing CPU request",
+			filesystem: fstest.MapFS{
+				"proc/self/mountinfo": &fstest.MapFile{Data: mountInfo},
+			},
+		},
+		{
+			name: "invalid CPU request",
+			filesystem: fstest.MapFS{
+				"proc/self/mountinfo":      &fstest.MapFile{Data: mountInfo},
+				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("invalid\n")},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ensureG1GCThreads(nil, tc.filesystem, 48)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=33"}, got)
+		})
+	}
+}
+
 func TestComputeG1ParallelGCThreads(t *testing.T) {
 	for _, tc := range []struct {
 		hostProcessors int

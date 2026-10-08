@@ -382,13 +382,12 @@ func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int) ([]s
 			return nil, errors.Wrap(err, "invalid ParallelGCThreads value")
 		}
 	} else {
+		requestedCores := uint(hostProcessors)
 		counter, err := NewCGroupProcessorCounter(filesystem)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get cgroup CPU request")
-		}
-		requestedCores, err := counter.ProcessorCount()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get cgroup CPU request")
+		if err == nil {
+			if cores, err := counter.ProcessorCount(); err == nil {
+				requestedCores = cores
+			}
 		}
 		parallelThreads = computeG1ParallelGCThreads(requestedCores, hostProcessors)
 		args = append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads))

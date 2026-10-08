@@ -224,7 +224,8 @@ preserved.
 
 CPU requests are derived from cgroup v1 ``cpu.shares`` (1024 shares per core), or shares converted from v2
 ``cpu.weight``. Requests are truncated to whole cores, with a minimum of one core before applying the sizing
-formula. CPU quotas are not used.
+formula. CPU quotas are not used. If cgroup detection or CPU request reading fails, thread sizing falls back to
+using the host core count.
 
 ### Disabling container support
 

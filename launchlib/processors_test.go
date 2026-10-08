@@ -16,7 +16,6 @@ package launchlib_test
 
 import (
 	"io/fs"
-	"runtime"
 	"testing"
 	"testing/fstest"
 
@@ -32,7 +31,7 @@ var (
 	badCPUSharesContent  = []byte(``)
 )
 
-func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
+func TestProcessorCounter_CGroupV1(t *testing.T) {
 	for _, test := range []struct {
 		name                   string
 		filesystem             fs.FS
@@ -67,7 +66,7 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			expectedError: errors.New("unable to convert cpu.shares value to expected type"),
 		},
 		{
-			name: "returns expected processor count when cpu.shares under 2 cores",
+			name: "truncates requests below one core without a minimum clamp",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
 					Data: CGroupContent,
@@ -79,10 +78,10 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 					Data: lowCPUSharesContent,
 				},
 			},
-			expectedProcessorCount: uint(min(2, runtime.NumCPU())),
+			expectedProcessorCount: 0,
 		},
 		{
-			name: "returns expected processor count when cpu.shares over 2 cores",
+			name: "returns whole requested cores without host clamping",
 			filesystem: fstest.MapFS{
 				"proc/self/cgroup": &fstest.MapFile{
 					Data: CGroupContent,
@@ -94,11 +93,12 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 					Data: highCPUSharesContent,
 				},
 			},
-			expectedProcessorCount: uint(min(9, runtime.NumCPU())),
+			expectedProcessorCount: 9,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			counter := launchlib.NewCGroupV1ProcessorCounter(test.filesystem)
+			counter, err := launchlib.NewCGroupProcessorCounter(test.filesystem)
+			require.NoError(t, err)
 			processorCount, err := counter.ProcessorCount()
 			if test.expectedError != nil {
 				require.Error(t, err)
@@ -107,6 +107,37 @@ func TestProcessorCounter_DefaultCGroupV1ProcessorCounter(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedProcessorCount, processorCount)
+		})
+	}
+}
+
+func TestProcessorCounter_CGroupV2(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		weight    string
+		want      uint
+		wantError string
+	}{
+		{name: "minimum weight has no core clamp", weight: "1\n", want: 0},
+		{name: "weight is converted to shares", weight: "100\n", want: 2},
+		{name: "maximum weight is not capped to host cores", weight: "10000\n", want: 256},
+		{name: "invalid weight is rejected", weight: "10001\n", wantError: "invalid cpu.weight value"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			filesystem := fstest.MapFS{
+				"proc/self/mountinfo":      &fstest.MapFile{Data: CGroupV2MountInfoContent},
+				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte(tc.weight)},
+				"sys/fs/cgroup/cpu.max":    &fstest.MapFile{Data: []byte("100000 100000\n")},
+			}
+			counter, err := launchlib.NewCGroupProcessorCounter(filesystem)
+			require.NoError(t, err)
+			got, err := counter.ProcessorCount()
+			if tc.wantError != "" {
+				require.ErrorContains(t, err, tc.wantError)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

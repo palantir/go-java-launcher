@@ -17,10 +17,8 @@ package launchlib
 import (
 	"io"
 	"io/fs"
-	"math"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -30,6 +28,7 @@ import (
 const (
 	cpuGroupName  = CGroupName("cpu")
 	cpuSharesName = "cpu.shares"
+	cpuWeightName = "cpu.weight"
 )
 
 type ProcessorCounter interface {
@@ -38,52 +37,65 @@ type ProcessorCounter interface {
 
 var defaultFS = os.DirFS("/")
 
-var DefaultCGroupV1ProcessorCounter = CGroupV1ProcessorCounter{
-	cgroupPaths: NewCGroupV1Pather(defaultFS),
-	fs:          defaultFS,
-}
+var DefaultCGroupV1ProcessorCounter = NewCGroupV1ProcessorCounter(defaultFS)
 
-type CGroupV1ProcessorCounter struct {
+type CGroupProcessorCounter struct {
 	cgroupPaths CGroupPather
 	fs          fs.FS
+	isCGroupV2  bool
+}
+
+func NewCGroupProcessorCounter(filesystem fs.FS) (ProcessorCounter, error) {
+	isCGroupV2, err := IsCGroupV2(filesystem)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to determine cgroup version")
+	}
+	if isCGroupV2 {
+		return CGroupProcessorCounter{
+			cgroupPaths: NewCGroupV2Pather(),
+			fs:          filesystem,
+			isCGroupV2:  true,
+		}, nil
+	}
+	return NewCGroupV1ProcessorCounter(filesystem), nil
 }
 
 func NewCGroupV1ProcessorCounter(filesystem fs.FS) ProcessorCounter {
-	return CGroupV1ProcessorCounter{cgroupPaths: NewCGroupV1Pather(filesystem), fs: filesystem}
+	return CGroupProcessorCounter{cgroupPaths: NewCGroupV1Pather(filesystem), fs: filesystem}
 }
 
-func (c CGroupV1ProcessorCounter) ProcessorCount() (uint, error) {
+func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 	cpuCgroupPath, err := c.cgroupPaths.Path(cpuGroupName)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get path to cpu cgroup")
 	}
 
-	cpuSharesFilepath := filepath.Join(cpuCgroupPath, cpuSharesName)
-	cpuSharesFile, err := c.fs.Open(convertToFSPath(cpuSharesFilepath))
+	cpuRequestName := cpuSharesName
+	if c.isCGroupV2 {
+		cpuRequestName = cpuWeightName
+	}
+	cpuRequestFilepath := filepath.Join(cpuCgroupPath, cpuRequestName)
+	cpuRequestFile, err := c.fs.Open(convertToFSPath(cpuRequestFilepath))
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to open cpu.shares at expected location: %s", cpuSharesFilepath)
+		return 0, errors.Wrapf(err, "unable to open %s at expected location: %s", cpuRequestName, cpuRequestFilepath)
 	}
 	defer func() {
-		_ = cpuSharesFile.Close()
+		_ = cpuRequestFile.Close()
 	}()
-	cpuShareBytes, err := io.ReadAll(cpuSharesFile)
+	cpuRequestBytes, err := io.ReadAll(cpuRequestFile)
 	if err != nil {
-		return 0, errors.Wrapf(err, "unable to read cpu.shares")
+		return 0, errors.Wrapf(err, "unable to read %s", cpuRequestName)
 	}
-	cpuShares, err := strconv.Atoi(strings.TrimSpace(string(cpuShareBytes)))
+	cpuShares, err := strconv.Atoi(strings.TrimSpace(string(cpuRequestBytes)))
 	if err != nil {
-		return 0, errors.New("unable to convert cpu.shares value to expected type")
+		return 0, errors.Errorf("unable to convert %s value to expected type", cpuRequestName)
 	}
-
-	virtualCPUs := runtime.NumCPU()
-	cpuShareCPUs := math.Floor(float64(cpuShares / 1024))
-
-	// We think we will be better off providing >1 cores in cases where the underlying host has multiple CPUs to ensure
-	// smaller applications don't get blocked by too few GC threads, as well as issues in many concurrent data-structures
-	// which assume they must operate differently when ActiveProcessorCount=1 because parallel computation is impossible.
-	// https://github.com/palantir/go-java-launcher/issues/313
-	if virtualCPUs == 1 {
-		return 1, nil
+	if cpuShares <= 0 || (c.isCGroupV2 && cpuShares > 10000) {
+		return 0, errors.Errorf("invalid %s value: %d", cpuRequestName, cpuShares)
 	}
-	return uint(math.Max(2.0, math.Min(cpuShareCPUs, float64(virtualCPUs)))), nil
+	if c.isCGroupV2 {
+		// Reverse the container runtime conversion from shares [2, 262144] to weight [1, 10000].
+		cpuShares = 2 + (cpuShares-1)*262142/9999
+	}
+	return uint(cpuShares / 1024), nil
 }

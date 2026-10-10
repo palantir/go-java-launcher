@@ -96,6 +96,8 @@ type ExperimentalLauncherConfig struct {
 	// Deprecated: use the top-level allowHeapShrink field on CustomLauncherConfig instead. This field is retained
 	// for backwards compatibility with existing overrides that set it under experimental.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
+	// LimitG1GCThreads enables experimental G1 GC thread sizing.
+	LimitG1GCThreads bool `yaml:"limitG1GcThreads,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

@@ -214,7 +214,7 @@ It uses the sizing formula:
 
 ```
 adjusted_cores = min(floor(requested_cores * 8), host_cores)
-parallel_threads = 8 + ((adjusted_cores - 8) * 5 / 8)
+parallel_threads = adjusted_cores if adjusted_cores < 8 else 8 + ((adjusted_cores - 8) * 5 / 8)
 ```
 
 For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default. In

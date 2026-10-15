@@ -378,6 +378,9 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger
 
 func computeParallelGCThreads(requestedCores uint, hostProcessors int) int {
 	adjustedCores := int(min(requestedCores*8, uint(hostProcessors)))
+	if adjustedCores < 8 {
+		return adjustedCores
+	}
 	return 8 + (adjustedCores-8)*5/8
 }
 

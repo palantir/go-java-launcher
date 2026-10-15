@@ -287,6 +287,9 @@ func TestComputeParallelGCThreads(t *testing.T) {
 		hostProcessors int
 		wantThreads    []int // CPU requests start at 1; the final value holds for all larger requests.
 	}{
+		{hostProcessors: 1, wantThreads: []int{1}},
+		{hostProcessors: 4, wantThreads: []int{4}},
+		{hostProcessors: 8, wantThreads: []int{8}},
 		{hostProcessors: 48, wantThreads: []int{8, 13, 18, 23, 28, 33}},
 		{hostProcessors: 64, wantThreads: []int{8, 13, 18, 23, 28, 33, 38, 43}},
 		{hostProcessors: 128, wantThreads: []int{8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58, 63, 68, 73, 78, 83}},

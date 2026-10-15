@@ -204,7 +204,7 @@ on the number of host cores, often resulting in unnecessarily large numbers of t
 
 ```
 experimental:
-  limitG1GcThreads: true
+  limitGcThreads: true
 ```
 
 It uses the sizing formula:
@@ -214,7 +214,9 @@ adjusted_cores = min(floor(requested_cores * 8), host_cores)
 parallel_threads = 8 + ((adjusted_cores - 8) * 5 / 8)
 ```
 
-The Concurrent GC threads are internally set at 1/4 the number of Parallel threads by the JVM.
+For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default. In
+the case of ZGC, the concurrent threads are set independently from the parallel threads, using a 
+formula that considers both the number of host cores and the max amount of JVM heap.
 
 This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
 ``-XX:MaxRAM=`` override. The launcher adds ``-XX:+UseG1GC`` if necessary. An enabled non-G1 collector or an

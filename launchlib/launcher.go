@@ -25,7 +25,6 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -303,9 +302,9 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		if customConfig.Experimental.LimitG1GCThreads {
+		if customConfig.Experimental.LimitGCThreads {
 			var err error
-			combinedJvmOpts, err = ensureG1GCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), logger)
+			combinedJvmOpts, err = ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), logger)
 			if err != nil {
 				return nil, err
 			}
@@ -342,74 +341,32 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts, nil
 }
 
-func ensureG1GCThreads(args []string, filesystem fs.FS, hostProcessors int, logger io.Writer) ([]string, error) {
-	collectors := []string{
-		"UseG1GC", "UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
-		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
-	}
-	enabled := make(map[string]bool)
-	var parallelGCThreadsArg, concGCThreadsArg string
+func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger io.Writer) ([]string, error) {
+	var parallelGCThreadsArg string
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") {
 			parallelGCThreadsArg = arg
-		} else if strings.HasPrefix(arg, "-XX:ConcGCThreads=") {
-			concGCThreadsArg = arg
-		}
-		for _, collector := range collectors {
-			switch arg {
-			case "-XX:+" + collector:
-				enabled[collector] = true
-			case "-XX:-" + collector:
-				enabled[collector] = false
-			}
 		}
 	}
-	for _, collector := range collectors[1:] {
-		if enabled[collector] {
-			return nil, errors.Errorf("limitG1GcThreads requires G1, but -XX:+%s is enabled", collector)
-		}
-	}
-	if g1, explicit := enabled["UseG1GC"]; explicit && !g1 {
-		return nil, errors.New("limitG1GcThreads conflicts with -XX:-UseG1GC")
-	}
-	var parallelThreads int
 	if parallelGCThreadsArg != "" {
-		var err error
-		parallelThreads, err = strconv.Atoi(strings.TrimPrefix(parallelGCThreadsArg, "-XX:ParallelGCThreads="))
-		if err != nil {
-			return nil, errors.Wrap(err, "invalid ParallelGCThreads value")
-		}
-	} else {
-		var requestedCores uint
-		counter, err := NewCGroupProcessorCounter(filesystem)
-		if err == nil {
-			requestedCores, err = counter.ProcessorCount()
-		}
-		if err != nil {
-			_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
-			return args, nil
-		}
-		parallelThreads = computeG1ParallelGCThreads(requestedCores, hostProcessors)
+		// An explicit ParallelGCThreads is preserved as-is; the JVM validates the value itself.
+		return args, nil
 	}
-	if concGCThreadsArg != "" {
-		concurrentThreads, err := strconv.Atoi(strings.TrimPrefix(concGCThreadsArg, "-XX:ConcGCThreads="))
-		if err != nil {
-			return nil, errors.Wrap(err, "invalid ConcGCThreads value")
-		}
-		if concurrentThreads > parallelThreads {
-			return nil, errors.Errorf("ConcGCThreads (%d) must not exceed ParallelGCThreads (%d)", concurrentThreads, parallelThreads)
-		}
+	var requestedCores uint
+	counter, err := NewCGroupProcessorCounter(filesystem)
+	if err == nil {
+		requestedCores, err = counter.ProcessorCount()
 	}
-	if !enabled["UseG1GC"] {
-		args = append(args, "-XX:+UseG1GC")
+	if err != nil {
+		_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
+		return args, nil
 	}
-	if parallelGCThreadsArg == "" {
-		args = append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads))
-	}
-	return args, nil
+	// ConcGCThreads is intentionally left untouched: each collector derives a reasonable concurrent thread count
+	// from the container-visible CPU count, and collectors that ignore the flag (Serial, Epsilon) are unaffected.
+	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", computeParallelGCThreads(requestedCores, hostProcessors))), nil
 }
 
-func computeG1ParallelGCThreads(requestedCores uint, hostProcessors int) int {
+func computeParallelGCThreads(requestedCores uint, hostProcessors int) int {
 	adjustedCores := int(min(requestedCores*8, uint(hostProcessors)))
 	return 8 + (adjustedCores-8)*5/8
 }

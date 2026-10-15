@@ -369,12 +369,12 @@ env:
 			},
 		},
 		{
-			name: "limitG1GcThreads is parsed",
+			name: "limitGcThreads is parsed",
 			data: `
 configType: java
 configVersion: 1
 experimental:
-  limitG1GcThreads: true
+  limitGcThreads: true
 `,
 			want: PrimaryCustomLauncherConfig{
 				VersionedConfig: VersionedConfig{
@@ -385,7 +385,7 @@ experimental:
 						Type: "java",
 					},
 					Experimental: ExperimentalLauncherConfig{
-						LimitG1GCThreads: true,
+						LimitGCThreads: true,
 					},
 				},
 			},

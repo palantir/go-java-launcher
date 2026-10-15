@@ -96,8 +96,14 @@ type ExperimentalLauncherConfig struct {
 	// Deprecated: use the top-level allowHeapShrink field on CustomLauncherConfig instead. This field is retained
 	// for backwards compatibility with existing overrides that set it under experimental.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
-	// LimitG1GCThreads enables experimental G1 GC thread sizing.
-	LimitG1GCThreads bool `yaml:"limitG1GcThreads,omitempty"`
+	// LimitGCThreads enables experimental GC thread sizing based on the cgroup CPU request and the host processor count,
+	// instead of solely from the host processors.
+	//
+	// When enabled in container mode, the launcher adds -XX:ParallelGCThreads derived from the requested CPU count
+	// unless it is already set explicitly. -XX:ConcGCThreads is left untouched: each collector derives a reasonable
+	// concurrent thread count from the container-visible CPU count. Applies to whichever garbage collector the JVM
+	// uses, and ignored by inapplicable GCs.
+	LimitGCThreads bool `yaml:"limitGcThreads,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

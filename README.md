@@ -195,10 +195,10 @@ launcher requires ``minHeapFreeRatio <= maxHeapFreeRatio``; the JVM validates pa
 These settings only take effect in the cgroup-based heap sizing path. They have no effect when container support is
 disabled or a ``-XX:MaxRAM=`` override is present.
 
-### Limiting G1 GC threads
+### Limiting GC threads
 
-This experimental option limits the number of Parallel and GC threads for the G1 garbage
-collector based on the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``.
+This experimental option limits the number of Parallel GC threads
+based on the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``.
 This overrides the default settings, which is to size the number of GC threads entirely based
 on the number of host cores, often resulting in unnecessarily large numbers of threads.
 
@@ -222,15 +222,8 @@ the case of ZGC, the concurrent threads are set independently from the parallel 
 formula that considers both the number of host cores and the max amount of JVM heap.
 
 This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
-``-XX:MaxRAM=`` override. The launcher adds ``-XX:+UseG1GC`` if necessary. An enabled non-G1 collector or an
-explicitly disabled G1 in static/custom ``jvmOpts`` causes a launcher error. Later settings for the same collector
-flag take precedence. Explicit ``ParallelGCThreads`` and ``ConcGCThreads`` values in ``jvmOpts`` are
+``-XX:MaxRAM=`` override. Explicit ``ParallelGCThreads`` and ``ConcGCThreads`` values in ``jvmOpts`` are
 preserved.
-
-CPU requests are derived from cgroup v1 ``cpu.shares`` (1024 shares per core), or shares converted from v2
-``cpu.weight``. Requests are truncated to whole cores, with a minimum of one core before applying the sizing
-formula. CPU quotas are not used. If cgroup detection or CPU request reading fails, the launcher logs the failure
-and adds no collector or GC thread arguments, leaving the JVM defaults in effect unless explicitly configured.
 
 ### Disabling container support
 

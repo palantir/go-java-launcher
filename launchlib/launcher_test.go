@@ -153,20 +153,29 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 }
 
 func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
+	t.Setenv(limitGCThreadsEnvVar, "")
+	require.NoError(t, os.Unsetenv(limitGCThreadsEnvVar))
 	for _, tc := range []struct {
 		name             string
 		enabled          bool
+		envOverride      string
 		container        bool
 		disableContainer bool
 		maxRAMOverride   bool
+		wantActive       bool
 	}{
-		{name: "active", enabled: true, container: true},
+		{name: "active", enabled: true, container: true, wantActive: true},
 		{name: "flag disabled", container: true},
 		{name: "outside container", enabled: true},
 		{name: "container support disabled", enabled: true, container: true, disableContainer: true},
 		{name: "MaxRAM override", enabled: true, container: true, maxRAMOverride: true},
+		{name: "env enables disabled config", envOverride: "true", container: true, wantActive: true},
+		{name: "env disables enabled config", enabled: true, envOverride: "false", container: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.envOverride != "" {
+				t.Setenv(limitGCThreadsEnvVar, tc.envOverride)
+			}
 			t.Setenv("CONTAINER", "")
 			if !tc.container {
 				require.NoError(t, os.Unsetenv("CONTAINER"))
@@ -182,7 +191,8 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 			var log bytes.Buffer
 			got, err := createJvmOpts(args, &config, &NoopClosingWriter{&log})
 			require.NoError(t, err)
-			if tc.enabled && tc.container && !tc.disableContainer && !tc.maxRAMOverride {
+			assert.Equal(t, tc.enabled, config.Experimental.LimitGCThreads, "environment override must not mutate config")
+			if tc.wantActive {
 				// Depending on the host, the limiter either appends a thread count or logs a cgroup
 				// read failure. Both outcomes prove it ran; TestEnsureGCThreads checks exact sizing.
 				if len(got) == len(args) {

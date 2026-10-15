@@ -97,7 +97,7 @@ type ExperimentalLauncherConfig struct {
 	// for backwards compatibility with existing overrides that set it under experimental.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
 	// LimitGCThreads enables experimental GC thread sizing based on the cgroup CPU request and the host processor count,
-	// instead of solely from the host processors.
+	// instead of solely from the host processors. Can also be set with envvar LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS.
 	//
 	// When enabled in container mode, the launcher adds -XX:ParallelGCThreads derived from the requested CPU count
 	// unless it is already set explicitly. -XX:ConcGCThreads is left untouched: each collector derives a reasonable

@@ -207,6 +207,9 @@ experimental:
   limitGcThreads: true
 ```
 
+This can also be set with the envvar `LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS`, which overrides this
+setting. 
+
 It uses the sizing formula:
 
 ```

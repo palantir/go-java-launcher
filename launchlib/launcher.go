@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -37,6 +38,7 @@ const (
 	ExecPathBlackListRegex           = `[^\w.\/_\-]`
 	BytesInMebibyte                  = 1048576
 	defaultNativeImageExecutablePath = "service/bin/native-executable"
+	limitGCThreadsEnvVar             = "LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS"
 )
 
 type ServiceCmds struct {
@@ -302,7 +304,15 @@ func delim(str string) string {
 func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
-		if customConfig.Experimental.LimitGCThreads {
+		limitGCThreads := customConfig.Experimental.LimitGCThreads
+		if value, set := os.LookupEnv(limitGCThreadsEnvVar); set {
+			var err error
+			limitGCThreads, err = strconv.ParseBool(value)
+			if err != nil {
+				return nil, errors.Wrapf(err, "invalid %s value", limitGCThreadsEnvVar)
+			}
+		}
+		if limitGCThreads {
 			var err error
 			combinedJvmOpts, err = ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), logger)
 			if err != nil {

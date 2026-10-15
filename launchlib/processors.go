@@ -94,8 +94,10 @@ func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 		return 0, errors.Errorf("invalid %s value: %d", cpuRequestName, cpuShares)
 	}
 	if c.isCGroupV2 {
-		// Reverse the container runtime conversion from shares [2, 262144] to weight [1, 10000].
-		cpuShares = 2 + (cpuShares-1)*262142/9999
+		// Runtimes use weight = 1 + floor((shares - 2) * 9999 / 262142), losing precision.
+		// Recover the largest shares value in that weight bucket before truncating to cores,
+		// so whole-core requests do not lose a core in the round trip. Clamp to the shares maximum.
+		cpuShares = int(min(262144, 1+(int64(cpuShares)*262142+9998)/9999))
 	}
 	return uint(max(1, cpuShares/1024)), nil
 }

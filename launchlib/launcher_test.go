@@ -214,9 +214,10 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 
 func TestEnsureGCThreads(t *testing.T) {
 	t.Setenv("CONTAINER", "true")
+	// A two-CPU request (2048 shares) becomes cpu.weight=79 in the container runtime.
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
-		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("100\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("79\n")},
 	}
 	for _, tc := range []struct {
 		name string

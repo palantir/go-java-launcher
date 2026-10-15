@@ -120,6 +120,11 @@ func TestProcessorCounter_CGroupV2(t *testing.T) {
 	}{
 		{name: "minimum weight requests at least one core", weight: "1\n", want: 1},
 		{name: "weight is converted to shares", weight: "100\n", want: 2},
+		{name: "weight below two-core request stays below two cores", weight: "78\n", want: 1},
+		{name: "two-core request survives runtime rounding", weight: "79\n", want: 2},
+		{name: "four-core request survives runtime rounding", weight: "157\n", want: 4},
+		{name: "eight-core request survives runtime rounding", weight: "313\n", want: 8},
+		{name: "weight below maximum stays below 256 cores", weight: "9999\n", want: 255},
 		{name: "maximum weight is not capped to host cores", weight: "10000\n", want: 256},
 		{name: "invalid weight is rejected", weight: "10001\n", wantError: "invalid cpu.weight value"},
 	} {

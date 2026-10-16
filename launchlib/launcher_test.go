@@ -159,12 +159,16 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 		name             string
 		enabled          bool
 		envOverride      string
+		collector        string
 		container        bool
 		disableContainer bool
 		maxRAMOverride   bool
 		wantActive       bool
 	}{
 		{name: "active", enabled: true, container: true, wantActive: true},
+		{name: "explicit G1", enabled: true, collector: "-XX:+UseG1GC", container: true, wantActive: true},
+		{name: "explicit non-G1", enabled: true, collector: "-XX:+UseZGC", container: true},
+		{name: "explicitly disabled G1", enabled: true, collector: "-XX:-UseG1GC", container: true},
 		{name: "flag disabled", container: true},
 		{name: "outside container", enabled: true},
 		{name: "container support disabled", enabled: true, container: true, disableContainer: true},
@@ -180,7 +184,10 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 			if !tc.container {
 				require.NoError(t, os.Unsetenv("CONTAINER"))
 			}
-			args := []string{"-XX:+UseSerialGC", "-XX:MaxRAMPercentage=75.0"}
+			args := []string{"-XX:MaxRAMPercentage=75.0"}
+			if tc.collector != "" {
+				args = append(args, tc.collector)
+			}
 			if tc.maxRAMOverride {
 				args = append(args, "-XX:MaxRAM=1024")
 			}
@@ -230,20 +237,65 @@ func TestEnsureGCThreads(t *testing.T) {
 			want: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2", "-XX:ParallelGCThreads=13"},
 		},
 		{
-			name: "non-G1 collector flag passes through untouched",
-			args: []string{"-XX:+UseSerialGC"},
-			want: []string{"-XX:+UseSerialGC", "-XX:ParallelGCThreads=13"},
+			name: "explicit G1 gets parallel threads",
+			args: []string{"-XX:+UseG1GC"},
+			want: []string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
 		},
 		{
 			name: "G1 disable passes through untouched",
 			args: []string{"-XX:+UseG1GC", "-XX:-UseG1GC"},
-			want: []string{"-XX:+UseG1GC", "-XX:-UseG1GC", "-XX:ParallelGCThreads=13"},
+			want: []string{"-XX:+UseG1GC", "-XX:-UseG1GC"},
+		},
+		{
+			name: "G1 re-enabled by later flag gets parallel threads",
+			args: []string{"-XX:-UseG1GC", "-XX:+UseG1GC"},
+			want: []string{"-XX:-UseG1GC", "-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "disabled non-G1 collector does not prevent sizing",
+			args: []string{"-XX:-UseZGC", "-XX:+UseG1GC"},
+			want: []string{"-XX:-UseZGC", "-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "non-G1 collector disabled by later flag does not prevent sizing",
+			args: []string{"-XX:+UseZGC", "-XX:-UseZGC"},
+			want: []string{"-XX:+UseZGC", "-XX:-UseZGC", "-XX:ParallelGCThreads=13"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := ensureGCThreads(tc.args, filesystem, 16, io.Discard)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestEnsureGCThreads_NonG1Collectors(t *testing.T) {
+	for _, collector := range []string{
+		"UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
+		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
+	} {
+		t.Run(collector, func(t *testing.T) {
+			flag := "-XX:+" + collector
+			for _, tc := range []struct {
+				name string
+				args []string
+			}{
+				{name: "selected", args: []string{flag}},
+				{name: "selected after G1", args: []string{"-XX:+UseG1GC", flag}},
+				{name: "selected before G1", args: []string{flag, "-XX:+UseG1GC"}},
+				{name: "re-enabled", args: []string{flag, "-XX:-" + collector, flag}},
+				{name: "explicit concurrent threads", args: []string{flag, "-XX:ConcGCThreads=14"}},
+				{name: "explicit thread counts", args: []string{flag, "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					var log bytes.Buffer
+					got, err := ensureGCThreads(tc.args, fstest.MapFS{}, 48, &log)
+					require.NoError(t, err)
+					assert.Equal(t, tc.args, got)
+					assert.Empty(t, log.String(), "inert limiter must not attempt to read cgroups")
+				})
+			}
 		})
 	}
 }
@@ -326,8 +378,8 @@ func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
 	}{
 		{
 			name: "concurrent exceeding computed parallel is preserved",
-			args: []string{"-XX:ConcGCThreads=14"},
-			want: []string{"-XX:ConcGCThreads=14", "-XX:ParallelGCThreads=13"},
+			args: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14"},
+			want: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14", "-XX:ParallelGCThreads=13"},
 		},
 		{
 			name: "explicit parallel and concurrent are both preserved",

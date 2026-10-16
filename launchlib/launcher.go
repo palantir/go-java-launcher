@@ -352,15 +352,27 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 }
 
 func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger io.Writer) ([]string, error) {
-	var parallelGCThreadsArg string
+	collectors := make(map[string]bool)
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") {
-			parallelGCThreadsArg = arg
+			// An explicit ParallelGCThreads is preserved as-is; the JVM validates the value itself.
+			return args, nil
+		}
+		if !strings.HasPrefix(arg, "-XX:+") && !strings.HasPrefix(arg, "-XX:-") {
+			continue
+		}
+		collector := arg[len("-XX:+"):]
+		switch collector {
+		case "UseG1GC", "UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
+			"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC":
+			// Later settings for the same collector take precedence.
+			collectors[collector] = strings.HasPrefix(arg, "-XX:+")
 		}
 	}
-	if parallelGCThreadsArg != "" {
-		// An explicit ParallelGCThreads is preserved as-is; the JVM validates the value itself.
-		return args, nil
+	for collector, enabled := range collectors {
+		if (collector == "UseG1GC" && !enabled) || (collector != "UseG1GC" && enabled) {
+			return args, nil
+		}
 	}
 	var requestedCores uint
 	counter, err := NewCGroupProcessorCounter(filesystem)
@@ -371,8 +383,8 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger
 		_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
 		return args, nil
 	}
-	// ConcGCThreads is intentionally left untouched: each collector derives a reasonable concurrent thread count
-	// from the container-visible CPU count, and collectors that ignore the flag (Serial, Epsilon) are unaffected.
+	// ConcGCThreads is intentionally left untouched: G1 derives its default from ParallelGCThreads,
+	// Explicit concurrent thread settings are preserved without validation.
 	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", computeParallelGCThreads(requestedCores, hostProcessors))), nil
 }
 

@@ -197,8 +197,8 @@ disabled or a ``-XX:MaxRAM=`` override is present.
 
 ### Limiting GC threads
 
-This experimental option limits the number of Parallel GC threads
-based on the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``.
+This experimental option limits the number of parallel GC threads when G1 is explicitly enabled or no
+collector is specified, based on the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``.
 This overrides the default settings, which is to size the number of GC threads entirely based
 on the number of host cores, often resulting in unnecessarily large numbers of threads.
 
@@ -208,7 +208,7 @@ experimental:
 ```
 
 This can also be set with the envvar `LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS`, which overrides this
-setting. 
+setting.
 
 It uses the sizing formula:
 
@@ -217,9 +217,8 @@ adjusted_cores = min(floor(requested_cores * 8), host_cores)
 parallel_threads = adjusted_cores if adjusted_cores < 8 else 8 + ((adjusted_cores - 8) * 5 / 8)
 ```
 
-For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default. In
-the case of ZGC, the concurrent threads are set independently from the parallel threads, using a 
-formula that considers both the number of host cores and the max amount of JVM heap.
+For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default.
+The launcher does not set ``ConcGCThreads`` nor validates explicit thread counts.
 
 This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
 ``-XX:MaxRAM=`` override. Explicit ``ParallelGCThreads`` and ``ConcGCThreads`` values in ``jvmOpts`` are

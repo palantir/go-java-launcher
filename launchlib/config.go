@@ -100,9 +100,8 @@ type ExperimentalLauncherConfig struct {
 	// instead of solely from the host processors. Can also be set with envvar LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS.
 	//
 	// When enabled in container mode, the launcher adds -XX:ParallelGCThreads derived from the requested CPU count
-	// unless it is already set explicitly. -XX:ConcGCThreads is left untouched: each collector derives a reasonable
-	// concurrent thread count from the container-visible CPU count. Applies to whichever garbage collector the JVM
-	// uses, and ignored by inapplicable GCs.
+	// unless it is already set explicitly. Only applies when G1 is explicitly enabled or no collector is specified;
+	// -XX:ConcGCThreads is left untouched: G1 derives its default from ParallelGCThreads, and explicit values are preserved.
 	LimitGCThreads bool `yaml:"limitGcThreads,omitempty"`
 }
 

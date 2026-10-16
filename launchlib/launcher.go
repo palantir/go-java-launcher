@@ -383,25 +383,17 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger
 		_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
 		return args, nil
 	}
-	parallelThreads := computeParallelGCThreads(requestedCores, hostProcessors)
-	if parallelThreads == parallelGCThreadsForProcessors(hostProcessors) {
-		_, _ = fmt.Fprintf(logger, "GC thread limit matches host-based JVM default (%d), leaving GC options unset\n", parallelThreads)
-		return args, nil
-	}
-	// ConcGCThreads is intentionally left untouched: G1 derives its default from ParallelGCThreads
+	// ConcGCThreads is intentionally left untouched: G1 derives its default from ParallelGCThreads,
 	// Explicit concurrent thread settings are preserved without validation.
-	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", parallelThreads)), nil
+	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", computeParallelGCThreads(requestedCores, hostProcessors))), nil
 }
 
 func computeParallelGCThreads(requestedCores uint, hostProcessors int) int {
-	return parallelGCThreadsForProcessors(int(min(requestedCores*8, uint(hostProcessors))))
-}
-
-func parallelGCThreadsForProcessors(processors int) int {
-	if processors < 8 {
-		return processors
+	adjustedCores := int(min(requestedCores*8, uint(hostProcessors)))
+	if adjustedCores < 8 {
+		return adjustedCores
 	}
-	return 8 + (processors-8)*5/8
+	return 8 + (adjustedCores-8)*5/8
 }
 
 func filterHeapSizeArgs(args []string, heapPercentage *float64) []string {

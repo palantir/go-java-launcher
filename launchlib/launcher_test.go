@@ -200,12 +200,11 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.enabled, config.Experimental.LimitGCThreads, "environment override must not mutate config")
 			if tc.wantActive {
-				// Depending on the host, the limiter either appends a thread count, logs a cgroup
-				// read failure, or logs that the count matches host-based JVM ergonomics.
-				// Each outcome proves it ran; TestEnsureGCThreads checks exact sizing.
+				// Depending on the host, the limiter either appends a thread count or logs a cgroup
+				// read failure. Both outcomes prove it ran; TestEnsureGCThreads checks exact sizing.
 				if len(got) == len(args) {
 					assert.Equal(t, args, got)
-					assert.Regexp(t, `Failed to get cgroup CPU request, falling back to JVM defaults: |GC thread limit matches host-based JVM default \([1-9][0-9]*\), leaving GC options unset`, log.String())
+					assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to JVM defaults: ")
 				} else {
 					require.Len(t, got, len(args)+1)
 					assert.Equal(t, args, got[:len(args)])
@@ -264,7 +263,7 @@ func TestEnsureGCThreads(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureGCThreads(tc.args, filesystem, 48, io.Discard)
+			got, err := ensureGCThreads(tc.args, filesystem, 16, io.Discard)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
@@ -389,7 +388,7 @@ func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureGCThreads(tc.args, filesystem, 48, io.Discard)
+			got, err := ensureGCThreads(tc.args, filesystem, 16, io.Discard)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})

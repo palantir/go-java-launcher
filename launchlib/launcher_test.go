@@ -15,11 +15,13 @@
 package launchlib
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"sort"
 	"testing"
+	"testing/fstest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -147,6 +149,250 @@ func TestMkdirChecksDirectorySyntax(t *testing.T) {
 	for _, dir := range badCases {
 		err = MkDirs([]string{dir}, os.Stdout)
 		assert.EqualError(t, err, "Cannot create directory with non [A-Za-z0-9] characters: "+dir)
+	}
+}
+
+func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
+	t.Setenv(limitGCThreadsEnvVar, "")
+	require.NoError(t, os.Unsetenv(limitGCThreadsEnvVar))
+	for _, tc := range []struct {
+		name             string
+		enabled          bool
+		envOverride      string
+		collector        string
+		container        bool
+		disableContainer bool
+		maxRAMOverride   bool
+		wantActive       bool
+	}{
+		{name: "active", enabled: true, container: true, wantActive: true},
+		{name: "explicit G1", enabled: true, collector: "-XX:+UseG1GC", container: true, wantActive: true},
+		{name: "explicit non-G1", enabled: true, collector: "-XX:+UseZGC", container: true},
+		{name: "explicitly disabled G1", enabled: true, collector: "-XX:-UseG1GC", container: true},
+		{name: "flag disabled", container: true},
+		{name: "outside container", enabled: true},
+		{name: "container support disabled", enabled: true, container: true, disableContainer: true},
+		{name: "MaxRAM override", enabled: true, container: true, maxRAMOverride: true},
+		{name: "env enables disabled config", envOverride: "true", container: true, wantActive: true},
+		{name: "env disables enabled config", enabled: true, envOverride: "false", container: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.envOverride != "" {
+				t.Setenv(limitGCThreadsEnvVar, tc.envOverride)
+			}
+			t.Setenv("CONTAINER", "")
+			if !tc.container {
+				require.NoError(t, os.Unsetenv("CONTAINER"))
+			}
+			args := []string{"-XX:MaxRAMPercentage=75.0"}
+			if tc.collector != "" {
+				args = append(args, tc.collector)
+			}
+			if tc.maxRAMOverride {
+				args = append(args, "-XX:MaxRAM=1024")
+			}
+			config := CustomLauncherConfig{
+				DisableContainerSupport: tc.disableContainer,
+				Experimental:            ExperimentalLauncherConfig{LimitGCThreads: tc.enabled},
+			}
+			var log bytes.Buffer
+			got, err := createJvmOpts(args, &config, &NoopClosingWriter{&log})
+			require.NoError(t, err)
+			assert.Equal(t, tc.enabled, config.Experimental.LimitGCThreads, "environment override must not mutate config")
+			if tc.wantActive {
+				// Depending on the host, the limiter either appends a thread count, logs a cgroup
+				// read failure, or logs that the count matches host-based JVM ergonomics.
+				// Each outcome proves it ran; TestEnsureGCThreads checks exact sizing.
+				if len(got) == len(args) {
+					assert.Equal(t, args, got)
+					assert.Regexp(t, `Failed to get cgroup CPU request, falling back to JVM defaults: |GC thread limit matches host-based JVM default \([1-9][0-9]*\), leaving GC options unset`, log.String())
+				} else {
+					require.Len(t, got, len(args)+1)
+					assert.Equal(t, args, got[:len(args)])
+					assert.Regexp(t, `^-XX:ParallelGCThreads=[1-9][0-9]*$`, got[len(args)])
+					assert.NotContains(t, log.String(), "Failed to get cgroup CPU request")
+				}
+				return
+			}
+			assert.NotContains(t, log.String(), "Failed to get cgroup CPU request")
+			assert.Equal(t, args, got)
+		})
+	}
+}
+
+func TestEnsureGCThreads(t *testing.T) {
+	t.Setenv("CONTAINER", "true")
+	// A two-CPU request (2048 shares) becomes cpu.weight=79 in the container runtime.
+	filesystem := fstest.MapFS{
+		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("79\n")},
+	}
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "adds parallel threads preserving other options",
+			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2"},
+			want: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "explicit G1 gets parallel threads",
+			args: []string{"-XX:+UseG1GC"},
+			want: []string{"-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "G1 disable passes through untouched",
+			args: []string{"-XX:+UseG1GC", "-XX:-UseG1GC"},
+			want: []string{"-XX:+UseG1GC", "-XX:-UseG1GC"},
+		},
+		{
+			name: "G1 re-enabled by later flag gets parallel threads",
+			args: []string{"-XX:-UseG1GC", "-XX:+UseG1GC"},
+			want: []string{"-XX:-UseG1GC", "-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "disabled non-G1 collector does not prevent sizing",
+			args: []string{"-XX:-UseZGC", "-XX:+UseG1GC"},
+			want: []string{"-XX:-UseZGC", "-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "non-G1 collector disabled by later flag does not prevent sizing",
+			args: []string{"-XX:+UseZGC", "-XX:-UseZGC"},
+			want: []string{"-XX:+UseZGC", "-XX:-UseZGC", "-XX:ParallelGCThreads=13"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ensureGCThreads(tc.args, filesystem, 48, io.Discard)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestEnsureGCThreads_NonG1Collectors(t *testing.T) {
+	for _, collector := range []string{
+		"UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
+		"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC",
+	} {
+		t.Run(collector, func(t *testing.T) {
+			flag := "-XX:+" + collector
+			for _, tc := range []struct {
+				name string
+				args []string
+			}{
+				{name: "selected", args: []string{flag}},
+				{name: "selected after G1", args: []string{"-XX:+UseG1GC", flag}},
+				{name: "selected before G1", args: []string{flag, "-XX:+UseG1GC"}},
+				{name: "re-enabled", args: []string{flag, "-XX:-" + collector, flag}},
+				{name: "explicit concurrent threads", args: []string{flag, "-XX:ConcGCThreads=14"}},
+				{name: "explicit thread counts", args: []string{flag, "-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					var log bytes.Buffer
+					got, err := ensureGCThreads(tc.args, fstest.MapFS{}, 48, &log)
+					require.NoError(t, err)
+					assert.Equal(t, tc.args, got)
+					assert.Empty(t, log.String(), "inert limiter must not attempt to read cgroups")
+				})
+			}
+		})
+	}
+}
+
+func TestEnsureGCThreads_CGroupFailureUsesJVMDefaults(t *testing.T) {
+	mountInfo := []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")
+	for _, tc := range []struct {
+		name       string
+		args       []string
+		filesystem fstest.MapFS
+	}{
+		{name: "missing mount information", filesystem: fstest.MapFS{}},
+		{
+			name: "missing CPU request",
+			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=100"},
+			filesystem: fstest.MapFS{
+				"proc/self/mountinfo": &fstest.MapFile{Data: mountInfo},
+			},
+		},
+		{
+			name: "invalid CPU request",
+			args: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=100"},
+			filesystem: fstest.MapFS{
+				"proc/self/mountinfo":      &fstest.MapFile{Data: mountInfo},
+				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("invalid\n")},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var log bytes.Buffer
+			got, err := ensureGCThreads(tc.args, tc.filesystem, 48, &log)
+			require.NoError(t, err)
+			assert.Equal(t, tc.args, got)
+			assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to JVM defaults: ")
+		})
+	}
+}
+
+func TestComputeParallelGCThreads(t *testing.T) {
+	for _, tc := range []struct {
+		hostProcessors int
+		wantThreads    []int // CPU requests start at 1; the final value holds for all larger requests.
+	}{
+		{hostProcessors: 1, wantThreads: []int{1}},
+		{hostProcessors: 4, wantThreads: []int{4}},
+		{hostProcessors: 8, wantThreads: []int{8}},
+		{hostProcessors: 48, wantThreads: []int{8, 13, 18, 23, 28, 33}},
+		{hostProcessors: 64, wantThreads: []int{8, 13, 18, 23, 28, 33, 38, 43}},
+		{hostProcessors: 128, wantThreads: []int{8, 13, 18, 23, 28, 33, 38, 43, 48, 53, 58, 63, 68, 73, 78, 83}},
+	} {
+		t.Run(fmt.Sprintf("%d_host_cores", tc.hostProcessors), func(t *testing.T) {
+			for requestedCores := 1; requestedCores <= tc.hostProcessors; requestedCores++ {
+				want := tc.wantThreads[min(requestedCores, len(tc.wantThreads))-1]
+				assert.Equal(t, want, computeParallelGCThreads(uint(requestedCores), tc.hostProcessors),
+					"CPU request: %d cores", requestedCores)
+			}
+		})
+	}
+}
+
+func TestEnsureGCThreads_PreservesExplicitThreads(t *testing.T) {
+	args := []string{
+		"-XX:+UseG1GC", "-XX:ParallelGCThreads=1", "-XX:ParallelGCThreads=3",
+		"-XX:ConcGCThreads=4", "-XX:ConcGCThreads=3",
+	}
+	got, err := ensureGCThreads(args, fstest.MapFS{}, 1, io.Discard)
+	require.NoError(t, err)
+	assert.Equal(t, args, got)
+}
+
+func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
+	filesystem := fstest.MapFS{
+		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("100\n")},
+	}
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "concurrent exceeding computed parallel is preserved",
+			args: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14"},
+			want: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "explicit parallel and concurrent are both preserved",
+			args: []string{"-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"},
+			want: []string{"-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ensureGCThreads(tc.args, filesystem, 48, io.Discard)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
 	}
 }
 
@@ -337,6 +583,7 @@ func TestCompileCmdNativeExecutionMode(t *testing.T) {
 			ExecutionMode:             ExecutionModeNative,
 			NativeImageExecutablePath: tmpPath,
 			NativeImageArguments:      []string{"-XX:MaximumHeapSizePercent=50"},
+			LimitGCThreads:            true,
 		},
 	}
 

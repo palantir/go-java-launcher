@@ -2,7 +2,7 @@ module github.com/palantir/go-java-launcher
 
 go 1.27.0
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require (
 	github.com/mitchellh/go-ps v1.0.0

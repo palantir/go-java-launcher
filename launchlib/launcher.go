@@ -352,7 +352,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 }
 
 func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger io.Writer) ([]string, error) {
-	collectors := make(map[string]bool)
+	enabledCollectors := make(map[string]bool)
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") {
 			// An explicit ParallelGCThreads is preserved as-is; the JVM validates the value itself.
@@ -366,13 +366,15 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger
 		case "UseG1GC", "UseSerialGC", "UseParallelGC", "UseZGC", "UseShenandoahGC", "UseEpsilonGC",
 			"UseConcMarkSweepGC", "UseParNewGC", "UseParallelOldGC":
 			// Later settings for the same collector take precedence.
-			collectors[collector] = strings.HasPrefix(arg, "-XX:+")
+			if strings.HasPrefix(arg, "-XX:+") {
+				enabledCollectors[collector] = true
+			} else {
+				delete(enabledCollectors, collector)
+			}
 		}
 	}
-	for collector, enabled := range collectors {
-		if (collector == "UseG1GC" && !enabled) || (collector != "UseG1GC" && enabled) {
-			return args, nil
-		}
+	if len(enabledCollectors) != 1 || !enabledCollectors["UseG1GC"] {
+		return args, nil
 	}
 	var requestedCores uint
 	counter, err := NewCGroupProcessorCounter(filesystem)

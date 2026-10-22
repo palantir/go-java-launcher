@@ -165,16 +165,16 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 		maxRAMOverride   bool
 		wantActive       bool
 	}{
-		{name: "active", enabled: true, container: true, wantActive: true},
 		{name: "explicit G1", enabled: true, collector: "-XX:+UseG1GC", container: true, wantActive: true},
+		{name: "no explicit collector is inert", enabled: true, container: true},
 		{name: "explicit non-G1", enabled: true, collector: "-XX:+UseZGC", container: true},
 		{name: "explicitly disabled G1", enabled: true, collector: "-XX:-UseG1GC", container: true},
-		{name: "flag disabled", container: true},
-		{name: "outside container", enabled: true},
-		{name: "container support disabled", enabled: true, container: true, disableContainer: true},
-		{name: "MaxRAM override", enabled: true, container: true, maxRAMOverride: true},
-		{name: "env enables disabled config", envOverride: "true", container: true, wantActive: true},
-		{name: "env disables enabled config", enabled: true, envOverride: "false", container: true},
+		{name: "flag disabled", collector: "-XX:+UseG1GC", container: true},
+		{name: "outside container", enabled: true, collector: "-XX:+UseG1GC"},
+		{name: "container support disabled", enabled: true, collector: "-XX:+UseG1GC", container: true, disableContainer: true},
+		{name: "MaxRAM override", enabled: true, collector: "-XX:+UseG1GC", container: true, maxRAMOverride: true},
+		{name: "env enables disabled config", envOverride: "true", collector: "-XX:+UseG1GC", container: true, wantActive: true},
+		{name: "env disables enabled config", enabled: true, envOverride: "false", collector: "-XX:+UseG1GC", container: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.envOverride != "" {
@@ -233,8 +233,13 @@ func TestEnsureGCThreads(t *testing.T) {
 	}{
 		{
 			name: "adds parallel threads preserving other options",
+			args: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ConcGCThreads=2"},
+			want: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ConcGCThreads=2", "-XX:ParallelGCThreads=13"},
+		},
+		{
+			name: "no explicit collector is inert",
 			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2"},
-			want: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2", "-XX:ParallelGCThreads=13"},
+			want: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2"},
 		},
 		{
 			name: "explicit G1 gets parallel threads",
@@ -257,9 +262,9 @@ func TestEnsureGCThreads(t *testing.T) {
 			want: []string{"-XX:-UseZGC", "-XX:+UseG1GC", "-XX:ParallelGCThreads=13"},
 		},
 		{
-			name: "non-G1 collector disabled by later flag does not prevent sizing",
+			name: "non-G1 collector disabled by later flag is inert",
 			args: []string{"-XX:+UseZGC", "-XX:-UseZGC"},
-			want: []string{"-XX:+UseZGC", "-XX:-UseZGC", "-XX:ParallelGCThreads=13"},
+			want: []string{"-XX:+UseZGC", "-XX:-UseZGC"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -307,10 +312,10 @@ func TestEnsureGCThreads_CGroupFailureUsesJVMDefaults(t *testing.T) {
 		args       []string
 		filesystem fstest.MapFS
 	}{
-		{name: "missing mount information", filesystem: fstest.MapFS{}},
+		{name: "missing mount information", args: []string{"-XX:+UseG1GC"}, filesystem: fstest.MapFS{}},
 		{
 			name: "missing CPU request",
-			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=100"},
+			args: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ConcGCThreads=100"},
 			filesystem: fstest.MapFS{
 				"proc/self/mountinfo": &fstest.MapFile{Data: mountInfo},
 			},

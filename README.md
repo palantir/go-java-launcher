@@ -197,10 +197,10 @@ disabled or a ``-XX:MaxRAM=`` override is present.
 
 ### Limiting GC threads
 
-This experimental option limits the number of parallel GC threads when G1 is explicitly enabled or no
-collector is specified, based on the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``.
-This overrides the default settings, which is to size the number of GC threads entirely based
-on the number of host cores, often resulting in unnecessarily large numbers of threads.
+This experimental option limits the number of parallel GC threads when G1 is explicitly enabled, based on
+the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``. This overrides the default
+settings, which is to size the number of GC threads entirely based on the number of host cores, often
+resulting in unnecessarily large numbers of threads.
 
 ```
 experimental:

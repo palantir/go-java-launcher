@@ -228,8 +228,8 @@ For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads b
 The launcher does not set ``ConcGCThreads`` nor validates explicit thread counts.
 
 This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
-``-XX:MaxRAM=`` override. Explicit ``ParallelGCThreads`` and ``ConcGCThreads`` values in ``jvmOpts`` are
-preserved.
+``-XX:MaxRAM=`` or ``-XX:ActiveProcessorCount=`` override. Explicit ``ParallelGCThreads`` and ``ConcGCThreads``
+values in ``jvmOpts`` are preserved.
 
 ### Disabling container support
 

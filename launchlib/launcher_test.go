@@ -163,6 +163,7 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 		container        bool
 		disableContainer bool
 		maxRAMOverride   bool
+		processorCount   string
 		wantActive       bool
 	}{
 		{name: "explicit G1", enabled: true, collector: "-XX:+UseG1GC", container: true, wantActive: true},
@@ -173,6 +174,8 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 		{name: "outside container", enabled: true, collector: "-XX:+UseG1GC"},
 		{name: "container support disabled", enabled: true, collector: "-XX:+UseG1GC", container: true, disableContainer: true},
 		{name: "MaxRAM override", enabled: true, collector: "-XX:+UseG1GC", container: true, maxRAMOverride: true},
+		{name: "active processor override", enabled: true, collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
+		{name: "env cannot override explicit processor count", envOverride: "true", collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
 		{name: "env enables disabled config", envOverride: "true", collector: "-XX:+UseG1GC", container: true, wantActive: true},
 		{name: "env disables enabled config", enabled: true, envOverride: "false", collector: "-XX:+UseG1GC", container: true},
 	} {
@@ -190,6 +193,9 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 			}
 			if tc.maxRAMOverride {
 				args = append(args, "-XX:MaxRAM=1024")
+			}
+			if tc.processorCount != "" {
+				args = append(args, "-XX:ActiveProcessorCount="+tc.processorCount)
 			}
 			config := CustomLauncherConfig{
 				DisableContainerSupport: tc.disableContainer,
@@ -271,6 +277,21 @@ func TestEnsureGCThreads(t *testing.T) {
 			got, err := ensureGCThreads(tc.args, filesystem, 16, nil, io.Discard)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestEnsureGCThreads_ActiveProcessorCount(t *testing.T) {
+	for _, value := range []string{"2", "0", "-1", "invalid"} {
+		t.Run(value, func(t *testing.T) {
+			args := []string{"-XX:+UseG1GC", "-XX:ActiveProcessorCount=" + value, "-XX:ConcGCThreads=2"}
+			for _, heapSize := range []*uint64{nil, new(uint64(8 << 20))} {
+				var log bytes.Buffer
+				got, err := ensureGCThreads(args, fstest.MapFS{}, 16, heapSize, &log)
+				require.NoError(t, err)
+				assert.Equal(t, args, got)
+				assert.Empty(t, log.String(), "processor override must prevent reading cgroups and applying the heap cap")
+			}
 		})
 	}
 }

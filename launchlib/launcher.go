@@ -352,8 +352,8 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, maxHeapSizeInBytes *uint64, logger io.Writer) ([]string, error) {
 	enabledCollectors := make(map[string]bool)
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") {
-			// An explicit ParallelGCThreads is preserved as-is; the JVM validates the value itself.
+		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") || strings.HasPrefix(arg, "-XX:ActiveProcessorCount=") {
+			// Explicit thread or processor settings take precedence; leave sizing and validation to the JVM.
 			return args, nil
 		}
 		if !strings.HasPrefix(arg, "-XX:+") && !strings.HasPrefix(arg, "-XX:-") {

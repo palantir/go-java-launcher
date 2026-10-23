@@ -305,7 +305,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		limitGCThreads := customConfig.Experimental.LimitGCThreads
-		if value, set := os.LookupEnv(limitGCThreadsEnvVar); set {
+		if value, set := os.LookupEnv(limitGCThreadsEnvVar); set && value != "" {
 			var err error
 			limitGCThreads, err = strconv.ParseBool(value)
 			if err != nil {

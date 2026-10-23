@@ -158,13 +158,14 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 	for _, tc := range []struct {
 		name             string
 		enabled          bool
-		envOverride      string
+		envOverride      *string
 		collector        string
 		container        bool
 		disableContainer bool
 		maxRAMOverride   bool
 		processorCount   string
 		wantActive       bool
+		wantError        bool
 	}{
 		{name: "explicit G1", enabled: true, collector: "-XX:+UseG1GC", container: true, wantActive: true},
 		{name: "no explicit collector is inert", enabled: true, container: true},
@@ -175,13 +176,17 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 		{name: "container support disabled", enabled: true, collector: "-XX:+UseG1GC", container: true, disableContainer: true},
 		{name: "MaxRAM override", enabled: true, collector: "-XX:+UseG1GC", container: true, maxRAMOverride: true},
 		{name: "active processor override", enabled: true, collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
-		{name: "env cannot override explicit processor count", envOverride: "true", collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
-		{name: "env enables disabled config", envOverride: "true", collector: "-XX:+UseG1GC", container: true, wantActive: true},
-		{name: "env disables enabled config", enabled: true, envOverride: "false", collector: "-XX:+UseG1GC", container: true},
+		{name: "env cannot override explicit processor count", envOverride: new("true"), collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
+		{name: "env enables disabled config", envOverride: new("true"), collector: "-XX:+UseG1GC", container: true, wantActive: true},
+		{name: "env disables enabled config", enabled: true, envOverride: new("false"), collector: "-XX:+UseG1GC", container: true},
+		{name: "empty env preserves disabled config", envOverride: new(""), collector: "-XX:+UseG1GC", container: true},
+		{name: "empty env preserves enabled config", enabled: true, envOverride: new(""), collector: "-XX:+UseG1GC", container: true, wantActive: true},
+		{name: "invalid env rejects disabled config", envOverride: new("invalid"), container: true, wantError: true},
+		{name: "invalid env rejects enabled config", enabled: true, envOverride: new("invalid"), container: true, wantError: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.envOverride != "" {
-				t.Setenv(limitGCThreadsEnvVar, tc.envOverride)
+			if tc.envOverride != nil {
+				t.Setenv(limitGCThreadsEnvVar, *tc.envOverride)
 			}
 			t.Setenv("CONTAINER", "")
 			if !tc.container {
@@ -203,8 +208,13 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 			}
 			var log bytes.Buffer
 			got, err := createJvmOpts(args, &config, &NoopClosingWriter{&log})
-			require.NoError(t, err)
 			assert.Equal(t, tc.enabled, config.Experimental.LimitGCThreads, "environment override must not mutate config")
+			if tc.wantError {
+				require.ErrorContains(t, err, "invalid "+limitGCThreadsEnvVar+" value")
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
 			if tc.wantActive {
 				// Depending on the host, the limiter either appends a thread count or logs a cgroup
 				// read failure. Both outcomes prove it ran; TestEnsureGCThreads checks exact sizing.

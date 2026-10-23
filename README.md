@@ -217,6 +217,13 @@ adjusted_cores = min(floor(requested_cores * 8), host_cores)
 parallel_threads = adjusted_cores if adjusted_cores < 8 else 8 + ((adjusted_cores - 8) * 5 / 8)
 ```
 
+The number of threads is also capped for smaller max heap sizes using a formula similar
+to the internal JVM default.
+```
+parallel_threads = min(parallel_threads, max(2, heap_bytes / 43620760))
+```
+In situations where memory percentages are used or memory arguments are omitted, this cap is not applied.
+
 For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default.
 The launcher does not set ``ConcGCThreads`` nor validates explicit thread counts.
 

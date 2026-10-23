@@ -268,9 +268,42 @@ func TestEnsureGCThreads(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureGCThreads(tc.args, filesystem, 16, io.Discard)
+			got, err := ensureGCThreads(tc.args, filesystem, 16, nil, io.Discard)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestEnsureGCThreads_HeapCap(t *testing.T) {
+	filesystem := fstest.MapFS{
+		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("79\n")},
+	}
+	for _, tc := range []struct {
+		name               string
+		maxHeapSizeInBytes *uint64
+		hostProcessors     int
+		wantThreads        int
+	}{
+		{name: "no absolute heap uses CPU sizing", hostProcessors: 16, wantThreads: 13},
+		{name: "large heap does not bind", maxHeapSizeInBytes: new(uint64(4 << 30)), hostProcessors: 16, wantThreads: 13},
+		{name: "256 MiB heap caps threads at six", maxHeapSizeInBytes: new(uint64(256 << 20)), hostProcessors: 16, wantThreads: 6},
+		{name: "tiny heap caps threads at two", maxHeapSizeInBytes: new(uint64(8 << 20)), hostProcessors: 16, wantThreads: 2},
+		{name: "zero heap still applies the minimum cap", maxHeapSizeInBytes: new(uint64(0)), hostProcessors: 16, wantThreads: 2},
+		{name: "heap cap never increases CPU threads", maxHeapSizeInBytes: new(uint64(8 << 20)), hostProcessors: 1, wantThreads: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			args := []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=2"}
+			var log bytes.Buffer
+			got, err := ensureGCThreads(args, filesystem, tc.hostProcessors, tc.maxHeapSizeInBytes, &log)
+			require.NoError(t, err)
+			assert.Equal(t, append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", tc.wantThreads)), got)
+			if tc.wantThreads < computeParallelGCThreads(2, tc.hostProcessors) {
+				assert.Contains(t, log.String(), "Capping ParallelGCThreads")
+			} else {
+				assert.Empty(t, log.String())
+			}
 		})
 	}
 }
@@ -295,7 +328,7 @@ func TestEnsureGCThreads_NonG1Collectors(t *testing.T) {
 			} {
 				t.Run(tc.name, func(t *testing.T) {
 					var log bytes.Buffer
-					got, err := ensureGCThreads(tc.args, fstest.MapFS{}, 48, &log)
+					got, err := ensureGCThreads(tc.args, fstest.MapFS{}, 48, new(uint64(8<<20)), &log)
 					require.NoError(t, err)
 					assert.Equal(t, tc.args, got)
 					assert.Empty(t, log.String(), "inert limiter must not attempt to read cgroups")
@@ -331,7 +364,7 @@ func TestEnsureGCThreads_CGroupFailureUsesJVMDefaults(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var log bytes.Buffer
-			got, err := ensureGCThreads(tc.args, tc.filesystem, 48, &log)
+			got, err := ensureGCThreads(tc.args, tc.filesystem, 48, new(uint64(8<<20)), &log)
 			require.NoError(t, err)
 			assert.Equal(t, tc.args, got)
 			assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to JVM defaults: ")
@@ -366,7 +399,7 @@ func TestEnsureGCThreads_PreservesExplicitThreads(t *testing.T) {
 		"-XX:+UseG1GC", "-XX:ParallelGCThreads=1", "-XX:ParallelGCThreads=3",
 		"-XX:ConcGCThreads=4", "-XX:ConcGCThreads=3",
 	}
-	got, err := ensureGCThreads(args, fstest.MapFS{}, 1, io.Discard)
+	got, err := ensureGCThreads(args, fstest.MapFS{}, 1, new(uint64(8<<20)), io.Discard)
 	require.NoError(t, err)
 	assert.Equal(t, args, got)
 }
@@ -393,7 +426,7 @@ func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureGCThreads(tc.args, filesystem, 16, io.Discard)
+			got, err := ensureGCThreads(tc.args, filesystem, 16, nil, io.Discard)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
@@ -409,6 +442,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 		allowHeapShrink  bool
 		minHeapFreeRatio *int
 		maxHeapFreeRatio *int
+		wantMaxHeapSize  *uint64
 		wantContains     []string
 		wantNotContains  []string
 	}{
@@ -418,6 +452,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			cgroupMemory:    10 * BytesInMebibyte,
 			heapPercentage:  new(10.0),
 			allowHeapShrink: false,
+			wantMaxHeapSize: new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-Dfoo=bar",
 				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
@@ -430,6 +465,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			cgroupMemory:    10 * BytesInMebibyte,
 			heapPercentage:  new(10.0),
 			allowHeapShrink: true,
+			wantMaxHeapSize: new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-Dfoo=bar",
 				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
@@ -445,11 +481,34 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			cgroupMemory:    10 * BytesInMebibyte,
 			heapPercentage:  new(10.0),
 			allowHeapShrink: false,
+			wantMaxHeapSize: new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-Dfoo=bar",
 				"-XX:+AlwaysPreTouch",
 				fmt.Sprintf("-Xms%d", 1*BytesInMebibyte),
 				fmt.Sprintf("-Xmx%d", 1*BytesInMebibyte),
+			},
+		},
+		{
+			name:           "maximum percentage alone has no calculated absolute heap",
+			args:           []string{"-Xmx1g", "-XX:MaxRAMPercentage=50.0"},
+			cgroupMemory:   10 * BytesInMebibyte,
+			heapPercentage: new(10.0),
+			wantContains:   []string{"-XX:MaxRAMPercentage=50.0"},
+			wantNotContains: []string{
+				"-Xmx1g",
+				fmt.Sprintf("-Xmx%d", BytesInMebibyte),
+			},
+		},
+		{
+			name:           "initial percentage alone has no calculated absolute heap",
+			args:           []string{"-Xms1g", "-XX:InitialRAMPercentage=50.0"},
+			cgroupMemory:   10 * BytesInMebibyte,
+			heapPercentage: new(10.0),
+			wantContains:   []string{"-XX:InitialRAMPercentage=50.0"},
+			wantNotContains: []string{
+				"-Xms1g",
+				fmt.Sprintf("-Xmx%d", BytesInMebibyte),
 			},
 		},
 		{
@@ -476,6 +535,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			allowHeapShrink:  true,
 			minHeapFreeRatio: new(20),
 			maxHeapFreeRatio: new(40),
+			wantMaxHeapSize:  new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-Dfoo=bar",
 				"-XX:MinHeapFreeRatio=20",
@@ -489,6 +549,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			heapPercentage:   new(10.0),
 			minHeapFreeRatio: new(20),
 			maxHeapFreeRatio: new(40),
+			wantMaxHeapSize:  new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-XX:MinHeapFreeRatio=20",
 				"-XX:MaxHeapFreeRatio=40",
@@ -504,6 +565,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			cgroupMemory:     10 * BytesInMebibyte,
 			heapPercentage:   new(10.0),
 			minHeapFreeRatio: new(20),
+			wantMaxHeapSize:  new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-XX:MinHeapFreeRatio=20",
 				"-XX:MaxHeapFreeRatio=90",
@@ -516,6 +578,7 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			cgroupMemory:     10 * BytesInMebibyte,
 			heapPercentage:   new(10.0),
 			maxHeapFreeRatio: new(40),
+			wantMaxHeapSize:  new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-XX:MinHeapFreeRatio=5",
 				"-XX:MaxHeapFreeRatio=40",
@@ -523,10 +586,11 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 			wantNotContains: []string{"-XX:MaxHeapFreeRatio=90"},
 		},
 		{
-			name:           "ratio present in jvmOpts is preserved when option is unset",
-			args:           []string{"-Dfoo=bar", "-XX:MaxHeapFreeRatio=90"},
-			cgroupMemory:   10 * BytesInMebibyte,
-			heapPercentage: new(10.0),
+			name:            "ratio present in jvmOpts is preserved when option is unset",
+			args:            []string{"-Dfoo=bar", "-XX:MaxHeapFreeRatio=90"},
+			cgroupMemory:    10 * BytesInMebibyte,
+			heapPercentage:  new(10.0),
+			wantMaxHeapSize: new(uint64(BytesInMebibyte)),
 			wantContains: []string{
 				"-XX:MaxHeapFreeRatio=90",
 			},
@@ -552,11 +616,12 @@ func TestFilterHeapSizeArgsV2(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, heapSizeOptions{
+			result, maxHeapSizeInBytes := filterHeapSizeArgsV2(tc.args, tc.heapPercentage, tc.cgroupMemory, heapSizeOptions{
 				allowHeapShrink:  tc.allowHeapShrink,
 				minHeapFreeRatio: tc.minHeapFreeRatio,
 				maxHeapFreeRatio: tc.maxHeapFreeRatio,
 			})
+			assert.Equal(t, tc.wantMaxHeapSize, maxHeapSizeInBytes)
 			for _, want := range tc.wantContains {
 				assert.Contains(t, result, want)
 			}

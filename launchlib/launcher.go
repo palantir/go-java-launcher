@@ -312,32 +312,30 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 				return nil, errors.Wrapf(err, "invalid %s value", limitGCThreadsEnvVar)
 			}
 		}
-		if limitGCThreads {
-			var err error
-			combinedJvmOpts, err = ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), logger)
-			if err != nil {
-				return nil, err
-			}
-		}
+		var maxHeapSizeInBytes *uint64
 		cgroupMemoryLimitInBytes, err := getCGroupMemoryLimitInBytes()
 		if err != nil {
 			// When we fail to get the memory limit from the cgroups files, fallback to using percentage-based heap
 			// sizing. While this method doesn't take into account the per-processor memory offset, it is supported
 			// by all platforms using Java.
 			_, _ = fmt.Fprintf(logger, "Failed to get cgroup memory limit, falling back to percentage-based heap sizing: %v\n", err)
-			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage), nil
-		}
-		if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
+		} else if cgroupMemoryLimitInBytes > 1_000_000*BytesInMebibyte {
 			// When the memory limit is unusually high (defined to be over 1TB), revert to percentage-based heap
 			// sizing. This handles the edge case where the cgroups memory limit is set to an arbitrary large value.
 			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
-			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage), nil
+			combinedJvmOpts = filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
+		} else {
+			combinedJvmOpts, maxHeapSizeInBytes = filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, heapSizeOptions{
+				allowHeapShrink:  customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink,
+				minHeapFreeRatio: customConfig.MinHeapFreeRatio,
+				maxHeapFreeRatio: customConfig.MaxHeapFreeRatio,
+			})
 		}
-		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, heapSizeOptions{
-			allowHeapShrink:  customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink,
-			minHeapFreeRatio: customConfig.MinHeapFreeRatio,
-			maxHeapFreeRatio: customConfig.MaxHeapFreeRatio,
-		}), nil
+		if limitGCThreads {
+			return ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), maxHeapSizeInBytes, logger)
+		}
+		return combinedJvmOpts, nil
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -351,7 +349,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 	return combinedJvmOpts, nil
 }
 
-func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger io.Writer) ([]string, error) {
+func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, maxHeapSizeInBytes *uint64, logger io.Writer) ([]string, error) {
 	enabledCollectors := make(map[string]bool)
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") {
@@ -385,10 +383,21 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, logger
 		_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
 		return args, nil
 	}
+	threads := computeParallelGCThreads(requestedCores, hostProcessors)
+	if maxHeapSizeInBytes != nil {
+		heapCap := max(2, *maxHeapSizeInBytes/heapSizePerGCThread)
+		if uint64(threads) > heapCap {
+			threads = int(heapCap)
+			_, _ = fmt.Fprintf(logger, "Capping ParallelGCThreads to %d based on maximum heap size %d bytes\n", threads, *maxHeapSizeInBytes)
+		}
+	}
 	// ConcGCThreads is intentionally left untouched: G1 derives its default from ParallelGCThreads,
 	// Explicit concurrent thread settings are preserved without validation.
-	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", computeParallelGCThreads(requestedCores, hostProcessors))), nil
+	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", threads)), nil
 }
+
+// The JVM default HeapSizePerGCThread on 64-bit platforms is 32 MiB scaled by 1.3 and aligned down to 8 bytes.
+const heapSizePerGCThread uint64 = (32 * BytesInMebibyte * 13 / 10) &^ 7
 
 func computeParallelGCThreads(requestedCores uint, hostProcessors int) int {
 	adjustedCores := int(min(requestedCores*8, uint(hostProcessors)))
@@ -444,8 +453,9 @@ type heapSizeOptions struct {
 	maxHeapFreeRatio *int
 }
 
-func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLimitInBytes uint64, opts heapSizeOptions) []string {
+func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLimitInBytes uint64, opts heapSizeOptions) ([]string, *uint64) {
 	var filtered []string
+	var maxHeapSizeInBytes *uint64
 	var hasMaxRAMPercentage, hasInitialRAMPercentage bool
 	for _, arg := range args {
 		if isHeapSizeArg(arg) {
@@ -476,6 +486,7 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLi
 			filtered = append(filtered, fmt.Sprintf("-Xms%d", jvmHeapSizeInBytes))
 		}
 		filtered = append(filtered, fmt.Sprintf("-Xmx%d", jvmHeapSizeInBytes))
+		maxHeapSizeInBytes = &jvmHeapSizeInBytes
 	}
 
 	// Heap free ratios are orthogonal to the heap sizing method, so append them regardless of whether the RAM
@@ -486,7 +497,7 @@ func filterHeapSizeArgsV2(args []string, heapPercentage *float64, cgroupMemoryLi
 	if opts.maxHeapFreeRatio != nil {
 		filtered = append(filtered, fmt.Sprintf("-XX:MaxHeapFreeRatio=%d", *opts.maxHeapFreeRatio))
 	}
-	return filtered
+	return filtered, maxHeapSizeInBytes
 }
 
 func hasMaxRAMOverride(args []string) bool {

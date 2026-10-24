@@ -195,6 +195,42 @@ launcher requires ``minHeapFreeRatio <= maxHeapFreeRatio``; the JVM validates pa
 These settings only take effect in the cgroup-based heap sizing path. They have no effect when container support is
 disabled or a ``-XX:MaxRAM=`` override is present.
 
+### Limiting GC threads
+
+This experimental option limits the number of parallel GC threads when G1 is explicitly enabled, based on
+the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``. This overrides the default
+settings, which is to size the number of GC threads entirely based on the number of host cores, often
+resulting in unnecessarily large numbers of threads.
+
+```
+experimental:
+  limitGcThreads: true
+```
+
+This can also be set with the envvar `LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS`, which overrides this
+setting.
+
+It uses the sizing formula:
+
+```
+adjusted_cores = min(floor(requested_cores * 8), host_cores)
+parallel_threads = adjusted_cores if adjusted_cores < 8 else 8 + ((adjusted_cores - 8) * 5 / 8)
+```
+
+The number of threads is also capped for smaller max heap sizes using a formula similar
+to the internal JVM default.
+```
+parallel_threads = min(parallel_threads, max(2, heap_bytes / 43620760))
+```
+In situations where memory percentages are used or memory arguments are omitted, this cap is not applied.
+
+For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default.
+The launcher does not set ``ConcGCThreads`` nor validates explicit thread counts.
+
+This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
+``-XX:MaxRAM=`` or ``-XX:ActiveProcessorCount=`` override. Explicit ``ParallelGCThreads`` and ``ConcGCThreads``
+values in ``jvmOpts`` are preserved.
+
 ### Disabling container support
 
 This behavior can be disabled by setting the following in ``launcher-custom.yml``:

@@ -98,8 +98,8 @@ type ExperimentalLauncherConfig struct {
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
 	// LimitGCThreads enables experimental GC thread sizing based on cgroup v2 cpu.weight
 	// (typically derived from the CPU request in Kubernetes), or cpu.shares on cgroup v1,
-	// capped by the processor count visible to the launcher via runtime.NumCPU().
-	// It does not read cgroup v2 cpu.max (the CPU quota, corresponding to the CPU limit in Kubernetes).
+	// capped by both runtime.NumCPU() and ceil(CPU quota / period), matching the JVM's container CPU count.
+	// The quota comes from cpu.max on cgroup v2 or cpu.cfs_quota_us/cpu.cfs_period_us on cgroup v1.
 	// Can also be set with envvar LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS.
 	//
 	// When enabled in container mode, the launcher adds -XX:ParallelGCThreads derived from these values

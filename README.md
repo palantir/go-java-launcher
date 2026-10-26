@@ -198,9 +198,9 @@ disabled or a ``-XX:MaxRAM=`` override is present.
 ### Limiting GC threads
 
 This experimental option limits the number of parallel GC threads when G1 is explicitly enabled, based on
-the number of host cores and the cgroup ``cpu.shares`` or ``cpu.weight``. This overrides the default
-settings, which is to size the number of GC threads entirely based on the number of host cores, often
-resulting in unnecessarily large numbers of threads.
+the number of available cores and the cgroup ``cpu.shares`` or ``cpu.weight``. Available cores are capped
+by both CPU affinity and the CPU quota, matching the JVM's container-aware default. This can reduce
+unnecessarily large numbers of GC threads without exceeding that default.
 
 ```
 experimental:
@@ -213,7 +213,8 @@ setting; an empty value is ignored.
 It uses the sizing formula:
 
 ```
-adjusted_cores = min(floor(requested_cores * 8), host_cores)
+available_cores = min(host_cores, ceil(quota / period))  # host_cores if quota is unlimited
+adjusted_cores = min(floor(requested_cores * 8), available_cores)
 parallel_threads = adjusted_cores if adjusted_cores < 8 else 8 + ((adjusted_cores - 8) * 5 / 8)
 ```
 

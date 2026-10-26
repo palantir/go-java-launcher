@@ -375,12 +375,18 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, maxHea
 		return args, nil
 	}
 	var requestedCores uint
-	counter, err := NewCGroupProcessorCounter(filesystem)
+	counter, err := newCGroupProcessorCounter(filesystem)
 	if err == nil {
 		requestedCores, err = counter.ProcessorCount()
 	}
 	if err != nil {
 		_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU request, falling back to JVM defaults: %v\n", err)
+		return args, nil
+	}
+	// runtime.NumCPU accounts for affinity, but not the quota used by the JVM in container mode.
+	hostProcessors, err = counter.clampToCPUQuota(hostProcessors)
+	if err != nil {
+		_, _ = fmt.Fprintf(logger, "Failed to get cgroup CPU quota, falling back to JVM defaults: %v\n", err)
 		return args, nil
 	}
 	threads := computeParallelGCThreads(requestedCores, hostProcessors)

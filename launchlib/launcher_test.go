@@ -220,7 +220,7 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 				// read failure. Both outcomes prove it ran; TestEnsureGCThreads checks exact sizing.
 				if len(got) == len(args) {
 					assert.Equal(t, args, got)
-					assert.Contains(t, log.String(), "Failed to get cgroup CPU request, falling back to JVM defaults: ")
+					assert.Regexp(t, `Failed to get cgroup CPU (request|quota), falling back to JVM defaults: `, log.String())
 				} else {
 					require.Len(t, got, len(args)+1)
 					assert.Equal(t, args, got[:len(args)])
@@ -241,6 +241,7 @@ func TestEnsureGCThreads(t *testing.T) {
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
 		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
+		"sys/fs/cgroup/cpu.max":    &fstest.MapFile{Data: []byte("max 100000\n")},
 	}
 	for _, tc := range []struct {
 		name string
@@ -291,6 +292,88 @@ func TestEnsureGCThreads(t *testing.T) {
 	}
 }
 
+func TestEnsureGCThreads_CPUQuota(t *testing.T) {
+	for _, version := range []string{"v1", "v2"} {
+		for _, tc := range []struct {
+			name               string
+			quota              string
+			period             string
+			hostProcessors     int
+			maxHeapSizeInBytes *uint64
+			wantThreads        int // Zero means quota parsing must fall back to JVM defaults.
+		}{
+			{name: "unlimited quota", quota: "max", period: "100000", wantThreads: 13},
+			{name: "two-core request with four-core limit", quota: "400000", period: "100000", wantThreads: 4},
+			{name: "fractional quota rounds up", quota: "400001", period: "100000", wantThreads: 5},
+			{name: "sub-core quota uses one processor", quota: "50000", period: "100000", wantThreads: 1},
+			{name: "affinity below quota", quota: "400000", period: "100000", hostProcessors: 2, wantThreads: 2},
+			{name: "quota above host does not raise thread count", quota: "6400000", period: "100000", hostProcessors: 12, wantThreads: 10},
+			{name: "quota above request-based sizing does not bind", quota: "2400000", period: "100000", wantThreads: 13},
+			{name: "quota above eight uses JVM scaling", quota: "1000000", period: "100000", wantThreads: 9},
+			{name: "heap cap still applies", quota: "400000", period: "100000", maxHeapSizeInBytes: new(uint64(8 << 20)), wantThreads: 2},
+			{name: "heap cap cannot raise quota-based threads", quota: "50000", period: "100000", maxHeapSizeInBytes: new(uint64(8 << 20)), wantThreads: 1},
+			{name: "surrounding whitespace", quota: "\t400000", period: "100000 \n", wantThreads: 4},
+			{name: "large quota avoids overflow", quota: "9223372036854775807", period: "2", wantThreads: 13},
+			{name: "missing quota", period: "100000", maxHeapSizeInBytes: new(uint64(8 << 20))},
+			{name: "missing period", quota: "400000"},
+			{name: "extra fields", quota: "400000 extra", period: "100000"},
+			{name: "invalid quota", quota: "invalid", period: "100000"},
+			{name: "overflowing quota", quota: "9223372036854775808", period: "100000"},
+			{name: "zero quota", quota: "0", period: "100000"},
+			{name: "negative quota", quota: "-2", period: "100000"},
+			{name: "zero period", quota: "400000", period: "0"},
+			{name: "negative period", quota: "400000", period: "-1"},
+			{name: "invalid period", quota: "400000", period: "invalid"},
+			{name: "overflowing period", quota: "400000", period: "9223372036854775808"},
+			{name: "unlimited quota with invalid period", quota: "max", period: "0"},
+		} {
+			t.Run(version+"/"+tc.name, func(t *testing.T) {
+				var filesystem fstest.MapFS
+				if version == "v2" {
+					filesystem = fstest.MapFS{
+						"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
+						"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
+					}
+					if tc.quota != "" {
+						filesystem["sys/fs/cgroup/cpu.max"] = &fstest.MapFile{Data: []byte(tc.quota + " " + tc.period + "\n")}
+					}
+				} else {
+					filesystem = fstest.MapFS{
+						"proc/self/cgroup":             &fstest.MapFile{Data: []byte("2:cpu:/container\n")},
+						"proc/self/mountinfo":          &fstest.MapFile{Data: []byte("36 25 0:33 /container /sys/fs/cgroup/cpu rw - cgroup cgroup rw,cpu\n")},
+						"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{Data: []byte("2048\n")},
+					}
+					if tc.quota != "" {
+						quota := tc.quota
+						if quota == "max" {
+							quota = "-1"
+						}
+						filesystem["sys/fs/cgroup/cpu/cpu.cfs_quota_us"] = &fstest.MapFile{Data: []byte(quota + "\n")}
+					}
+					if tc.period != "" {
+						filesystem["sys/fs/cgroup/cpu/cpu.cfs_period_us"] = &fstest.MapFile{Data: []byte(tc.period + "\n")}
+					}
+				}
+				hostProcessors := tc.hostProcessors
+				if hostProcessors == 0 {
+					hostProcessors = 48
+				}
+				args := []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=2"}
+				var log bytes.Buffer
+				got, err := ensureGCThreads(args, filesystem, hostProcessors, tc.maxHeapSizeInBytes, &log)
+				require.NoError(t, err)
+				if tc.wantThreads == 0 {
+					assert.Equal(t, args, got)
+					assert.Contains(t, log.String(), "Failed to get cgroup CPU quota, falling back to JVM defaults: ")
+					return
+				}
+				assert.Equal(t, append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", tc.wantThreads)), got)
+				assert.NotContains(t, log.String(), "Failed to get cgroup CPU")
+			})
+		}
+	}
+}
+
 func TestEnsureGCThreads_ActiveProcessorCount(t *testing.T) {
 	for _, value := range []string{"2", "0", "-1", "invalid"} {
 		t.Run(value, func(t *testing.T) {
@@ -310,6 +393,7 @@ func TestEnsureGCThreads_HeapCap(t *testing.T) {
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
 		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
+		"sys/fs/cgroup/cpu.max":    &fstest.MapFile{Data: []byte("max 100000\n")},
 	}
 	for _, tc := range []struct {
 		name               string
@@ -439,6 +523,7 @@ func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
 		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
+		"sys/fs/cgroup/cpu.max":    &fstest.MapFile{Data: []byte("max 100000\n")},
 	}
 	for _, tc := range []struct {
 		name string

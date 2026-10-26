@@ -30,6 +30,9 @@ const (
 	cpuGroupName  = CGroupName("cpu")
 	cpuSharesName = "cpu.shares"
 	cpuWeightName = "cpu.weight"
+	cpuMaxName    = "cpu.max"
+	cpuQuotaName  = "cpu.cfs_quota_us"
+	cpuPeriodName = "cpu.cfs_period_us"
 )
 
 type ProcessorCounter interface {
@@ -47,18 +50,23 @@ type CGroupProcessorCounter struct {
 }
 
 func NewCGroupProcessorCounter(filesystem fs.FS) (ProcessorCounter, error) {
+	counter, err := newCGroupProcessorCounter(filesystem)
+	if err != nil {
+		return nil, err
+	}
+	return counter, nil
+}
+
+func newCGroupProcessorCounter(filesystem fs.FS) (CGroupProcessorCounter, error) {
 	isCGroupV2, err := IsCGroupV2(filesystem)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to determine cgroup version")
+		return CGroupProcessorCounter{}, errors.Wrap(err, "failed to determine cgroup version")
 	}
+	cgroupPaths := NewCGroupV1Pather(filesystem)
 	if isCGroupV2 {
-		return CGroupProcessorCounter{
-			cgroupPaths: NewCGroupV2Pather(),
-			fs:          filesystem,
-			isCGroupV2:  true,
-		}, nil
+		cgroupPaths = NewCGroupV2Pather()
 	}
-	return NewCGroupV1ProcessorCounter(filesystem), nil
+	return CGroupProcessorCounter{cgroupPaths: cgroupPaths, fs: filesystem, isCGroupV2: isCGroupV2}, nil
 }
 
 func NewCGroupV1ProcessorCounter(filesystem fs.FS) ProcessorCounter {
@@ -102,4 +110,54 @@ func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 		cpuShares = int(min(262144, math.Exp2((math.Sqrt(16129+2448*math.Log10(float64(cpuShares)))-125)/2)))
 	}
 	return uint(max(1, cpuShares/1024)), nil
+}
+
+// clampToCPUQuota matches the JVM's quota-based processor count, without exceeding CPU affinity.
+func (c CGroupProcessorCounter) clampToCPUQuota(processors int) (int, error) {
+	cpuCgroupPath, err := c.cgroupPaths.Path(cpuGroupName)
+	if err != nil {
+		return 0, errors.Wrap(err, "failed to get path to cpu cgroup")
+	}
+	readValue := func(name string) (string, error) {
+		content, err := fs.ReadFile(c.fs, convertToFSPath(filepath.Join(cpuCgroupPath, name)))
+		if err != nil {
+			return "", errors.Wrapf(err, "unable to read %s", name)
+		}
+		return strings.TrimSpace(string(content)), nil
+	}
+	var quota, period string
+	if c.isCGroupV2 {
+		value, err := readValue(cpuMaxName)
+		if err != nil {
+			return 0, err
+		}
+		fields := strings.Fields(value)
+		if len(fields) != 2 {
+			return 0, errors.Errorf("invalid %s value: %q", cpuMaxName, value)
+		}
+		quota, period = fields[0], fields[1]
+	} else {
+		quota, err = readValue(cpuQuotaName)
+		if err != nil {
+			return 0, err
+		}
+		period, err = readValue(cpuPeriodName)
+		if err != nil {
+			return 0, err
+		}
+	}
+	periodMicros, err := strconv.ParseInt(period, 10, 64)
+	if err != nil || periodMicros <= 0 {
+		return 0, errors.Errorf("invalid CPU period: %q", period)
+	}
+	if (c.isCGroupV2 && quota == "max") || (!c.isCGroupV2 && quota == "-1") {
+		return processors, nil
+	}
+	quotaMicros, err := strconv.ParseInt(quota, 10, 64)
+	if err != nil || quotaMicros <= 0 {
+		return 0, errors.Errorf("invalid CPU quota: %q", quota)
+	}
+	// Integer ceil(quota/period), avoiding overflow when adding period to quota.
+	quotaProcessors := 1 + (quotaMicros-1)/periodMicros
+	return int(min(int64(processors), quotaProcessors)), nil
 }

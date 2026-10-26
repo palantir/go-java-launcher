@@ -103,8 +103,8 @@ type ExperimentalLauncherConfig struct {
 	// Can also be set with envvar LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS.
 	//
 	// When enabled in container mode, the launcher adds -XX:ParallelGCThreads derived from these values
-	// unless it or -XX:ActiveProcessorCount is already set explicitly. Only applies when G1 is explicitly enabled.
-	// -XX:ConcGCThreads is left untouched: G1 derives its default from ParallelGCThreads, and explicit values are preserved.
+	// unless -XX:ParallelGCThreads, -XX:ConcGCThreads, or -XX:ActiveProcessorCount is already set explicitly.
+	// Only applies when G1 is explicitly enabled; G1 derives its default ConcGCThreads from ParallelGCThreads.
 	LimitGCThreads bool `yaml:"limitGcThreads,omitempty"`
 }
 

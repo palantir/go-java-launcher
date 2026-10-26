@@ -156,16 +156,17 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 	t.Setenv(limitGCThreadsEnvVar, "")
 	require.NoError(t, os.Unsetenv(limitGCThreadsEnvVar))
 	for _, tc := range []struct {
-		name             string
-		enabled          bool
-		envOverride      *string
-		collector        string
-		container        bool
-		disableContainer bool
-		maxRAMOverride   bool
-		processorCount   string
-		wantActive       bool
-		wantError        bool
+		name              string
+		enabled           bool
+		envOverride       *string
+		collector         string
+		container         bool
+		disableContainer  bool
+		maxRAMOverride    bool
+		processorCount    string
+		concurrentThreads string
+		wantActive        bool
+		wantError         bool
 	}{
 		{name: "explicit G1", enabled: true, collector: "-XX:+UseG1GC", container: true, wantActive: true},
 		{name: "no explicit collector is inert", enabled: true, container: true},
@@ -177,6 +178,8 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 		{name: "MaxRAM override", enabled: true, collector: "-XX:+UseG1GC", container: true, maxRAMOverride: true},
 		{name: "active processor override", enabled: true, collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
 		{name: "env cannot override explicit processor count", envOverride: new("true"), collector: "-XX:+UseG1GC", container: true, processorCount: "2"},
+		{name: "explicit concurrent threads", enabled: true, collector: "-XX:+UseG1GC", container: true, concurrentThreads: "14"},
+		{name: "env cannot override explicit concurrent threads", envOverride: new("true"), collector: "-XX:+UseG1GC", container: true, concurrentThreads: "14"},
 		{name: "env enables disabled config", envOverride: new("true"), collector: "-XX:+UseG1GC", container: true, wantActive: true},
 		{name: "env disables enabled config", enabled: true, envOverride: new("false"), collector: "-XX:+UseG1GC", container: true},
 		{name: "empty env preserves disabled config", envOverride: new(""), collector: "-XX:+UseG1GC", container: true},
@@ -201,6 +204,9 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 			}
 			if tc.processorCount != "" {
 				args = append(args, "-XX:ActiveProcessorCount="+tc.processorCount)
+			}
+			if tc.concurrentThreads != "" {
+				args = append(args, "-XX:ConcGCThreads="+tc.concurrentThreads)
 			}
 			config := CustomLauncherConfig{
 				DisableContainerSupport: tc.disableContainer,
@@ -250,13 +256,13 @@ func TestEnsureGCThreads(t *testing.T) {
 	}{
 		{
 			name: "adds parallel threads preserving other options",
-			args: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ConcGCThreads=2"},
-			want: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ConcGCThreads=2", "-XX:ParallelGCThreads=13"},
+			args: []string{"-XX:+UseG1GC", "-Dfoo=bar"},
+			want: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ParallelGCThreads=13"},
 		},
 		{
 			name: "no explicit collector is inert",
-			args: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2"},
-			want: []string{"-Dfoo=bar", "-XX:ConcGCThreads=2"},
+			args: []string{"-Dfoo=bar"},
+			want: []string{"-Dfoo=bar"},
 		},
 		{
 			name: "explicit G1 gets parallel threads",
@@ -358,7 +364,7 @@ func TestEnsureGCThreads_CPUQuota(t *testing.T) {
 				if hostProcessors == 0 {
 					hostProcessors = 48
 				}
-				args := []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=2"}
+				args := []string{"-XX:+UseG1GC"}
 				var log bytes.Buffer
 				got, err := ensureGCThreads(args, filesystem, hostProcessors, tc.maxHeapSizeInBytes, &log)
 				require.NoError(t, err)
@@ -374,18 +380,20 @@ func TestEnsureGCThreads_CPUQuota(t *testing.T) {
 	}
 }
 
-func TestEnsureGCThreads_ActiveProcessorCount(t *testing.T) {
-	for _, value := range []string{"2", "0", "-1", "invalid"} {
-		t.Run(value, func(t *testing.T) {
-			args := []string{"-XX:+UseG1GC", "-XX:ActiveProcessorCount=" + value, "-XX:ConcGCThreads=2"}
-			for _, heapSize := range []*uint64{nil, new(uint64(8 << 20))} {
-				var log bytes.Buffer
-				got, err := ensureGCThreads(args, fstest.MapFS{}, 16, heapSize, &log)
-				require.NoError(t, err)
-				assert.Equal(t, args, got)
-				assert.Empty(t, log.String(), "processor override must prevent reading cgroups and applying the heap cap")
-			}
-		})
+func TestEnsureGCThreads_ExplicitOverrides(t *testing.T) {
+	for _, flag := range []string{"ActiveProcessorCount", "ParallelGCThreads", "ConcGCThreads"} {
+		for _, value := range []string{"2", "14", "0", "-1", "", "invalid"} {
+			t.Run(flag+"="+value, func(t *testing.T) {
+				args := []string{"-XX:+UseG1GC", "-XX:" + flag + "=" + value}
+				for _, heapSize := range []*uint64{nil, new(uint64(8 << 20))} {
+					var log bytes.Buffer
+					got, err := ensureGCThreads(args, fstest.MapFS{}, 16, heapSize, &log)
+					require.NoError(t, err)
+					assert.Equal(t, args, got)
+					assert.Empty(t, log.String(), "explicit override must prevent reading cgroups and applying the heap cap")
+				}
+			})
+		}
 	}
 }
 
@@ -409,7 +417,7 @@ func TestEnsureGCThreads_HeapCap(t *testing.T) {
 		{name: "heap cap never increases CPU threads", maxHeapSizeInBytes: new(uint64(8 << 20)), hostProcessors: 1, wantThreads: 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			args := []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=2"}
+			args := []string{"-XX:+UseG1GC"}
 			var log bytes.Buffer
 			got, err := ensureGCThreads(args, filesystem, tc.hostProcessors, tc.maxHeapSizeInBytes, &log)
 			require.NoError(t, err)
@@ -463,14 +471,14 @@ func TestEnsureGCThreads_CGroupFailureUsesJVMDefaults(t *testing.T) {
 		{name: "missing mount information", args: []string{"-XX:+UseG1GC"}, filesystem: fstest.MapFS{}},
 		{
 			name: "missing CPU request",
-			args: []string{"-XX:+UseG1GC", "-Dfoo=bar", "-XX:ConcGCThreads=100"},
+			args: []string{"-XX:+UseG1GC", "-Dfoo=bar"},
 			filesystem: fstest.MapFS{
 				"proc/self/mountinfo": &fstest.MapFile{Data: mountInfo},
 			},
 		},
 		{
 			name: "invalid CPU request",
-			args: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=100"},
+			args: []string{"-XX:+UseG1GC"},
 			filesystem: fstest.MapFS{
 				"proc/self/mountinfo":      &fstest.MapFile{Data: mountInfo},
 				"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("invalid\n")},
@@ -517,36 +525,6 @@ func TestEnsureGCThreads_PreservesExplicitThreads(t *testing.T) {
 	got, err := ensureGCThreads(args, fstest.MapFS{}, 1, new(uint64(8<<20)), io.Discard)
 	require.NoError(t, err)
 	assert.Equal(t, args, got)
-}
-
-func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
-	filesystem := fstest.MapFS{
-		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
-		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
-		"sys/fs/cgroup/cpu.max":    &fstest.MapFile{Data: []byte("max 100000\n")},
-	}
-	for _, tc := range []struct {
-		name string
-		args []string
-		want []string
-	}{
-		{
-			name: "concurrent exceeding computed parallel is preserved",
-			args: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14"},
-			want: []string{"-XX:+UseG1GC", "-XX:ConcGCThreads=14", "-XX:ParallelGCThreads=13"},
-		},
-		{
-			name: "explicit parallel and concurrent are both preserved",
-			args: []string{"-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"},
-			want: []string{"-XX:ParallelGCThreads=3", "-XX:ConcGCThreads=4"},
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := ensureGCThreads(tc.args, filesystem, 16, nil, io.Discard)
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, got)
-		})
-	}
 }
 
 func TestFilterHeapSizeArgsV2(t *testing.T) {

@@ -226,11 +226,12 @@ parallel_threads = min(parallel_threads, max(2, heap_bytes / 43620760))
 In situations where memory percentages are used or memory arguments are omitted, this cap is not applied.
 
 For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default.
-The launcher does not set ``ConcGCThreads`` nor validates explicit thread counts.
+The launcher does not set ``ConcGCThreads`` or validate explicit thread counts.
 
 This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
-``-XX:MaxRAM=`` or ``-XX:ActiveProcessorCount=`` override. Explicit ``ParallelGCThreads`` and ``ConcGCThreads``
-values in ``jvmOpts`` are preserved.
+``-XX:MaxRAM=``, ``-XX:ActiveProcessorCount=``, ``-XX:ParallelGCThreads=``, or ``-XX:ConcGCThreads=`` override.
+An explicit parallel or concurrent GC thread count makes ``limitGcThreads`` inert: both CPU-based sizing
+and the heap-based thread cap are skipped, leaving the supplied options unchanged.
 
 ### Disabling container support
 

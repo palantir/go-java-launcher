@@ -352,7 +352,8 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, maxHeapSizeInBytes *uint64, logger io.Writer) ([]string, error) {
 	enabledCollectors := make(map[string]bool)
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") || strings.HasPrefix(arg, "-XX:ActiveProcessorCount=") {
+		if strings.HasPrefix(arg, "-XX:ParallelGCThreads=") || strings.HasPrefix(arg, "-XX:ConcGCThreads=") ||
+			strings.HasPrefix(arg, "-XX:ActiveProcessorCount=") {
 			// Explicit thread or processor settings take precedence; leave sizing and validation to the JVM.
 			return args, nil
 		}
@@ -397,8 +398,7 @@ func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, maxHea
 			_, _ = fmt.Fprintf(logger, "Capping ParallelGCThreads to %d based on maximum heap size %d bytes\n", threads, *maxHeapSizeInBytes)
 		}
 	}
-	// ConcGCThreads is intentionally left untouched: G1 derives its default from ParallelGCThreads,
-	// Explicit concurrent thread settings are preserved without validation.
+	// G1 derives its default ConcGCThreads from ParallelGCThreads.
 	return append(args, fmt.Sprintf("-XX:ParallelGCThreads=%d", threads)), nil
 }
 

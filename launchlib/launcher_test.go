@@ -237,10 +237,10 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 
 func TestEnsureGCThreads(t *testing.T) {
 	t.Setenv("CONTAINER", "true")
-	// A two-CPU request (2048 shares) becomes cpu.weight=79 in the container runtime.
+	// A two-CPU request (2048 shares) becomes cpu.weight=174 in the container runtime.
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
-		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("79\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
 	}
 	for _, tc := range []struct {
 		name string
@@ -309,7 +309,7 @@ func TestEnsureGCThreads_ActiveProcessorCount(t *testing.T) {
 func TestEnsureGCThreads_HeapCap(t *testing.T) {
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
-		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("79\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
 	}
 	for _, tc := range []struct {
 		name               string
@@ -438,7 +438,7 @@ func TestEnsureGCThreads_PreservesExplicitThreads(t *testing.T) {
 func TestEnsureGCThreads_ConcGCThreadsLeftUntouched(t *testing.T) {
 	filesystem := fstest.MapFS{
 		"proc/self/mountinfo":      &fstest.MapFile{Data: []byte("36 25 0:33 / /sys/fs/cgroup rw - cgroup2 cgroup rw\n")},
-		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("100\n")},
+		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte("174\n")},
 	}
 	for _, tc := range []struct {
 		name string

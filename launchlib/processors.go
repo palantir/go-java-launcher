@@ -17,6 +17,7 @@ package launchlib
 import (
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -94,10 +95,11 @@ func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 		return 0, errors.Errorf("invalid %s value: %d", cpuRequestName, cpuShares)
 	}
 	if c.isCGroupV2 {
-		// Runtimes use weight = 1 + floor((shares - 2) * 9999 / 262142), losing precision.
-		// Recover the largest shares value in that weight bucket before truncating to cores,
-		// so whole-core requests do not lose a core in the round trip. Clamp to the shares maximum.
-		cpuShares = int(min(262144, 1+(int64(cpuShares)*262142+9998)/9999))
+		// runc >= 1.3.2 and crun >= 1.23 use weight = ceil(10^((l*l+125*l)/612 - 7/34)),
+		// where l = log2(shares). See https://github.com/opencontainers/cgroups/blob/v0.0.4/utils.go.
+		// Invert at the weight bucket's upper bound so runtime rounding does not lose whole cores.
+		// Clamp to the shares maximum before truncating to cores.
+		cpuShares = int(min(262144, math.Exp2((math.Sqrt(16129+2448*math.Log10(float64(cpuShares)))-125)/2)))
 	}
 	return uint(max(1, cpuShares/1024)), nil
 }

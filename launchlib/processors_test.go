@@ -15,7 +15,9 @@
 package launchlib_test
 
 import (
+	"fmt"
 	"io/fs"
+	"math"
 	"testing"
 	"testing/fstest"
 
@@ -119,13 +121,16 @@ func TestProcessorCounter_CGroupV2(t *testing.T) {
 		wantError string
 	}{
 		{name: "minimum weight requests at least one core", weight: "1\n", want: 1},
-		{name: "weight is converted to shares", weight: "100\n", want: 2},
-		{name: "weight below two-core request stays below two cores", weight: "78\n", want: 1},
-		{name: "two-core request survives runtime rounding", weight: "79\n", want: 2},
-		{name: "four-core request survives runtime rounding", weight: "157\n", want: 4},
-		{name: "eight-core request survives runtime rounding", weight: "313\n", want: 8},
+		{name: "default weight requests one core", weight: "100\n", want: 1},
+		{name: "weight below two-core request stays below two cores", weight: "173\n", want: 1},
+		{name: "two-core request survives runtime rounding", weight: "174\n", want: 2},
+		{name: "fractional core request is truncated", weight: "208\n", want: 2},
+		{name: "four-core request survives runtime rounding", weight: "303\n", want: 4},
+		{name: "eight-core request survives runtime rounding", weight: "532\n", want: 8},
 		{name: "weight below maximum stays below 256 cores", weight: "9999\n", want: 255},
 		{name: "maximum weight is not capped to host cores", weight: "10000\n", want: 256},
+		{name: "zero weight is rejected", weight: "0\n", wantError: "invalid cpu.weight value"},
+		{name: "negative weight is rejected", weight: "-1\n", wantError: "invalid cpu.weight value"},
 		{name: "invalid weight is rejected", weight: "10001\n", wantError: "invalid cpu.weight value"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -144,5 +149,32 @@ func TestProcessorCounter_CGroupV2(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
+	}
+}
+
+func TestProcessorCounter_CGroupV2_WholeCoreBoundaries(t *testing.T) {
+	for cores := uint(1); cores <= 256; cores++ {
+		// Use the upstream runtime conversion to check every whole-core boundary.
+		l := math.Log2(float64(cores * 1024))
+		weight := min(10000, int(math.Ceil(math.Pow(10, (l*l+125*l)/612.0-7.0/34.0))))
+		for _, tc := range []struct {
+			weight int
+			want   uint
+		}{
+			{weight: weight, want: cores},
+			{weight: weight - 1, want: max(1, cores-1)},
+		} {
+			t.Run(fmt.Sprintf("%d_cores/weight_%d", cores, tc.weight), func(t *testing.T) {
+				filesystem := fstest.MapFS{
+					"proc/self/mountinfo":      &fstest.MapFile{Data: CGroupV2MountInfoContent},
+					"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte(fmt.Sprintf("%d\n", tc.weight))},
+				}
+				counter, err := launchlib.NewCGroupProcessorCounter(filesystem)
+				require.NoError(t, err)
+				got, err := counter.ProcessorCount()
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, got)
+			})
+		}
 	}
 }

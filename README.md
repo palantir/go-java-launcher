@@ -195,6 +195,30 @@ launcher requires ``minHeapFreeRatio <= maxHeapFreeRatio``; the JVM validates pa
 These settings only take effect in the cgroup-based heap sizing path. They have no effect when container support is
 disabled or a ``-XX:MaxRAM=`` override is present.
 
+### Trimming the native heap
+
+> [!WARNING]
+> This is experimental and may be either removed or promoted in the future.
+
+glibc malloc keeps memory freed by the JVM (from JIT compilation, class loading, NIO, and other native allocations)
+in its arenas rather than returning it to the OS, so a container's RSS can stay well above what the JVM is using. To
+have the JVM periodically call ``malloc_trim`` via ``-XX:TrimNativeHeapInterval=5000``, set:
+
+```yaml
+experimental:
+  trimNativeHeap: true
+```
+
+or set the ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP`` environment variable to ``true`` or ``false``, which overrides the
+config value.
+
+The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2) is at
+most 2 cores and ``-Xmx`` is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
+to small containers. It is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options, or if the
+Java version in ``$JAVA_HOME/release`` is older than 17 and ``-XX:+IgnoreUnrecognizedVMOptions`` is not set.
+
+This setting only takes effect in the cgroup-based heap sizing path.
+
 ### Disabling container support
 
 This behavior can be disabled by setting the following in ``launcher-custom.yml``:

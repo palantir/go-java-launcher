@@ -119,7 +119,7 @@ func compileCmdFromConfig(
 				staticConfig.JavaConfig.Classpath))
 			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
-			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, logger)
+			jvmOpts := createJvmOpts(combinedJvmOpts, customConfig, javaHome, logger)
 
 			executable, executableErr = verifyPathIsSafeForExec(filepath.Join(javaHome, javaExecutablePath))
 			if executableErr != nil {
@@ -292,7 +292,7 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) []string {
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, javaHome string, logger io.WriteCloser) []string {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		cgroupMemoryLimitInBytes, err := getCGroupMemoryLimitInBytes()
@@ -309,11 +309,15 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			_, _ = fmt.Fprintf(logger, "Cgroup memory limit unusually high (%d bytes), falling back to percentage-based heap sizing\n", cgroupMemoryLimitInBytes)
 			return filterHeapSizeArgs(combinedJvmOpts, customConfig.HeapPercentage)
 		}
-		return filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, heapSizeOptions{
+		jvmOpts := filterHeapSizeArgsV2(combinedJvmOpts, customConfig.HeapPercentage, cgroupMemoryLimitInBytes, heapSizeOptions{
 			allowHeapShrink:  customConfig.AllowHeapShrink || customConfig.Experimental.AllowHeapShrink,
 			minHeapFreeRatio: customConfig.MinHeapFreeRatio,
 			maxHeapFreeRatio: customConfig.MaxHeapFreeRatio,
 		})
+		if trimNativeHeapEnabled(customConfig, logger) {
+			jvmOpts = ensureTrimNativeHeap(jvmOpts, os.DirFS("/"), javaHome, logger)
+		}
+		return jvmOpts
 	}
 
 	if isEnvVarSet("CONTAINER") {

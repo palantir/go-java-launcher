@@ -34,7 +34,7 @@ const (
 	trimNativeHeapIntervalMs  = 5000
 	// Periodic trimming is only applied to services with a CPU request and heap at or below these limits. The benefit
 	// is a roughly fixed number of MiB per JVM, which only matters relative to a small container.
-	trimNativeHeapMaxCPUMillicores = 2000
+	trimNativeHeapMaxCPUMillicores = 4000
 	trimNativeHeapMaxHeapBytes     = 8 * 1024 * BytesInMebibyte
 
 	cpuCGroupName         = CGroupName("cpu")

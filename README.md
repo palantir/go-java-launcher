@@ -213,7 +213,7 @@ or set the ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP`` environment variable to ``
 config value.
 
 The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2) is at
-most 2 cores and ``-Xmx`` is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
+most 4 cores and ``-Xmx`` is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
 to small containers. It is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options, or if the
 Java version in ``$JAVA_HOME/release`` is older than 17 and ``-XX:+IgnoreUnrecognizedVMOptions`` is not set.
 

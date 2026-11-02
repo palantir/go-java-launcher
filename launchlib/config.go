@@ -96,7 +96,7 @@ type ExperimentalLauncherConfig struct {
 	// Deprecated: use the top-level allowHeapShrink field on CustomLauncherConfig instead. This field is retained
 	// for backwards compatibility with existing overrides that set it under experimental.
 	AllowHeapShrink bool `yaml:"allowHeapShrink,omitempty"`
-	// TrimNativeHeap enables -XX:TrimNativeHeapInterval for services with a cgroup CPU request of at most 2 cores and
+	// TrimNativeHeap enables -XX:TrimNativeHeapInterval for services with a cgroup CPU request of at most 4 cores and
 	// a max heap of at most 8 GiB, so the JVM periodically returns memory freed into glibc malloc arenas to the OS.
 	// Only applies in the cgroup-based heap sizing path. Can also be set with envvar
 	// LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP, which overrides this setting.

@@ -52,6 +52,8 @@ func TestCPUSharesToWeight(t *testing.T) {
 		1024:   100,
 		2048:   174,
 		3072:   240,
+		4096:   303,
+		5120:   363,
 		262144: 10000,
 	} {
 		assert.Equal(t, want, cpuSharesToWeight(shares), "shares %d", shares)
@@ -112,8 +114,8 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 		wantTrim bool
 	}{
 		{name: "small service", args: []string{"-Xms402653184", "-Xmx402653184"}, weight: "35", javaHome: "/opt/java", wantTrim: true},
-		{name: "2 cores and 8 GiB heap", args: []string{"-Xmx8g"}, weight: "174", javaHome: "/opt/java", wantTrim: true},
-		{name: "more than 2 cores", args: []string{"-Xmx512m"}, weight: "240", javaHome: "/opt/java", wantTrim: false},
+		{name: "4 cores and 8 GiB heap", args: []string{"-Xmx8g"}, weight: "303", javaHome: "/opt/java", wantTrim: true},
+		{name: "more than 4 cores", args: []string{"-Xmx512m"}, weight: "304", javaHome: "/opt/java", wantTrim: false},
 		{name: "heap above 8 GiB", args: []string{"-Xmx8193m"}, weight: "35", javaHome: "/opt/java", wantTrim: false},
 		{name: "large service", args: []string{"-Xmx160g"}, weight: "5000", javaHome: "/opt/java", wantTrim: false},
 		{name: "unknown heap size", args: []string{"-XX:MaxRAMPercentage=75.0"}, weight: "35", javaHome: "/opt/java", wantTrim: false},

@@ -369,6 +369,28 @@ env:
 			},
 		},
 		{
+			name: "limitGcThreads is parsed",
+			data: `
+configType: java
+configVersion: 1
+experimental:
+  limitGcThreads: true
+`,
+			want: PrimaryCustomLauncherConfig{
+				VersionedConfig: VersionedConfig{
+					Version: 1,
+				},
+				CustomLauncherConfig: CustomLauncherConfig{
+					TypedConfig: TypedConfig{
+						Type: "java",
+					},
+					Experimental: ExperimentalLauncherConfig{
+						LimitGCThreads: true,
+					},
+				},
+			},
+		},
+		{
 			name: "allowHeapShrink is parsed",
 			data: `
 configType: java

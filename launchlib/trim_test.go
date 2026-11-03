@@ -109,28 +109,29 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 	for _, test := range []struct {
 		name     string
 		args     []string
+		heap     uint64
 		weight   string
 		javaHome string
 		wantTrim bool
 	}{
-		{name: "small service", args: []string{"-Xms402653184", "-Xmx402653184"}, weight: "35", javaHome: "/opt/java", wantTrim: true},
-		{name: "4 cores and 8 GiB heap", args: []string{"-Xmx8g"}, weight: "303", javaHome: "/opt/java", wantTrim: true},
-		{name: "more than 4 cores", args: []string{"-Xmx512m"}, weight: "304", javaHome: "/opt/java", wantTrim: false},
-		{name: "heap above 8 GiB", args: []string{"-Xmx8193m"}, weight: "35", javaHome: "/opt/java", wantTrim: false},
-		{name: "large service", args: []string{"-Xmx160g"}, weight: "5000", javaHome: "/opt/java", wantTrim: false},
-		{name: "unknown heap size", args: []string{"-XX:MaxRAMPercentage=75.0"}, weight: "35", javaHome: "/opt/java", wantTrim: false},
-		{name: "missing release file", args: []string{"-Xmx512m"}, weight: "35", javaHome: "/missing", wantTrim: false},
+		{name: "small service", args: []string{"-Xms402653184", "-Xmx402653184"}, heap: 402653184, weight: "35", javaHome: "/opt/java", wantTrim: true},
+		{name: "4 cores and 8 GiB heap", args: []string{"-Xmx8589934592"}, heap: 8 * 1024 * BytesInMebibyte, weight: "303", javaHome: "/opt/java", wantTrim: true},
+		{name: "more than 4 cores", args: []string{"-Xmx536870912"}, heap: 512 * BytesInMebibyte, weight: "304", javaHome: "/opt/java", wantTrim: false},
+		{name: "heap above 8 GiB", args: []string{"-Xmx8590983168"}, heap: 8193 * BytesInMebibyte, weight: "35", javaHome: "/opt/java", wantTrim: false},
+		{name: "large service", args: []string{"-Xmx171798691840"}, heap: 160 * 1024 * BytesInMebibyte, weight: "5000", javaHome: "/opt/java", wantTrim: false},
+		{name: "missing release file", args: []string{"-Xmx536870912"}, heap: 512 * BytesInMebibyte, weight: "35", javaHome: "/missing", wantTrim: false},
 		// The flag is experimental on 17.0.11, which fails startup even with IgnoreUnrecognizedVMOptions.
 		{
 			name:     "experimental flag with ignore flag",
-			args:     []string{"-XX:+IgnoreUnrecognizedVMOptions", "-Xmx512m"},
+			args:     []string{"-XX:+IgnoreUnrecognizedVMOptions", "-Xmx536870912"},
+			heap:     512 * BytesInMebibyte,
 			weight:   "35",
 			javaHome: "/opt/java17",
 			wantTrim: false,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got := ensureTrimNativeHeap(test.args, cgroupV2CPUWeightFS(test.weight), test.javaHome, io.Discard)
+			got := ensureTrimNativeHeap(test.args, cgroupV2CPUWeightFS(test.weight), test.heap, test.javaHome, io.Discard)
 			if test.wantTrim {
 				assert.Equal(t, append(append([]string{}, test.args...), trimArg), got)
 			} else {
@@ -140,14 +141,14 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 	}
 
 	t.Run("explicit interval is preserved", func(t *testing.T) {
-		args := []string{"-Xmx512m", "-XX:TrimNativeHeapInterval=0"}
-		assert.Equal(t, args, ensureTrimNativeHeap(args, cgroupV2CPUWeightFS("35"), "/opt/java", io.Discard))
+		args := []string{"-Xmx536870912", "-XX:TrimNativeHeapInterval=0"}
+		assert.Equal(t, args, ensureTrimNativeHeap(args, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte, "/opt/java", io.Discard))
 	})
 
 	t.Run("cgroup read failure leaves args unchanged", func(t *testing.T) {
 		var log bytes.Buffer
-		args := []string{"-Xmx512m"}
-		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, "/opt/java", &log))
+		args := []string{"-Xmx536870912"}
+		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, 512*BytesInMebibyte, "/opt/java", &log))
 		assert.Contains(t, log.String(), "Not trimming native heap: failed to get cgroup CPU request")
 	})
 }
@@ -213,12 +214,14 @@ func TestTrimNativeHeapEnabled(t *testing.T) {
 		config  bool
 		env     *string
 		enabled bool
+		wantErr bool
 	}{
 		{name: "disabled by default", enabled: false},
 		{name: "enabled in config", config: true, enabled: true},
 		{name: "env enables", env: ptr("true"), enabled: true},
 		{name: "env disables config", config: true, env: ptr("false"), enabled: false},
-		{name: "invalid env falls back to config", config: true, env: ptr("maybe"), enabled: true},
+		{name: "empty env is ignored", config: true, env: ptr(""), enabled: true},
+		{name: "invalid env is an error", config: true, env: ptr("maybe"), wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if test.env != nil {
@@ -227,25 +230,14 @@ func TestTrimNativeHeapEnabled(t *testing.T) {
 				require.NoError(t, os.Unsetenv(trimNativeHeapEnvVar))
 			}
 			config := &CustomLauncherConfig{Experimental: ExperimentalLauncherConfig{TrimNativeHeap: test.config}}
-			assert.Equal(t, test.enabled, trimNativeHeapEnabled(config, io.Discard))
+			enabled, err := trimNativeHeapEnabled(config)
+			if test.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.enabled, enabled)
 		})
-	}
-}
-
-func TestParseJVMMemorySize(t *testing.T) {
-	for value, want := range map[string]uint64{
-		"402653184": 402653184,
-		"1024k":     1024 * 1024,
-		"512m":      512 * BytesInMebibyte,
-		"8G":        8 * 1024 * BytesInMebibyte,
-	} {
-		got, err := parseJVMMemorySize(value)
-		require.NoError(t, err)
-		assert.Equal(t, want, got, value)
-	}
-	for _, value := range []string{"lots", "17179869184g", "18446744073709551616"} {
-		_, err := parseJVMMemorySize(value)
-		assert.Error(t, err, value)
 	}
 }
 

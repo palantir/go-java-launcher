@@ -195,6 +195,44 @@ launcher requires ``minHeapFreeRatio <= maxHeapFreeRatio``; the JVM validates pa
 These settings only take effect in the cgroup-based heap sizing path. They have no effect when container support is
 disabled or a ``-XX:MaxRAM=`` override is present.
 
+### Limiting GC threads
+
+This experimental option limits the number of parallel GC threads when G1 is explicitly enabled, based on
+the number of available cores and the cgroup ``cpu.shares`` or ``cpu.weight``. Available cores are capped
+by both CPU affinity and the CPU quota, matching the JVM's container-aware default. This can reduce
+unnecessarily large numbers of GC threads without exceeding that default.
+
+```
+experimental:
+  limitGcThreads: true
+```
+
+This can also be set with the envvar `LAUNCHER_EXPERIMENTAL_LIMIT_GC_THREADS`. A non-empty value overrides this
+setting; an empty value is ignored.
+
+It uses the sizing formula:
+
+```
+available_cores = min(host_cores, ceil(quota / period))  # host_cores if quota is unlimited
+adjusted_cores = min(floor(requested_cores * 8), available_cores)
+parallel_threads = adjusted_cores if adjusted_cores < 8 else 8 + ((adjusted_cores - 8) * 5 / 8)
+```
+
+The number of threads is also capped for smaller max heap sizes using a formula similar
+to the internal JVM default.
+```
+parallel_threads = min(parallel_threads, max(2, heap_bytes / 43620760))
+```
+In situations where memory percentages are used or memory arguments are omitted, this cap is not applied.
+
+For G1 GC, concurrent GC threads are set to 1/4 the number of parallel threads by default.
+The launcher does not set ``ConcGCThreads`` or validate explicit thread counts.
+
+This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no
+``-XX:MaxRAM=``, ``-XX:ActiveProcessorCount=``, ``-XX:ParallelGCThreads=``, or ``-XX:ConcGCThreads=`` override.
+An explicit parallel or concurrent GC thread count makes ``limitGcThreads`` inert: both CPU-based sizing
+and the heap-based thread cap are skipped, leaving the supplied options unchanged.
+
 ### Trimming the native heap
 
 > [!WARNING]
@@ -209,11 +247,11 @@ experimental:
   trimNativeHeap: true
 ```
 
-or set the ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP`` environment variable to ``true`` or ``false``, which overrides the
-config value.
+This can also be set with the envvar ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP``. A non-empty value overrides this
+setting; an empty value is ignored.
 
 The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2) is at
-most 4 cores and ``-Xmx`` is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
+most 4 cores and the max heap chosen by the launcher is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
 to small containers. It is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options, or if the
 ``release`` file of the selected Java home doesn't show a version where the flag is a product flag (17.0.12+, 21.0.3+,
 22.0.1+ or 23+). Earlier updates of 17, 21 and 22 declare it as experimental, which fails startup even with

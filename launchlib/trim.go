@@ -37,43 +37,27 @@ const (
 	trimNativeHeapMaxCPUMillicores = 4000
 	trimNativeHeapMaxHeapBytes     = 8 * 1024 * BytesInMebibyte
 
-	cpuCGroupName         = CGroupName("cpu")
-	cgroupV1CPUSharesFile = "cpu.shares"
-	cgroupV2CPUWeightFile = "cpu.weight"
-	cgroupMaxShares       = 262144
+	cgroupMaxShares = 262144
 )
 
-func trimNativeHeapEnabled(customConfig *CustomLauncherConfig, logger io.Writer) bool {
-	value, set := os.LookupEnv(trimNativeHeapEnvVar)
-	if !set {
-		return customConfig.Experimental.TrimNativeHeap
+func trimNativeHeapEnabled(customConfig *CustomLauncherConfig) (bool, error) {
+	if value, set := os.LookupEnv(trimNativeHeapEnvVar); set && value != "" {
+		enabled, err := strconv.ParseBool(value)
+		if err != nil {
+			return false, errors.Wrapf(err, "invalid %s value", trimNativeHeapEnvVar)
+		}
+		return enabled, nil
 	}
-	enabled, err := strconv.ParseBool(value)
-	if err != nil {
-		_, _ = fmt.Fprintf(logger, "Ignoring invalid %s value %q\n", trimNativeHeapEnvVar, value)
-		return customConfig.Experimental.TrimNativeHeap
-	}
-	return enabled
+	return customConfig.Experimental.TrimNativeHeap, nil
 }
 
 // ensureTrimNativeHeap appends -XX:TrimNativeHeapInterval for small services so the JVM periodically returns memory
-// freed into glibc malloc arenas to the OS. args must already contain the final heap size flags.
-func ensureTrimNativeHeap(args []string, filesystem fs.FS, javaHome string, logger io.Writer) []string {
-	var heapBytes uint64
-	var hasHeapBytes bool
+// freed into glibc malloc arenas to the OS. heapBytes is the max heap size chosen by cgroup-based heap sizing.
+func ensureTrimNativeHeap(args []string, filesystem fs.FS, heapBytes uint64, javaHome string, logger io.Writer) []string {
 	for _, arg := range args {
-		switch {
-		case strings.HasPrefix(arg, trimNativeHeapIntervalArg):
+		if strings.HasPrefix(arg, trimNativeHeapIntervalArg) {
 			return args
-		case strings.HasPrefix(arg, "-Xmx"):
-			if size, err := parseJVMMemorySize(arg[len("-Xmx"):]); err == nil {
-				heapBytes, hasHeapBytes = size, true
-			}
 		}
-	}
-	if !hasHeapBytes {
-		_, _ = fmt.Fprintln(logger, "Not trimming native heap: unable to determine max heap size")
-		return args
 	}
 	if heapBytes > trimNativeHeapMaxHeapBytes {
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: max heap %d bytes is above %d\n", heapBytes, uint64(trimNativeHeapMaxHeapBytes))
@@ -109,11 +93,11 @@ func cgroupCPURequestAbove(filesystem fs.FS, maxMillicores uint64) (bool, string
 	if err != nil {
 		return false, "", errors.Wrap(err, "failed to determine cgroup version")
 	}
-	pather, fileName := NewCGroupV1Pather(filesystem), cgroupV1CPUSharesFile
+	pather, fileName := NewCGroupV1Pather(filesystem), cpuSharesName
 	if isCGroupV2 {
-		pather, fileName = NewCGroupV2Pather(), cgroupV2CPUWeightFile
+		pather, fileName = NewCGroupV2Pather(), cpuWeightName
 	}
-	cpuCGroupPath, err := pather.Path(cpuCGroupName)
+	cpuCGroupPath, err := pather.Path(cpuGroupName)
 	if err != nil {
 		return false, "", errors.Wrap(err, "failed to get cpu cgroup path")
 	}
@@ -145,34 +129,6 @@ func cpuSharesToWeight(shares uint64) uint64 {
 	}
 	l := math.Log2(float64(shares))
 	return uint64(math.Ceil(math.Pow(10, (l*l+125*l)/612-7.0/34)))
-}
-
-// parseJVMMemorySize parses a JVM memory size such as 512m, 2g, 1048576k or 1073741824.
-func parseJVMMemorySize(value string) (uint64, error) {
-	multiplier := uint64(1)
-	if n := len(value); n > 0 {
-		switch value[n-1] {
-		case 'k', 'K':
-			multiplier = 1024
-		case 'm', 'M':
-			multiplier = BytesInMebibyte
-		case 'g', 'G':
-			multiplier = 1024 * BytesInMebibyte
-		case 't', 'T':
-			multiplier = 1024 * 1024 * BytesInMebibyte
-		}
-		if multiplier != 1 {
-			value = value[:n-1]
-		}
-	}
-	size, err := strconv.ParseUint(value, 10, 64)
-	if err != nil {
-		return 0, errors.Wrapf(err, "invalid memory size %q", value)
-	}
-	if size > math.MaxUint64/multiplier {
-		return 0, errors.Errorf("memory size %q overflows", value)
-	}
-	return size * multiplier, nil
 }
 
 // supportsTrimNativeHeap reports whether -XX:TrimNativeHeapInterval is a product flag in the given Java version

@@ -60,13 +60,11 @@ func trimNativeHeapEnabled(customConfig *CustomLauncherConfig, logger io.Writer)
 // freed into glibc malloc arenas to the OS. args must already contain the final heap size flags.
 func ensureTrimNativeHeap(args []string, filesystem fs.FS, javaHome string, logger io.Writer) []string {
 	var heapBytes uint64
-	var hasHeapBytes, ignoresUnrecognizedOptions bool
+	var hasHeapBytes bool
 	for _, arg := range args {
 		switch {
 		case strings.HasPrefix(arg, trimNativeHeapIntervalArg):
 			return args
-		case arg == "-XX:+IgnoreUnrecognizedVMOptions":
-			ignoresUnrecognizedOptions = true
 		case strings.HasPrefix(arg, "-Xmx"):
 			if size, err := parseJVMMemorySize(arg[len("-Xmx"):]); err == nil {
 				heapBytes, hasHeapBytes = size, true
@@ -90,13 +88,16 @@ func ensureTrimNativeHeap(args []string, filesystem fs.FS, javaHome string, logg
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: CPU request is above %dm: %s\n", trimNativeHeapMaxCPUMillicores, cpuRequest)
 		return args
 	}
-	// Older JVMs fail to start on unrecognized -XX options; the flag exists on Java 17+.
-	if !ignoresUnrecognizedOptions {
-		major, err := javaMajorVersion(filesystem, javaHome)
-		if err != nil || major < 17 {
-			_, _ = fmt.Fprintf(logger, "Not trimming native heap: unable to confirm Java 17+ (version %d, error %v)\n", major, err)
-			return args
-		}
+	// Some JDK updates declare the flag as experimental, which fails startup even with
+	// -XX:+IgnoreUnrecognizedVMOptions, so only add it where it is a product flag.
+	version, err := javaVersion(filesystem, javaHome)
+	if err != nil {
+		_, _ = fmt.Fprintf(logger, "Not trimming native heap: failed to get Java version: %v\n", err)
+		return args
+	}
+	if !supportsTrimNativeHeap(version) {
+		_, _ = fmt.Fprintf(logger, "Not trimming native heap: Java %v does not support %s as a product flag\n", version, trimNativeHeapIntervalArg)
+		return args
 	}
 	return append(args, fmt.Sprintf("%s%d", trimNativeHeapIntervalArg, trimNativeHeapIntervalMs))
 }
@@ -168,14 +169,44 @@ func parseJVMMemorySize(value string) (uint64, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "invalid memory size %q", value)
 	}
+	if size > math.MaxUint64/multiplier {
+		return 0, errors.Errorf("memory size %q overflows", value)
+	}
 	return size * multiplier, nil
 }
 
-// javaMajorVersion reads JAVA_VERSION from the release file of the given Java home.
-func javaMajorVersion(filesystem fs.FS, javaHome string) (int, error) {
+// supportsTrimNativeHeap reports whether -XX:TrimNativeHeapInterval is a product flag in the given Java version
+// (feature, interim, update). It was backported as an experimental flag to 17.0.9 and 21.0.1, was experimental in
+// 22, and became a product flag in 17.0.12, 21.0.3, 22.0.1 and 23.
+func supportsTrimNativeHeap(version []int) bool {
+	update := 0
+	if len(version) >= 3 {
+		update = version[2]
+	}
+	switch feature := version[0]; {
+	case feature >= 23:
+		return true
+	case feature == 22:
+		return update >= 1
+	case feature == 21:
+		return update >= 3
+	case feature == 17:
+		return update >= 12
+	default:
+		return false
+	}
+}
+
+// javaVersion reads JAVA_VERSION from the release file of the given Java home and returns its numeric components,
+// e.g. [17 0 12] for 17.0.12 and [8 0 402] for 1.8.0_402.
+func javaVersion(filesystem fs.FS, javaHome string) ([]int, error) {
+	javaHome, err := filepath.Abs(javaHome)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to resolve Java home")
+	}
 	file, err := filesystem.Open(convertToFSPath(filepath.Join(javaHome, "release")))
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to open release file")
+		return nil, errors.Wrap(err, "failed to open release file")
 	}
 	defer func() {
 		_ = file.Close()
@@ -186,11 +217,29 @@ func javaMajorVersion(filesystem fs.FS, javaHome string) (int, error) {
 		if !strings.HasPrefix(line, "JAVA_VERSION=") {
 			continue
 		}
-		version := strings.Trim(strings.TrimPrefix(line, "JAVA_VERSION="), `"`)
-		// Java 8 and earlier report 1.x.
-		version = strings.TrimPrefix(version, "1.")
-		major, _, _ := strings.Cut(version, ".")
-		return strconv.Atoi(major)
+		value := strings.Trim(strings.TrimPrefix(line, "JAVA_VERSION="), `"`)
+		// Java 8 and earlier report 1.x, with the update after an underscore.
+		value = strings.ReplaceAll(strings.TrimPrefix(value, "1."), "_", ".")
+		var version []int
+		for _, part := range strings.Split(value, ".") {
+			digits := part[:len(part)-len(strings.TrimLeft(part, "0123456789"))]
+			if digits == "" {
+				break
+			}
+			number, err := strconv.Atoi(digits)
+			if err != nil {
+				return nil, errors.Wrapf(err, "invalid JAVA_VERSION %q", value)
+			}
+			version = append(version, number)
+			if len(digits) != len(part) {
+				// Stop at pre-release or build metadata such as 25-ea or 17.0.9+9.
+				break
+			}
+		}
+		if len(version) == 0 {
+			return nil, errors.Errorf("invalid JAVA_VERSION %q", value)
+		}
+		return version, nil
 	}
-	return 0, errors.New("JAVA_VERSION not found in release file")
+	return nil, errors.New("JAVA_VERSION not found in release file")
 }

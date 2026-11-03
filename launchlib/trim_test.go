@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"testing/fstest"
 
@@ -39,8 +40,7 @@ func cgroupV2CPUWeightFS(weight string) fstest.MapFS {
 		"proc/self/mountinfo":      &fstest.MapFile{Data: trimCGroupV2MountInfo},
 		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte(weight + "\n")},
 		"opt/java/release":         &fstest.MapFile{Data: []byte("IMPLEMENTOR=\"Amazon.com Inc.\"\nJAVA_VERSION=\"25.0.4\"\n")},
-		"opt/java11/release":       &fstest.MapFile{Data: []byte("JAVA_VERSION=\"11.0.28\"\n")},
-		"opt/java8/release":        &fstest.MapFile{Data: []byte("JAVA_VERSION=\"1.8.0_462\"\n")},
+		"opt/java17/release":       &fstest.MapFile{Data: []byte("JAVA_VERSION=\"17.0.11\"\n")},
 	}
 }
 
@@ -119,15 +119,14 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 		{name: "heap above 8 GiB", args: []string{"-Xmx8193m"}, weight: "35", javaHome: "/opt/java", wantTrim: false},
 		{name: "large service", args: []string{"-Xmx160g"}, weight: "5000", javaHome: "/opt/java", wantTrim: false},
 		{name: "unknown heap size", args: []string{"-XX:MaxRAMPercentage=75.0"}, weight: "35", javaHome: "/opt/java", wantTrim: false},
-		{name: "java 11 without ignore flag", args: []string{"-Xmx512m"}, weight: "35", javaHome: "/opt/java11", wantTrim: false},
-		{name: "java 8 without ignore flag", args: []string{"-Xmx512m"}, weight: "35", javaHome: "/opt/java8", wantTrim: false},
-		{name: "missing release file without ignore flag", args: []string{"-Xmx512m"}, weight: "35", javaHome: "/missing", wantTrim: false},
+		{name: "missing release file", args: []string{"-Xmx512m"}, weight: "35", javaHome: "/missing", wantTrim: false},
+		// The flag is experimental on 17.0.11, which fails startup even with IgnoreUnrecognizedVMOptions.
 		{
-			name:     "java 11 with ignore flag",
+			name:     "experimental flag with ignore flag",
 			args:     []string{"-XX:+IgnoreUnrecognizedVMOptions", "-Xmx512m"},
 			weight:   "35",
-			javaHome: "/opt/java11",
-			wantTrim: true,
+			javaHome: "/opt/java17",
+			wantTrim: false,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -151,6 +150,61 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, "/opt/java", &log))
 		assert.Contains(t, log.String(), "Not trimming native heap: failed to get cgroup CPU request")
 	})
+}
+
+func TestSupportsTrimNativeHeap(t *testing.T) {
+	for _, test := range []struct {
+		version   []int
+		supported bool
+	}{
+		{version: []int{8, 0, 462}, supported: false},
+		{version: []int{11, 0, 28}, supported: false},
+		{version: []int{17, 0, 8}, supported: false},
+		{version: []int{17, 0, 11}, supported: false},
+		{version: []int{17, 0, 12}, supported: true},
+		{version: []int{20, 0, 2}, supported: false},
+		{version: []int{21}, supported: false},
+		{version: []int{21, 0, 2}, supported: false},
+		{version: []int{21, 0, 3}, supported: true},
+		{version: []int{22}, supported: false},
+		{version: []int{22, 0, 1}, supported: true},
+		{version: []int{23}, supported: true},
+		{version: []int{25, 0, 4}, supported: true},
+	} {
+		assert.Equal(t, test.supported, supportsTrimNativeHeap(test.version), "%v", test.version)
+	}
+}
+
+func TestJavaVersion(t *testing.T) {
+	for value, want := range map[string][]int{
+		`"25.0.4"`:    {25, 0, 4},
+		`"21.0.12.1"`: {21, 0, 12, 1},
+		`"21"`:        {21},
+		`"17.0.9+9"`:  {17, 0, 9},
+		`"25-ea"`:     {25},
+		`"1.8.0_402"`: {8, 0, 402},
+	} {
+		got, err := javaVersion(fstest.MapFS{
+			"opt/java/release": &fstest.MapFile{Data: []byte("IMPLEMENTOR=\"x\"\nJAVA_VERSION=" + value + "\n")},
+		}, "/opt/java")
+		require.NoError(t, err, value)
+		assert.Equal(t, want, got, value)
+	}
+
+	t.Run("relative java home", func(t *testing.T) {
+		javaHome, err := filepath.Abs("jre")
+		require.NoError(t, err)
+		got, err := javaVersion(fstest.MapFS{
+			convertToFSPath(filepath.Join(javaHome, "release")): &fstest.MapFile{Data: []byte("JAVA_VERSION=\"21.0.3\"\n")},
+		}, "jre")
+		require.NoError(t, err)
+		assert.Equal(t, []int{21, 0, 3}, got)
+	})
+
+	for _, release := range []string{"IMPLEMENTOR=\"x\"\n", "JAVA_VERSION=\"ea\"\n"} {
+		_, err := javaVersion(fstest.MapFS{"opt/java/release": &fstest.MapFile{Data: []byte(release)}}, "/opt/java")
+		assert.Error(t, err, release)
+	}
 }
 
 func TestTrimNativeHeapEnabled(t *testing.T) {
@@ -189,8 +243,10 @@ func TestParseJVMMemorySize(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, want, got, value)
 	}
-	_, err := parseJVMMemorySize("lots")
-	assert.Error(t, err)
+	for _, value := range []string{"lots", "17179869184g", "18446744073709551616"} {
+		_, err := parseJVMMemorySize(value)
+		assert.Error(t, err, value)
+	}
 }
 
 func ptr(s string) *string {

@@ -215,7 +215,9 @@ config value.
 The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2) is at
 most 4 cores and ``-Xmx`` is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
 to small containers. It is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options, or if the
-Java version in ``$JAVA_HOME/release`` is older than 17 and ``-XX:+IgnoreUnrecognizedVMOptions`` is not set.
+``release`` file of the selected Java home doesn't show a version where the flag is a product flag (17.0.12+, 21.0.3+,
+22.0.1+ or 23+). Earlier updates of 17, 21 and 22 declare it as experimental, which fails startup even with
+``-XX:+IgnoreUnrecognizedVMOptions``.
 
 This setting only takes effect in the cgroup-based heap sizing path.
 

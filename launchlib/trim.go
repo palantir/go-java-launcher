@@ -15,13 +15,10 @@
 package launchlib
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
-	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -34,10 +31,8 @@ const (
 	trimNativeHeapIntervalMs  = 5000
 	// Periodic trimming is only applied to services with a CPU request and heap at or below these limits. The benefit
 	// is a roughly fixed number of MiB per JVM, which only matters relative to a small container.
-	trimNativeHeapMaxCPUMillicores = 4000
-	trimNativeHeapMaxHeapBytes     = 8 * 1024 * BytesInMebibyte
-
-	cgroupMaxShares = 262144
+	trimNativeHeapMaxCPUCores  = 4
+	trimNativeHeapMaxHeapBytes = 8 * 1024 * BytesInMebibyte
 )
 
 func trimNativeHeapEnabled(customConfig *CustomLauncherConfig) (bool, error) {
@@ -53,7 +48,7 @@ func trimNativeHeapEnabled(customConfig *CustomLauncherConfig) (bool, error) {
 
 // ensureTrimNativeHeap appends -XX:TrimNativeHeapInterval for small services so the JVM periodically returns memory
 // freed into glibc malloc arenas to the OS. heapBytes is the max heap size chosen by cgroup-based heap sizing.
-func ensureTrimNativeHeap(args []string, filesystem fs.FS, heapBytes uint64, javaHome string, logger io.Writer) []string {
+func ensureTrimNativeHeap(args []string, filesystem fs.FS, heapBytes uint64, logger io.Writer) []string {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, trimNativeHeapIntervalArg) {
 			return args
@@ -63,139 +58,18 @@ func ensureTrimNativeHeap(args []string, filesystem fs.FS, heapBytes uint64, jav
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: max heap %d bytes is above %d\n", heapBytes, uint64(trimNativeHeapMaxHeapBytes))
 		return args
 	}
-	cpuAbove, cpuRequest, err := cgroupCPURequestAbove(filesystem, trimNativeHeapMaxCPUMillicores)
+	var requestedCores uint
+	counter, err := newCGroupProcessorCounter(filesystem)
+	if err == nil {
+		requestedCores, err = counter.ProcessorCount()
+	}
 	if err != nil {
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: failed to get cgroup CPU request: %v\n", err)
 		return args
 	}
-	if cpuAbove {
-		_, _ = fmt.Fprintf(logger, "Not trimming native heap: CPU request is above %dm: %s\n", trimNativeHeapMaxCPUMillicores, cpuRequest)
-		return args
-	}
-	// Some JDK updates declare the flag as experimental, which fails startup even with
-	// -XX:+IgnoreUnrecognizedVMOptions, so only add it where it is a product flag.
-	version, err := javaVersion(filesystem, javaHome)
-	if err != nil {
-		_, _ = fmt.Fprintf(logger, "Not trimming native heap: failed to get Java version: %v\n", err)
-		return args
-	}
-	if !supportsTrimNativeHeap(version) {
-		_, _ = fmt.Fprintf(logger, "Not trimming native heap: Java %v does not support %s as a product flag\n", version, trimNativeHeapIntervalArg)
+	if requestedCores > trimNativeHeapMaxCPUCores {
+		_, _ = fmt.Fprintf(logger, "Not trimming native heap: CPU request of %d cores is above %d\n", requestedCores, trimNativeHeapMaxCPUCores)
 		return args
 	}
 	return append(args, fmt.Sprintf("%s%d", trimNativeHeapIntervalArg, trimNativeHeapIntervalMs))
-}
-
-// cgroupCPURequestAbove reports whether the container CPU request is above maxMillicores, using cgroup v1 cpu.shares
-// or cgroup v2 cpu.weight. The returned string describes the observed value for logging.
-func cgroupCPURequestAbove(filesystem fs.FS, maxMillicores uint64) (bool, string, error) {
-	isCGroupV2, err := IsCGroupV2(filesystem)
-	if err != nil {
-		return false, "", errors.Wrap(err, "failed to determine cgroup version")
-	}
-	pather, fileName := NewCGroupV1Pather(filesystem), cpuSharesName
-	if isCGroupV2 {
-		pather, fileName = NewCGroupV2Pather(), cpuWeightName
-	}
-	cpuCGroupPath, err := pather.Path(cpuGroupName)
-	if err != nil {
-		return false, "", errors.Wrap(err, "failed to get cpu cgroup path")
-	}
-	contents, err := fs.ReadFile(filesystem, convertToFSPath(filepath.Join(cpuCGroupPath, fileName)))
-	if err != nil {
-		return false, "", errors.Wrapf(err, "unable to read %s", fileName)
-	}
-	value, err := strconv.ParseUint(strings.TrimSpace(string(contents)), 10, 64)
-	if err != nil || value == 0 || (isCGroupV2 && value > 10000) {
-		return false, "", errors.Errorf("invalid %s value: %q", fileName, strings.TrimSpace(string(contents)))
-	}
-	limit := maxMillicores * 1024 / 1000
-	if isCGroupV2 {
-		// Compare in weight space so the boundary matches the runtime's rounding exactly.
-		limit = cpuSharesToWeight(limit)
-	}
-	return value > limit, fmt.Sprintf("%s %d (limit %d)", fileName, value, limit), nil
-}
-
-// cpuSharesToWeight matches the conversion used by runc >= 1.3.2 and crun >= 1.23. See
-// https://github.com/opencontainers/cgroups/blob/v0.0.4/utils.go. Older runtimes produce a lower weight for the same
-// request, which makes the threshold more permissive.
-func cpuSharesToWeight(shares uint64) uint64 {
-	if shares <= 2 {
-		return 1
-	}
-	if shares >= cgroupMaxShares {
-		return 10000
-	}
-	l := math.Log2(float64(shares))
-	return uint64(math.Ceil(math.Pow(10, (l*l+125*l)/612-7.0/34)))
-}
-
-// supportsTrimNativeHeap reports whether -XX:TrimNativeHeapInterval is a product flag in the given Java version
-// (feature, interim, update). It was backported as an experimental flag to 17.0.9 and 21.0.1, was experimental in
-// 22, and became a product flag in 17.0.12, 21.0.3, 22.0.1 and 23.
-func supportsTrimNativeHeap(version []int) bool {
-	update := 0
-	if len(version) >= 3 {
-		update = version[2]
-	}
-	switch feature := version[0]; {
-	case feature >= 23:
-		return true
-	case feature == 22:
-		return update >= 1
-	case feature == 21:
-		return update >= 3
-	case feature == 17:
-		return update >= 12
-	default:
-		return false
-	}
-}
-
-// javaVersion reads JAVA_VERSION from the release file of the given Java home and returns its numeric components,
-// e.g. [17 0 12] for 17.0.12 and [8 0 402] for 1.8.0_402.
-func javaVersion(filesystem fs.FS, javaHome string) ([]int, error) {
-	javaHome, err := filepath.Abs(javaHome)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to resolve Java home")
-	}
-	file, err := filesystem.Open(convertToFSPath(filepath.Join(javaHome, "release")))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open release file")
-	}
-	defer func() {
-		_ = file.Close()
-	}()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if !strings.HasPrefix(line, "JAVA_VERSION=") {
-			continue
-		}
-		value := strings.Trim(strings.TrimPrefix(line, "JAVA_VERSION="), `"`)
-		// Java 8 and earlier report 1.x, with the update after an underscore.
-		value = strings.ReplaceAll(strings.TrimPrefix(value, "1."), "_", ".")
-		var version []int
-		for _, part := range strings.Split(value, ".") {
-			digits := part[:len(part)-len(strings.TrimLeft(part, "0123456789"))]
-			if digits == "" {
-				break
-			}
-			number, err := strconv.Atoi(digits)
-			if err != nil {
-				return nil, errors.Wrapf(err, "invalid JAVA_VERSION %q", value)
-			}
-			version = append(version, number)
-			if len(digits) != len(part) {
-				// Stop at pre-release or build metadata such as 25-ea or 17.0.9+9.
-				break
-			}
-		}
-		if len(version) == 0 {
-			return nil, errors.Errorf("invalid JAVA_VERSION %q", value)
-		}
-		return version, nil
-	}
-	return nil, errors.New("JAVA_VERSION not found in release file")
 }

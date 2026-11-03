@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"path/filepath"
 	"testing"
 	"testing/fstest"
 
@@ -28,184 +27,51 @@ import (
 
 const trimArg = "-XX:TrimNativeHeapInterval=5000"
 
-var (
-	trimCGroupV1Content   = []byte("10:cpu,cpuacct:/abc\n")
-	trimCGroupV1MountInfo = []byte("5137 5093 0:41 /abc /sys/fs/cgroup/cpu,cpuacct ro,nosuid,nodev,noexec,relatime " +
-		"master:23 - cgroup cgroup rw,cpu,cpuacct\n")
-	trimCGroupV2MountInfo = []byte("36 25 0:33 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw\n")
-)
-
 func cgroupV2CPUWeightFS(weight string) fstest.MapFS {
 	return fstest.MapFS{
-		"proc/self/mountinfo":      &fstest.MapFile{Data: trimCGroupV2MountInfo},
+		"proc/self/mountinfo": &fstest.MapFile{
+			Data: []byte("36 25 0:33 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw\n"),
+		},
 		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte(weight + "\n")},
-		"opt/java/release":         &fstest.MapFile{Data: []byte("IMPLEMENTOR=\"Amazon.com Inc.\"\nJAVA_VERSION=\"25.0.4\"\n")},
-		"opt/java17/release":       &fstest.MapFile{Data: []byte("JAVA_VERSION=\"17.0.11\"\n")},
-	}
-}
-
-func TestCPUSharesToWeight(t *testing.T) {
-	for shares, want := range map[uint64]uint64{
-		2:      1,
-		102:    17,
-		256:    35,
-		1024:   100,
-		2048:   174,
-		3072:   240,
-		4096:   303,
-		5120:   363,
-		262144: 10000,
-	} {
-		assert.Equal(t, want, cpuSharesToWeight(shares), "shares %d", shares)
-	}
-}
-
-func TestCGroupCPURequestAbove(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		weight string
-		above  bool
-	}{
-		{name: "250m", weight: "35", above: false},
-		{name: "1 core", weight: "100", above: false},
-		{name: "2 cores", weight: "174", above: false},
-		{name: "just over 2 cores", weight: "175", above: true},
-		{name: "3 cores", weight: "240", above: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			above, _, err := cgroupCPURequestAbove(cgroupV2CPUWeightFS(test.weight), 2000)
-			require.NoError(t, err)
-			assert.Equal(t, test.above, above)
-		})
-	}
-
-	for _, test := range []struct {
-		shares string
-		above  bool
-	}{
-		{shares: "2048", above: false},
-		{shares: "2049", above: true},
-	} {
-		t.Run("cgroup v1 shares "+test.shares, func(t *testing.T) {
-			above, _, err := cgroupCPURequestAbove(fstest.MapFS{
-				"proc/self/cgroup":             &fstest.MapFile{Data: trimCGroupV1Content},
-				"proc/self/mountinfo":          &fstest.MapFile{Data: trimCGroupV1MountInfo},
-				"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{Data: []byte(test.shares + "\n")},
-			}, 2000)
-			require.NoError(t, err)
-			assert.Equal(t, test.above, above)
-		})
-	}
-
-	for _, weight := range []string{"0", "10001", "lots"} {
-		t.Run("invalid weight "+weight, func(t *testing.T) {
-			_, _, err := cgroupCPURequestAbove(cgroupV2CPUWeightFS(weight), 2000)
-			assert.Error(t, err)
-		})
 	}
 }
 
 func TestEnsureTrimNativeHeap(t *testing.T) {
 	for _, test := range []struct {
 		name     string
-		args     []string
 		heap     uint64
 		weight   string
-		javaHome string
 		wantTrim bool
 	}{
-		{name: "small service", args: []string{"-Xms402653184", "-Xmx402653184"}, heap: 402653184, weight: "35", javaHome: "/opt/java", wantTrim: true},
-		{name: "4 cores and 8 GiB heap", args: []string{"-Xmx8589934592"}, heap: 8 * 1024 * BytesInMebibyte, weight: "303", javaHome: "/opt/java", wantTrim: true},
-		{name: "more than 4 cores", args: []string{"-Xmx536870912"}, heap: 512 * BytesInMebibyte, weight: "304", javaHome: "/opt/java", wantTrim: false},
-		{name: "heap above 8 GiB", args: []string{"-Xmx8590983168"}, heap: 8193 * BytesInMebibyte, weight: "35", javaHome: "/opt/java", wantTrim: false},
-		{name: "large service", args: []string{"-Xmx171798691840"}, heap: 160 * 1024 * BytesInMebibyte, weight: "5000", javaHome: "/opt/java", wantTrim: false},
-		{name: "missing release file", args: []string{"-Xmx536870912"}, heap: 512 * BytesInMebibyte, weight: "35", javaHome: "/missing", wantTrim: false},
-		// The flag is experimental on 17.0.11, which fails startup even with IgnoreUnrecognizedVMOptions.
-		{
-			name:     "experimental flag with ignore flag",
-			args:     []string{"-XX:+IgnoreUnrecognizedVMOptions", "-Xmx536870912"},
-			heap:     512 * BytesInMebibyte,
-			weight:   "35",
-			javaHome: "/opt/java17",
-			wantTrim: false,
-		},
+		// cpu.weight values are what runc >= 1.3.2 and crun >= 1.23 set for each CPU request.
+		{name: "quarter core and small heap", heap: 384 * BytesInMebibyte, weight: "35", wantTrim: true},
+		{name: "4 cores and 8 GiB heap", heap: 8 * 1024 * BytesInMebibyte, weight: "303", wantTrim: true},
+		{name: "5 cores", heap: 512 * BytesInMebibyte, weight: "363", wantTrim: false},
+		{name: "heap above 8 GiB", heap: 8193 * BytesInMebibyte, weight: "35", wantTrim: false},
+		{name: "large service", heap: 160 * 1024 * BytesInMebibyte, weight: "5000", wantTrim: false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			got := ensureTrimNativeHeap(test.args, cgroupV2CPUWeightFS(test.weight), test.heap, test.javaHome, io.Discard)
+			args := []string{"-Xmx1", "-XX:+UseG1GC"}
+			got := ensureTrimNativeHeap(args, cgroupV2CPUWeightFS(test.weight), test.heap, io.Discard)
 			if test.wantTrim {
-				assert.Equal(t, append(append([]string{}, test.args...), trimArg), got)
+				assert.Equal(t, append(append([]string{}, args...), trimArg), got)
 			} else {
-				assert.Equal(t, test.args, got)
+				assert.Equal(t, args, got)
 			}
 		})
 	}
 
 	t.Run("explicit interval is preserved", func(t *testing.T) {
-		args := []string{"-Xmx536870912", "-XX:TrimNativeHeapInterval=0"}
-		assert.Equal(t, args, ensureTrimNativeHeap(args, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte, "/opt/java", io.Discard))
+		args := []string{"-XX:TrimNativeHeapInterval=0"}
+		assert.Equal(t, args, ensureTrimNativeHeap(args, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte, io.Discard))
 	})
 
 	t.Run("cgroup read failure leaves args unchanged", func(t *testing.T) {
 		var log bytes.Buffer
-		args := []string{"-Xmx536870912"}
-		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, 512*BytesInMebibyte, "/opt/java", &log))
+		args := []string{"-XX:+UseG1GC"}
+		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, 512*BytesInMebibyte, &log))
 		assert.Contains(t, log.String(), "Not trimming native heap: failed to get cgroup CPU request")
 	})
-}
-
-func TestSupportsTrimNativeHeap(t *testing.T) {
-	for _, test := range []struct {
-		version   []int
-		supported bool
-	}{
-		{version: []int{8, 0, 462}, supported: false},
-		{version: []int{11, 0, 28}, supported: false},
-		{version: []int{17, 0, 8}, supported: false},
-		{version: []int{17, 0, 11}, supported: false},
-		{version: []int{17, 0, 12}, supported: true},
-		{version: []int{20, 0, 2}, supported: false},
-		{version: []int{21}, supported: false},
-		{version: []int{21, 0, 2}, supported: false},
-		{version: []int{21, 0, 3}, supported: true},
-		{version: []int{22}, supported: false},
-		{version: []int{22, 0, 1}, supported: true},
-		{version: []int{23}, supported: true},
-		{version: []int{25, 0, 4}, supported: true},
-	} {
-		assert.Equal(t, test.supported, supportsTrimNativeHeap(test.version), "%v", test.version)
-	}
-}
-
-func TestJavaVersion(t *testing.T) {
-	for value, want := range map[string][]int{
-		`"25.0.4"`:    {25, 0, 4},
-		`"21.0.12.1"`: {21, 0, 12, 1},
-		`"21"`:        {21},
-		`"17.0.9+9"`:  {17, 0, 9},
-		`"25-ea"`:     {25},
-		`"1.8.0_402"`: {8, 0, 402},
-	} {
-		got, err := javaVersion(fstest.MapFS{
-			"opt/java/release": &fstest.MapFile{Data: []byte("IMPLEMENTOR=\"x\"\nJAVA_VERSION=" + value + "\n")},
-		}, "/opt/java")
-		require.NoError(t, err, value)
-		assert.Equal(t, want, got, value)
-	}
-
-	t.Run("relative java home", func(t *testing.T) {
-		javaHome, err := filepath.Abs("jre")
-		require.NoError(t, err)
-		got, err := javaVersion(fstest.MapFS{
-			convertToFSPath(filepath.Join(javaHome, "release")): &fstest.MapFile{Data: []byte("JAVA_VERSION=\"21.0.3\"\n")},
-		}, "jre")
-		require.NoError(t, err)
-		assert.Equal(t, []int{21, 0, 3}, got)
-	})
-
-	for _, release := range []string{"IMPLEMENTOR=\"x\"\n", "JAVA_VERSION=\"ea\"\n"} {
-		_, err := javaVersion(fstest.MapFS{"opt/java/release": &fstest.MapFile{Data: []byte(release)}}, "/opt/java")
-		assert.Error(t, err, release)
-	}
 }
 
 func TestTrimNativeHeapEnabled(t *testing.T) {

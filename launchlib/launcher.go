@@ -122,7 +122,7 @@ func compileCmdFromConfig(
 				staticConfig.JavaConfig.Classpath))
 			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
-			jvmOpts, err := createJvmOpts(combinedJvmOpts, customConfig, javaHome, logger)
+			jvmOpts, err := createJvmOpts(combinedJvmOpts, customConfig, logger)
 			if err != nil {
 				return nil, err
 			}
@@ -298,7 +298,7 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, javaHome string, logger io.WriteCloser) ([]string, error) {
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		limitGCThreads := customConfig.Experimental.LimitGCThreads
@@ -341,7 +341,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		}
 		// Only the cgroup-based heap sizing path knows the max heap size.
 		if trimNativeHeap && maxHeapSizeInBytes != nil {
-			combinedJvmOpts = ensureTrimNativeHeap(combinedJvmOpts, os.DirFS("/"), *maxHeapSizeInBytes, javaHome, logger)
+			combinedJvmOpts = ensureTrimNativeHeap(combinedJvmOpts, os.DirFS("/"), *maxHeapSizeInBytes, logger)
 		}
 		return combinedJvmOpts, nil
 	}

@@ -250,12 +250,13 @@ experimental:
 This can also be set with the envvar ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP``. A non-empty value overrides this
 setting; an empty value is ignored.
 
-The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2) is at
-most 4 cores and the max heap chosen by the launcher is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative
-to small containers. It is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options, or if the
-``release`` file of the selected Java home doesn't show a version where the flag is a product flag (17.0.12+, 21.0.3+,
-22.0.1+ or 23+). Earlier updates of 17, 21 and 22 declare it as experimental, which fails startup even with
-``-XX:+IgnoreUnrecognizedVMOptions``.
+The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2,
+converted to whole cores the same way as ``limitGcThreads``) is at most 4 cores and the max heap chosen by the launcher
+is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative to small containers. It
+is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options.
+
+The launcher doesn't check the Java version. The flag needs Java 17.0.12+, 21.0.3+ or 22.0.1+; earlier updates either
+lack it or declare it experimental, which fails startup.
 
 This setting only takes effect in the cgroup-based heap sizing path.
 

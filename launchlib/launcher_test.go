@@ -213,7 +213,7 @@ func TestCreateJvmOpts_GCThreadsActivationGates(t *testing.T) {
 				Experimental:            ExperimentalLauncherConfig{LimitGCThreads: tc.enabled},
 			}
 			var log bytes.Buffer
-			got, err := createJvmOpts(args, &config, "", &NoopClosingWriter{&log})
+			got, err := createJvmOpts(args, &config, &NoopClosingWriter{&log})
 			assert.Equal(t, tc.enabled, config.Experimental.LimitGCThreads, "environment override must not mutate config")
 			if tc.wantError {
 				require.ErrorContains(t, err, "invalid "+limitGCThreadsEnvVar+" value")

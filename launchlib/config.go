@@ -112,6 +112,12 @@ type ExperimentalLauncherConfig struct {
 	// cgroup-based heap sizing path, and an existing glibc.malloc.mmap_threshold setting is left alone. Can also be set
 	// with envvar LAUNCHER_EXPERIMENTAL_PIN_MALLOC_MMAP_THRESHOLD; a non-empty value overrides this setting.
 	PinMallocMmapThreshold bool `yaml:"pinMallocMmapThreshold,omitempty"`
+	// LimitCompilerThreads adds -XX:CICompilerCount using the JVM's own sizing formula for min(8 * cgroup CPU request,
+	// available processors) instead of the available processors, when that is lower than the JVM default. Applies in
+	// container mode unless -XX:CICompilerCount, -XX:ActiveProcessorCount, -XX:ReservedCodeCacheSize,
+	// CICompilerCountPerCPU or -Xint is set. Can also be set with envvar LAUNCHER_EXPERIMENTAL_LIMIT_COMPILER_THREADS;
+	// a non-empty value overrides this setting.
+	LimitCompilerThreads bool `yaml:"limitCompilerThreads,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

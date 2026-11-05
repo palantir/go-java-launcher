@@ -27,60 +27,6 @@ import (
 
 const pinnedThreshold = "glibc.malloc.mmap_threshold=131072"
 
-func cpuWeightFS(weight string) fstest.MapFS {
-	return fstest.MapFS{
-		"proc/self/mountinfo": &fstest.MapFile{
-			Data: []byte("36 25 0:33 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw\n"),
-		},
-		"sys/fs/cgroup/cpu.weight": &fstest.MapFile{Data: []byte(weight + "\n")},
-	}
-}
-
-func cpuSharesFS(shares string) fstest.MapFS {
-	return fstest.MapFS{
-		"proc/self/cgroup": &fstest.MapFile{Data: []byte("10:cpu,cpuacct:/abc\n")},
-		"proc/self/mountinfo": &fstest.MapFile{
-			Data: []byte("5137 5093 0:41 /abc /sys/fs/cgroup/cpu,cpuacct ro,nosuid,nodev,noexec,relatime master:23 - cgroup cgroup rw,cpu,cpuacct\n"),
-		},
-		"sys/fs/cgroup/cpu/cpu.shares": &fstest.MapFile{Data: []byte(shares + "\n")},
-	}
-}
-
-func TestCPUSharesToWeight(t *testing.T) {
-	// Kubernetes maps 200m to 204 shares, 1 core to 1024 and 2 cores to 2048.
-	for shares, want := range map[uint64]uint64{2: 1, 204: 29, 1024: 100, 2048: 174, 262144: 10000} {
-		assert.Equal(t, want, cpuSharesToWeight(shares), "shares %d", shares)
-	}
-}
-
-func TestCGroupCPURequestAbove(t *testing.T) {
-	for _, test := range []struct {
-		name       string
-		filesystem fstest.MapFS
-		above      bool
-	}{
-		{name: "v2 50m", filesystem: cpuWeightFS("10"), above: false},
-		{name: "v2 200m", filesystem: cpuWeightFS("29"), above: false},
-		{name: "v2 just over 200m", filesystem: cpuWeightFS("30"), above: true},
-		{name: "v2 1 core", filesystem: cpuWeightFS("100"), above: true},
-		{name: "v1 200m", filesystem: cpuSharesFS("204"), above: false},
-		{name: "v1 just over 200m", filesystem: cpuSharesFS("205"), above: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			above, _, err := cgroupCPURequestAbove(test.filesystem, 200)
-			require.NoError(t, err)
-			assert.Equal(t, test.above, above)
-		})
-	}
-
-	for _, weight := range []string{"0", "10001", "lots"} {
-		t.Run("invalid weight "+weight, func(t *testing.T) {
-			_, _, err := cgroupCPURequestAbove(cpuWeightFS(weight), 200)
-			assert.Error(t, err)
-		})
-	}
-}
-
 func TestEnsureMallocMmapThreshold(t *testing.T) {
 	small := uint64(376 * BytesInMebibyte)
 	require.NoError(t, os.Unsetenv(glibcTunablesEnvVar))

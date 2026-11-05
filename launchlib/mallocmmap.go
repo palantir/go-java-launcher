@@ -18,9 +18,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -37,7 +35,6 @@ const (
 	// Only applied to services with a CPU request and heap at or below these limits.
 	pinMallocMmapThresholdMaxCPUMillicores = 200
 	pinMallocMmapThresholdMaxHeapBytes     = 1024 * BytesInMebibyte
-	maxCPUShares                           = 262144
 )
 
 func pinMallocMmapThresholdEnabled(customConfig *CustomLauncherConfig) (bool, error) {
@@ -58,12 +55,12 @@ func ensureMallocMmapThreshold(env map[string]string, filesystem fs.FS, heapByte
 		_, _ = fmt.Fprintf(logger, "Not pinning malloc mmap threshold: max heap %d bytes is above %d\n", heapBytes, uint64(pinMallocMmapThresholdMaxHeapBytes))
 		return env
 	}
-	above, request, err := cgroupCPURequestAbove(filesystem, pinMallocMmapThresholdMaxCPUMillicores)
+	request, err := readCgroupCPURequest(filesystem)
 	if err != nil {
 		_, _ = fmt.Fprintf(logger, "Not pinning malloc mmap threshold: failed to get cgroup CPU request: %v\n", err)
 		return env
 	}
-	if above {
+	if request.above(pinMallocMmapThresholdMaxCPUMillicores) {
 		_, _ = fmt.Fprintf(logger, "Not pinning malloc mmap threshold: CPU request is above %dm: %s\n", pinMallocMmapThresholdMaxCPUMillicores, request)
 		return env
 	}
@@ -81,50 +78,4 @@ func ensureMallocMmapThreshold(env map[string]string, filesystem fs.FS, heapByte
 		setting = tunables + ":" + setting
 	}
 	return merge(env, map[string]string{glibcTunablesEnvVar: setting})
-}
-
-// cgroupCPURequestAbove reports whether the container CPU request is above maxMillicores, using cgroup v1 cpu.shares
-// or cgroup v2 cpu.weight. The returned string describes the observed value for logging.
-func cgroupCPURequestAbove(filesystem fs.FS, maxMillicores uint64) (bool, string, error) {
-	isCGroupV2, err := IsCGroupV2(filesystem)
-	if err != nil {
-		return false, "", errors.Wrap(err, "failed to determine cgroup version")
-	}
-	pather, fileName := NewCGroupV1Pather(filesystem), cpuSharesName
-	if isCGroupV2 {
-		pather, fileName = NewCGroupV2Pather(), cpuWeightName
-	}
-	cpuCGroupPath, err := pather.Path(cpuGroupName)
-	if err != nil {
-		return false, "", errors.Wrap(err, "failed to get cpu cgroup path")
-	}
-	contents, err := fs.ReadFile(filesystem, convertToFSPath(filepath.Join(cpuCGroupPath, fileName)))
-	if err != nil {
-		return false, "", errors.Wrapf(err, "unable to read %s", fileName)
-	}
-	value, err := strconv.ParseUint(strings.TrimSpace(string(contents)), 10, 64)
-	if err != nil || value == 0 || (isCGroupV2 && value > 10000) {
-		return false, "", errors.Errorf("invalid %s value: %q", fileName, strings.TrimSpace(string(contents)))
-	}
-	// Kubernetes converts a CPU request to shares as millicores * 1024 / 1000.
-	limit := maxMillicores * 1024 / 1000
-	if isCGroupV2 {
-		// Compare in weight space so the boundary matches the runtime's rounding exactly.
-		limit = cpuSharesToWeight(limit)
-	}
-	return value > limit, fmt.Sprintf("%s %d (limit %d)", fileName, value, limit), nil
-}
-
-// cpuSharesToWeight matches the conversion used by runc >= 1.3.2 and crun >= 1.23. See
-// https://github.com/opencontainers/cgroups/blob/v0.0.4/utils.go. Older runtimes produce a lower weight for the same
-// request, which makes the threshold more permissive.
-func cpuSharesToWeight(shares uint64) uint64 {
-	if shares <= 2 {
-		return 1
-	}
-	if shares >= maxCPUShares {
-		return 10000
-	}
-	l := math.Log2(float64(shares))
-	return uint64(math.Ceil(math.Pow(10, (l*l+125*l)/612-7.0/34)))
 }

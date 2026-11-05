@@ -257,6 +257,39 @@ at most 200m and the max heap chosen by the launcher is at most 1 GiB. Other ``G
 launcher configuration or the environment are kept, and an existing ``glibc.malloc.mmap_threshold`` is left
 unchanged. It has no effect on musl. This setting only takes effect in the cgroup-based heap sizing path.
 
+### Limiting compiler threads
+
+This experimental option sizes the JIT compiler thread count from the cgroup CPU request.
+
+```
+experimental:
+  limitCompilerThreads: true
+```
+
+This can also be set with the envvar `LAUNCHER_EXPERIMENTAL_LIMIT_COMPILER_THREADS`. A non-empty value overrides this
+setting; an empty value is ignored.
+
+The JVM sizes ``CICompilerCount`` from the number of available processors, which in a container is usually the host's
+processor count rather than the CPU request. Each C2 compilation holds its scratch memory for as long as it runs, so a
+burst of compilations, for example when traffic first reaches a service, raises native memory well above where it
+settles. This option applies the JVM's own formula to a processor count derived from the request, like
+``limitGcThreads``:
+
+```
+available_cores = min(host_cores, ceil(quota / period))  # host_cores if quota is unlimited
+adjusted_cores = min(max(1, ceil(requested_cores * 8)), available_cores)
+log_cores = floor(log2(adjusted_cores))
+compiler_threads = max(2, log_cores * floor(log2(max(log_cores, 1))) * 3 / 2)
+```
+
+``requested_cores`` comes from ``cpu.shares`` on cgroup v1 or ``cpu.weight`` on cgroup v2. Requests up to 375m get 2
+threads (one C1 and one C2), up to 875m get 3 and up to 1.875 cores get 4. Larger requests get the JVM default for
+hosts with up to 31 processors, so the option is only added when it lowers the count.
+
+This only applies in JVM container mode (``CONTAINER`` set), with container support enabled and no ``-XX:MaxRAM=``,
+``-XX:ActiveProcessorCount=``, ``-XX:CICompilerCount=``, ``CICompilerCountPerCPU``, ``-XX:ReservedCodeCacheSize=``
+or ``-Xint`` setting. The JVM still starts and stops compiler threads dynamically up to this count.
+
 ### Disabling container support
 
 This behavior can be disabled by setting the following in ``launcher-custom.yml``:

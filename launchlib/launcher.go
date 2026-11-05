@@ -348,6 +348,13 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 				return nil, nil, err
 			}
 		}
+		limitCompilerThreads, err := limitCompilerThreadsEnabled(customConfig)
+		if err != nil {
+			return nil, nil, err
+		}
+		if limitCompilerThreads {
+			combinedJvmOpts = ensureCompilerThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), logger)
+		}
 		return combinedJvmOpts, maxHeapSizeInBytes, nil
 	}
 

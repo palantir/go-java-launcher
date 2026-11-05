@@ -233,6 +233,30 @@ This only applies in JVM container mode (``CONTAINER`` set), with container supp
 An explicit parallel or concurrent GC thread count makes ``limitGcThreads`` inert: both CPU-based sizing
 and the heap-based thread cap are skipped, leaving the supplied options unchanged.
 
+### Pinning the malloc mmap threshold
+
+This experimental option sets ``glibc.malloc.mmap_threshold=131072`` in ``GLIBC_TUNABLES`` for small services.
+
+```
+experimental:
+  pinMallocMmapThreshold: true
+```
+
+This can also be set with the envvar `LAUNCHER_EXPERIMENTAL_PIN_MALLOC_MMAP_THRESHOLD`. A non-empty value overrides
+this setting; an empty value is ignored.
+
+glibc serves allocations at or above its mmap threshold with their own ``mmap``, which is returned to the OS on
+``free``. By default the threshold starts at 128 KiB but rises to the size of each large mmapped block that is freed
+(up to 32 MiB), so later allocations of that size come from the malloc arenas and their memory stays resident after
+they are freed. Setting the threshold explicitly turns that off, keeping it at glibc's own 128 KiB default. Each large
+allocation then costs an ``mmap``/``munmap`` and fresh page faults, which mostly shows up as slightly more CPU during
+startup.
+
+The setting is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2) is
+at most 200m and the max heap chosen by the launcher is at most 1 GiB. Other ``GLIBC_TUNABLES`` values from the
+launcher configuration or the environment are kept, and an existing ``glibc.malloc.mmap_threshold`` is left
+unchanged. It has no effect on musl. This setting only takes effect in the cgroup-based heap sizing path.
+
 ### Disabling container support
 
 This behavior can be disabled by setting the following in ``launcher-custom.yml``:

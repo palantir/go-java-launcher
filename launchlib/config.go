@@ -106,6 +106,11 @@ type ExperimentalLauncherConfig struct {
 	// unless -XX:ParallelGCThreads, -XX:ConcGCThreads, or -XX:ActiveProcessorCount is already set explicitly.
 	// Only applies when G1 is explicitly enabled; G1 derives its default ConcGCThreads from ParallelGCThreads.
 	LimitGCThreads bool `yaml:"limitGcThreads,omitempty"`
+	// TrimNativeHeap enables -XX:TrimNativeHeapInterval for services with a cgroup CPU request of at most 4 cores and
+	// a max heap of at most 8 GiB, so the JVM periodically returns memory freed into glibc malloc arenas to the OS.
+	// Only applies in the cgroup-based heap sizing path. Can also be set with envvar
+	// LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP; a non-empty value overrides this setting.
+	TrimNativeHeap bool `yaml:"trimNativeHeap,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

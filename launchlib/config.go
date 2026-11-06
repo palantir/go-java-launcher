@@ -106,6 +106,12 @@ type ExperimentalLauncherConfig struct {
 	// unless -XX:ParallelGCThreads, -XX:ConcGCThreads, or -XX:ActiveProcessorCount is already set explicitly.
 	// Only applies when G1 is explicitly enabled; G1 derives its default ConcGCThreads from ParallelGCThreads.
 	LimitGCThreads bool `yaml:"limitGcThreads,omitempty"`
+	// PinMallocMmapThreshold adds glibc.malloc.mmap_threshold=131072 to GLIBC_TUNABLES for services with a cgroup CPU
+	// request of at most 200m and a max heap of at most 1 GiB. This turns off glibc's dynamic mmap threshold, so large
+	// malloc'd blocks go back to the OS when freed instead of staying in the malloc arenas. Only applies in the
+	// cgroup-based heap sizing path, and an existing glibc.malloc.mmap_threshold setting is left alone. Can also be set
+	// with envvar LAUNCHER_EXPERIMENTAL_PIN_MALLOC_MMAP_THRESHOLD; a non-empty value overrides this setting.
+	PinMallocMmapThreshold bool `yaml:"pinMallocMmapThreshold,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

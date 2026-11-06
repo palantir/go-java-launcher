@@ -89,6 +89,7 @@ func compileCmdFromConfig(
 	var args []string
 	var executable string
 	var executableErr error
+	var maxHeapSizeInBytes *uint64
 
 	if staticConfig.Type == "java" {
 		var combinedJvmOpts []string
@@ -122,7 +123,8 @@ func compileCmdFromConfig(
 				staticConfig.JavaConfig.Classpath))
 			_, _ = fmt.Fprintf(logger, "Classpath: %s\n", classpath)
 
-			jvmOpts, err := createJvmOpts(combinedJvmOpts, customConfig, logger)
+			var jvmOpts []string
+			jvmOpts, maxHeapSizeInBytes, err = createJvmOpts(combinedJvmOpts, customConfig, logger)
 			if err != nil {
 				return nil, err
 			}
@@ -163,6 +165,16 @@ func compileCmdFromConfig(
 	_, _ = fmt.Fprintf(logger, "Argument list to executable binary: %v\n\n", args)
 
 	env := replaceEnvironmentVariables(merge(staticConfig.Env, customConfig.Env))
+	// Only the cgroup-based heap sizing path knows the max heap size.
+	if maxHeapSizeInBytes != nil {
+		pinMallocMmapThreshold, err := pinMallocMmapThresholdEnabled(customConfig)
+		if err != nil {
+			return nil, err
+		}
+		if pinMallocMmapThreshold {
+			env = ensureMallocMmapThreshold(env, os.DirFS("/"), *maxHeapSizeInBytes, logger)
+		}
+	}
 
 	return createCmd(executable, args, env)
 }
@@ -298,7 +310,8 @@ func delim(str string) string {
 	return fmt.Sprintf("%s%s%s", TemplateDelimsOpen, str, TemplateDelimsClose)
 }
 
-func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, error) {
+// createJvmOpts returns the JVM options and, when cgroup-based heap sizing chose one, the max heap size in bytes.
+func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig, logger io.WriteCloser) ([]string, *uint64, error) {
 	if isEnvVarSet("CONTAINER") && !customConfig.DisableContainerSupport && !hasMaxRAMOverride(combinedJvmOpts) {
 		_, _ = fmt.Fprintln(logger, "Container support enabled")
 		limitGCThreads := customConfig.Experimental.LimitGCThreads
@@ -306,7 +319,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			var err error
 			limitGCThreads, err = strconv.ParseBool(value)
 			if err != nil {
-				return nil, errors.Wrapf(err, "invalid %s value", limitGCThreadsEnvVar)
+				return nil, nil, errors.Wrapf(err, "invalid %s value", limitGCThreadsEnvVar)
 			}
 		}
 		var maxHeapSizeInBytes *uint64
@@ -330,9 +343,12 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			})
 		}
 		if limitGCThreads {
-			return ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), maxHeapSizeInBytes, logger)
+			combinedJvmOpts, err = ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), maxHeapSizeInBytes, logger)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
-		return combinedJvmOpts, nil
+		return combinedJvmOpts, maxHeapSizeInBytes, nil
 	}
 
 	if isEnvVarSet("CONTAINER") {
@@ -343,7 +359,7 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		}
 	}
 
-	return combinedJvmOpts, nil
+	return combinedJvmOpts, nil, nil
 }
 
 func ensureGCThreads(args []string, filesystem fs.FS, hostProcessors int, maxHeapSizeInBytes *uint64, logger io.Writer) ([]string, error) {

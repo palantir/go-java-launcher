@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -28,7 +29,11 @@ import (
 const (
 	trimNativeHeapEnvVar      = "LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP"
 	trimNativeHeapIntervalArg = "-XX:TrimNativeHeapInterval="
-	trimNativeHeapIntervalMs  = 5000
+	// The default trim interval. Benchmarks showed 5s noticeably lowers peak RSS during startup (class loading and JIT
+	// compilation) compared to 15s, with steady-state peaks within a few MiB of each other.
+	trimNativeHeapDefaultIntervalSeconds = 5
+	// TrimNativeHeapInterval is a uint in milliseconds, so this is the largest whole number of seconds it can hold.
+	trimNativeHeapMaxIntervalSeconds = math.MaxUint32 / 1000
 	// Periodic trimming is only applied to services with a CPU request and heap at or below these limits. The benefit
 	// is a roughly fixed number of MiB per JVM, which only matters relative to a small container.
 	trimNativeHeapMaxCPUCores  = 4
@@ -46,9 +51,20 @@ func trimNativeHeapEnabled(customConfig *CustomLauncherConfig) (bool, error) {
 	return customConfig.Experimental.TrimNativeHeap, nil
 }
 
+// trimNativeHeapIntervalSeconds returns the configured trim interval, or the default if unset. The configured value
+// is validated when the custom config is parsed.
+func trimNativeHeapIntervalSeconds(customConfig *CustomLauncherConfig) int {
+	if interval := customConfig.Experimental.TrimNativeHeapIntervalSeconds; interval != nil {
+		return *interval
+	}
+	return trimNativeHeapDefaultIntervalSeconds
+}
+
 // ensureTrimNativeHeap appends -XX:TrimNativeHeapInterval for small services so the JVM periodically returns memory
 // freed into glibc malloc arenas to the OS. heapBytes is the max heap size chosen by cgroup-based heap sizing.
-func ensureTrimNativeHeap(args []string, filesystem fs.FS, heapBytes uint64, logger io.Writer) []string {
+func ensureTrimNativeHeap(
+	args []string, filesystem fs.FS, heapBytes uint64, intervalSeconds int, logger io.Writer,
+) []string {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, trimNativeHeapIntervalArg) {
 			return args
@@ -71,5 +87,5 @@ func ensureTrimNativeHeap(args []string, filesystem fs.FS, heapBytes uint64, log
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: CPU request of %d cores is above %d\n", requestedCores, trimNativeHeapMaxCPUCores)
 		return args
 	}
-	return append(args, fmt.Sprintf("%s%d", trimNativeHeapIntervalArg, trimNativeHeapIntervalMs))
+	return append(args, fmt.Sprintf("%s%d", trimNativeHeapIntervalArg, intervalSeconds*1000))
 }

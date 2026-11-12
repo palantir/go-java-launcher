@@ -52,7 +52,7 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			args := []string{"-Xmx1", "-XX:+UseG1GC"}
-			got := ensureTrimNativeHeap(args, cgroupV2CPUWeightFS(test.weight), test.heap, io.Discard)
+			got := ensureTrimNativeHeap(args, cgroupV2CPUWeightFS(test.weight), test.heap, 5, io.Discard)
 			if test.wantTrim {
 				assert.Equal(t, append(append([]string{}, args...), trimArg), got)
 			} else {
@@ -63,13 +63,24 @@ func TestEnsureTrimNativeHeap(t *testing.T) {
 
 	t.Run("explicit interval is preserved", func(t *testing.T) {
 		args := []string{"-XX:TrimNativeHeapInterval=0"}
-		assert.Equal(t, args, ensureTrimNativeHeap(args, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte, io.Discard))
+		assert.Equal(t, args, ensureTrimNativeHeap(args, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte, 5, io.Discard))
+	})
+
+	t.Run("custom interval is converted to milliseconds", func(t *testing.T) {
+		got := ensureTrimNativeHeap(nil, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte, 30, io.Discard)
+		assert.Equal(t, []string{"-XX:TrimNativeHeapInterval=30000"}, got)
+	})
+
+	t.Run("max interval fits in the JVM flag", func(t *testing.T) {
+		got := ensureTrimNativeHeap(nil, cgroupV2CPUWeightFS("35"), 512*BytesInMebibyte,
+			trimNativeHeapMaxIntervalSeconds, io.Discard)
+		assert.Equal(t, []string{"-XX:TrimNativeHeapInterval=4294967000"}, got)
 	})
 
 	t.Run("cgroup read failure leaves args unchanged", func(t *testing.T) {
 		var log bytes.Buffer
 		args := []string{"-XX:+UseG1GC"}
-		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, 512*BytesInMebibyte, &log))
+		assert.Equal(t, args, ensureTrimNativeHeap(args, fstest.MapFS{}, 512*BytesInMebibyte, 5, &log))
 		assert.Contains(t, log.String(), "Not trimming native heap: failed to get cgroup CPU request")
 	})
 }
@@ -105,6 +116,12 @@ func TestTrimNativeHeapEnabled(t *testing.T) {
 			assert.Equal(t, test.enabled, enabled)
 		})
 	}
+}
+
+func TestTrimNativeHeapIntervalSeconds(t *testing.T) {
+	assert.Equal(t, 5, trimNativeHeapIntervalSeconds(&CustomLauncherConfig{}))
+	config := &CustomLauncherConfig{Experimental: ExperimentalLauncherConfig{TrimNativeHeapIntervalSeconds: new(15)}}
+	assert.Equal(t, 15, trimNativeHeapIntervalSeconds(config))
 }
 
 func ptr(s string) *string {

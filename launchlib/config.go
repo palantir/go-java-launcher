@@ -111,6 +111,10 @@ type ExperimentalLauncherConfig struct {
 	// Only applies in the cgroup-based heap sizing path. Can also be set with envvar
 	// LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP; a non-empty value overrides this setting.
 	TrimNativeHeap bool `yaml:"trimNativeHeap,omitempty"`
+	// TrimNativeHeapIntervalSeconds sets the interval used when TrimNativeHeap is enabled. Defaults to 5 seconds when
+	// unset. Must be in [1, 4294967], the range of the JVM's millisecond interval. Has no effect unless TrimNativeHeap
+	// is enabled.
+	TrimNativeHeapIntervalSeconds *int `yaml:"trimNativeHeapIntervalSeconds,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {
@@ -316,6 +320,11 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid heap free ratio config in custom "+
 				"subProcess config %s", name)
 		}
+
+		if err := validateTrimNativeHeapInterval(subProcess); err != nil {
+			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid experimental config in custom "+
+				"subProcess config %s", name)
+		}
 	}
 	if err := validateExecutionMode(config.Experimental.ExecutionMode); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
@@ -323,7 +332,21 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 	if err := validateHeapFreeRatio(config.CustomLauncherConfig); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
 	}
+	if err := validateTrimNativeHeapInterval(config.CustomLauncherConfig); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
+	}
 	return config, nil
+}
+
+// validateTrimNativeHeapInterval rejects intervals the JVM would refuse at startup. The JVM flag is a uint in
+// milliseconds, and 0 would disable trimming rather than mean "use the default".
+func validateTrimNativeHeapInterval(config CustomLauncherConfig) error {
+	interval := config.Experimental.TrimNativeHeapIntervalSeconds
+	if interval != nil && (*interval < 1 || *interval > trimNativeHeapMaxIntervalSeconds) {
+		return errors.Errorf("trimNativeHeapIntervalSeconds must be in [1, %d], found %d",
+			trimNativeHeapMaxIntervalSeconds, *interval)
+	}
+	return nil
 }
 
 // validateHeapFreeRatio validates the bounds of each dedicated heap free ratio setting and compares them when both

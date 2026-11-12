@@ -240,7 +240,7 @@ and the heap-based thread cap are skipped, leaving the supplied options unchange
 
 glibc malloc keeps memory freed by the JVM (from JIT compilation, class loading, NIO, and other native allocations)
 in its arenas rather than returning it to the OS, so a container's RSS can stay well above what the JVM is using. To
-have the JVM periodically call ``malloc_trim`` via ``-XX:TrimNativeHeapInterval=5000``, set:
+have the JVM periodically call ``malloc_trim`` via ``-XX:TrimNativeHeapInterval``, set:
 
 ```yaml
 experimental:
@@ -249,6 +249,19 @@ experimental:
 
 This can also be set with the envvar ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP``. A non-empty value overrides this
 setting; an empty value is ignored.
+
+The trim runs every 5 seconds by default. To change the interval, set ``trimNativeHeapIntervalSeconds`` to a whole
+number of seconds between 1 and 4294967:
+
+```yaml
+experimental:
+  trimNativeHeap: true
+  trimNativeHeapIntervalSeconds: 15
+```
+
+Shorter intervals keep peak RSS lower, especially during startup when class loading and JIT compilation allocate
+heavily. Each trim briefly locks the malloc arena being trimmed, though, so a longer interval can help
+latency-sensitive services. The interval has no effect unless ``trimNativeHeap`` is enabled.
 
 The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2,
 converted to whole cores the same way as ``limitGcThreads``) is at most 4 cores and the max heap chosen by the launcher

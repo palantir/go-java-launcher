@@ -341,7 +341,8 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 		}
 		// Only the cgroup-based heap sizing path knows the max heap size.
 		if trimNativeHeap && maxHeapSizeInBytes != nil {
-			combinedJvmOpts = ensureTrimNativeHeap(combinedJvmOpts, os.DirFS("/"), *maxHeapSizeInBytes, logger)
+			combinedJvmOpts = ensureTrimNativeHeap(combinedJvmOpts, os.DirFS("/"), *maxHeapSizeInBytes,
+				trimNativeHeapIntervalSeconds(customConfig), logger)
 		}
 		return combinedJvmOpts, nil
 	}

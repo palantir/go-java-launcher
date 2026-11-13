@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseStaticConfig(t *testing.T) {
@@ -691,6 +692,40 @@ func TestValidateHeapFreeRatio(t *testing.T) {
 			assert.Regexp(t, tc.msg, err.Error(), "%s had the wrong error message", tc.name)
 		})
 	}
+}
+
+func TestValidateTrimNativeHeapInterval(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		data string
+		msg  string
+	}{
+		{
+			name: "zero",
+			data: "configType: java\nconfigVersion: 1\nexperimental:\n  trimNativeHeapIntervalSeconds: 0\n",
+			msg:  "trimNativeHeapIntervalSeconds must be in \\[1, 4294967\\], found 0",
+		},
+		{
+			name: "above JVM range",
+			data: "configType: java\nconfigVersion: 1\nexperimental:\n  trimNativeHeapIntervalSeconds: 4294968\n",
+			msg:  "trimNativeHeapIntervalSeconds must be in \\[1, 4294967\\], found 4294968",
+		},
+		{
+			name: "invalid interval in subProcess",
+			data: "configType: java\nconfigVersion: 1\nsubProcesses:\n  sidecar:\n    configType: java\n    experimental:\n      trimNativeHeapIntervalSeconds: -1\n",
+			msg:  "invalid experimental config in custom subProcess config sidecar: trimNativeHeapIntervalSeconds must be in \\[1, 4294967\\], found -1",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parseCustomConfig([]byte(tc.data))
+			require.Error(t, err, "%s expected an error", tc.name)
+			assert.Regexp(t, tc.msg, err.Error(), "%s had the wrong error message", tc.name)
+		})
+	}
+
+	config, err := parseCustomConfig([]byte("configType: java\nconfigVersion: 1\nexperimental:\n  trimNativeHeap: true\n  trimNativeHeapIntervalSeconds: 15\n"))
+	require.NoError(t, err)
+	assert.Equal(t, new(15), config.Experimental.TrimNativeHeapIntervalSeconds)
 }
 
 func TestValidateHeapFreeRatioAllowsOneValue(t *testing.T) {

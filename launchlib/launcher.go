@@ -330,7 +330,19 @@ func createJvmOpts(combinedJvmOpts []string, customConfig *CustomLauncherConfig,
 			})
 		}
 		if limitGCThreads {
-			return ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), maxHeapSizeInBytes, logger)
+			combinedJvmOpts, err = ensureGCThreads(combinedJvmOpts, os.DirFS("/"), runtime.NumCPU(), maxHeapSizeInBytes, logger)
+			if err != nil {
+				return nil, err
+			}
+		}
+		trimNativeHeap, err := trimNativeHeapEnabled(customConfig)
+		if err != nil {
+			return nil, err
+		}
+		// Only the cgroup-based heap sizing path knows the max heap size.
+		if trimNativeHeap && maxHeapSizeInBytes != nil {
+			combinedJvmOpts = ensureTrimNativeHeap(combinedJvmOpts, os.DirFS("/"), *maxHeapSizeInBytes,
+				trimNativeHeapIntervalSeconds(customConfig), logger)
 		}
 		return combinedJvmOpts, nil
 	}

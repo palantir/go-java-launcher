@@ -233,6 +233,46 @@ This only applies in JVM container mode (``CONTAINER`` set), with container supp
 An explicit parallel or concurrent GC thread count makes ``limitGcThreads`` inert: both CPU-based sizing
 and the heap-based thread cap are skipped, leaving the supplied options unchanged.
 
+### Trimming the native heap
+
+> [!WARNING]
+> This is experimental and may be either removed or promoted in the future.
+
+glibc malloc keeps memory freed by the JVM (from JIT compilation, class loading, NIO, and other native allocations)
+in its arenas rather than returning it to the OS, so a container's RSS can stay well above what the JVM is using. To
+have the JVM periodically call ``malloc_trim`` via ``-XX:TrimNativeHeapInterval``, set:
+
+```yaml
+experimental:
+  trimNativeHeap: true
+```
+
+This can also be set with the envvar ``LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP``. A non-empty value overrides this
+setting; an empty value is ignored.
+
+The trim runs every 5 seconds by default. To change the interval, set ``trimNativeHeapIntervalSeconds`` to a whole
+number of seconds between 1 and 4294967:
+
+```yaml
+experimental:
+  trimNativeHeap: true
+  trimNativeHeapIntervalSeconds: 15
+```
+
+Shorter intervals keep peak RSS lower, especially during startup when class loading and JIT compilation allocate
+heavily. Each trim briefly locks the malloc arena being trimmed, though, so a longer interval can help
+latency-sensitive services. The interval has no effect unless ``trimNativeHeap`` is enabled.
+
+The flag is only added when the cgroup CPU request (``cpu.shares`` on cgroup v1, ``cpu.weight`` on cgroup v2,
+converted to whole cores the same way as ``limitGcThreads``) is at most 4 cores and the max heap chosen by the launcher
+is at most 8 GiB. The savings are a roughly fixed amount per JVM, so they only matter relative to small containers. It
+is also skipped if ``-XX:TrimNativeHeapInterval=`` is already in the JVM options.
+
+The launcher doesn't check the Java version. The flag needs Java 17.0.12+, 21.0.3+ or 22.0.1+; earlier updates either
+lack it or declare it experimental, which fails startup.
+
+This setting only takes effect in the cgroup-based heap sizing path.
+
 ### Pinning the malloc mmap threshold
 
 This experimental option sets ``glibc.malloc.mmap_threshold=131072`` in ``GLIBC_TUNABLES`` for small services.

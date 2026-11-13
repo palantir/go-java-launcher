@@ -106,6 +106,15 @@ type ExperimentalLauncherConfig struct {
 	// unless -XX:ParallelGCThreads, -XX:ConcGCThreads, or -XX:ActiveProcessorCount is already set explicitly.
 	// Only applies when G1 is explicitly enabled; G1 derives its default ConcGCThreads from ParallelGCThreads.
 	LimitGCThreads bool `yaml:"limitGcThreads,omitempty"`
+	// TrimNativeHeap enables -XX:TrimNativeHeapInterval for services with a cgroup CPU request of at most 4 cores and
+	// a max heap of at most 8 GiB, so the JVM periodically returns memory freed into glibc malloc arenas to the OS.
+	// Only applies in the cgroup-based heap sizing path. Can also be set with envvar
+	// LAUNCHER_EXPERIMENTAL_TRIM_NATIVE_HEAP; a non-empty value overrides this setting.
+	TrimNativeHeap bool `yaml:"trimNativeHeap,omitempty"`
+	// TrimNativeHeapIntervalSeconds sets the interval used when TrimNativeHeap is enabled. Defaults to 5 seconds when
+	// unset. Must be in [1, 4294967], the range of the JVM's millisecond interval. Has no effect unless TrimNativeHeap
+	// is enabled.
+	TrimNativeHeapIntervalSeconds *int `yaml:"trimNativeHeapIntervalSeconds,omitempty"`
 	// PinMallocMmapThreshold adds glibc.malloc.mmap_threshold=131072 to GLIBC_TUNABLES for services with a cgroup CPU
 	// request of at most 200m and a max heap of at most 1 GiB. This turns off glibc's dynamic mmap threshold, so large
 	// malloc'd blocks go back to the OS when freed instead of staying in the malloc arenas. Only applies in the
@@ -317,6 +326,11 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid heap free ratio config in custom "+
 				"subProcess config %s", name)
 		}
+
+		if err := validateTrimNativeHeapInterval(subProcess); err != nil {
+			return PrimaryCustomLauncherConfig{}, errors.Wrapf(err, "invalid experimental config in custom "+
+				"subProcess config %s", name)
+		}
 	}
 	if err := validateExecutionMode(config.Experimental.ExecutionMode); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
@@ -324,7 +338,21 @@ func parseCustomConfig(yamlString []byte) (PrimaryCustomLauncherConfig, error) {
 	if err := validateHeapFreeRatio(config.CustomLauncherConfig); err != nil {
 		return PrimaryCustomLauncherConfig{}, err
 	}
+	if err := validateTrimNativeHeapInterval(config.CustomLauncherConfig); err != nil {
+		return PrimaryCustomLauncherConfig{}, err
+	}
 	return config, nil
+}
+
+// validateTrimNativeHeapInterval rejects intervals the JVM would refuse at startup. The JVM flag is a uint in
+// milliseconds, and 0 would disable trimming rather than mean "use the default".
+func validateTrimNativeHeapInterval(config CustomLauncherConfig) error {
+	interval := config.Experimental.TrimNativeHeapIntervalSeconds
+	if interval != nil && (*interval < 1 || *interval > trimNativeHeapMaxIntervalSeconds) {
+		return errors.Errorf("trimNativeHeapIntervalSeconds must be in [1, %d], found %d",
+			trimNativeHeapMaxIntervalSeconds, *interval)
+	}
+	return nil
 }
 
 // validateHeapFreeRatio validates the bounds of each dedicated heap free ratio setting and compares them when both

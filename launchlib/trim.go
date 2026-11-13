@@ -74,17 +74,19 @@ func ensureTrimNativeHeap(
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: max heap %d bytes is above %d\n", heapBytes, uint64(trimNativeHeapMaxHeapBytes))
 		return args
 	}
-	var requestedCores uint
+	var requestedCores float64
 	counter, err := newCGroupProcessorCounter(filesystem)
 	if err == nil {
-		requestedCores, err = counter.ProcessorCount()
+		requestedCores, err = counter.cpuRequestCores()
 	}
 	if err != nil {
 		_, _ = fmt.Fprintf(logger, "Not trimming native heap: failed to get cgroup CPU request: %v\n", err)
 		return args
 	}
-	if requestedCores > trimNativeHeapMaxCPUCores {
-		_, _ = fmt.Fprintf(logger, "Not trimming native heap: CPU request of %d cores is above %d\n", requestedCores, trimNativeHeapMaxCPUCores)
+	// Compare whole cores, matching limitGcThreads. This also absorbs the cgroup v2 cpu.weight rounding, which reads a
+	// 4 core request as about 4.012 cores.
+	if math.Floor(requestedCores) > trimNativeHeapMaxCPUCores {
+		_, _ = fmt.Fprintf(logger, "Not trimming native heap: CPU request of %.3f cores is above %d\n", requestedCores, trimNativeHeapMaxCPUCores)
 		return args
 	}
 	return append(args, fmt.Sprintf("%s%d", trimNativeHeapIntervalArg, intervalSeconds*1000))

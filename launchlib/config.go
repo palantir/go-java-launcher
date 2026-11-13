@@ -115,6 +115,12 @@ type ExperimentalLauncherConfig struct {
 	// unset. Must be in [1, 4294967], the range of the JVM's millisecond interval. Has no effect unless TrimNativeHeap
 	// is enabled.
 	TrimNativeHeapIntervalSeconds *int `yaml:"trimNativeHeapIntervalSeconds,omitempty"`
+	// PinMallocMmapThreshold adds glibc.malloc.mmap_threshold=131072 to GLIBC_TUNABLES for services with a cgroup CPU
+	// request of at most 200m and a max heap of at most 1 GiB. This turns off glibc's dynamic mmap threshold, so large
+	// malloc'd blocks go back to the OS when freed instead of staying in the malloc arenas. Only applies in the
+	// cgroup-based heap sizing path, and an existing glibc.malloc.mmap_threshold setting is left alone. Can also be set
+	// with envvar LAUNCHER_EXPERIMENTAL_PIN_MALLOC_MMAP_THRESHOLD; a non-empty value overrides this setting.
+	PinMallocMmapThreshold bool `yaml:"pinMallocMmapThreshold,omitempty"`
 }
 
 type PrimaryCustomLauncherConfig struct {

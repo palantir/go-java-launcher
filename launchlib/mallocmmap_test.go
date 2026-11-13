@@ -46,36 +46,45 @@ func cpuSharesFS(shares string) fstest.MapFS {
 	}
 }
 
-func TestCPUSharesToWeight(t *testing.T) {
-	// Kubernetes maps 200m to 204 shares, 1 core to 1024 and 2 cores to 2048.
-	for shares, want := range map[uint64]uint64{2: 1, 204: 29, 1024: 100, 2048: 174, 262144: 10000} {
-		assert.Equal(t, want, cpuSharesToWeight(shares), "shares %d", shares)
-	}
-}
-
-func TestCGroupCPURequestAbove(t *testing.T) {
+func TestCPURequestCores(t *testing.T) {
 	for _, test := range []struct {
 		name       string
 		filesystem fstest.MapFS
-		above      bool
+		want       float64
 	}{
-		{name: "v2 50m", filesystem: cpuWeightFS("10"), above: false},
-		{name: "v2 200m", filesystem: cpuWeightFS("29"), above: false},
-		{name: "v2 just over 200m", filesystem: cpuWeightFS("30"), above: true},
-		{name: "v2 1 core", filesystem: cpuWeightFS("100"), above: true},
-		{name: "v1 200m", filesystem: cpuSharesFS("204"), above: false},
-		{name: "v1 just over 200m", filesystem: cpuSharesFS("205"), above: true},
+		{name: "v1 no request", filesystem: cpuSharesFS("2"), want: 2.0 / 1024},
+		{name: "v1 200m", filesystem: cpuSharesFS("204"), want: 204.0 / 1024},
+		{name: "v1 1.5 cores", filesystem: cpuSharesFS("1536"), want: 1.5},
+		// cpu.weight values are what runc >= 1.3.2 and crun >= 1.23 set for each CPU request, and read back as the top
+		// of the range of shares that map to them.
+		{name: "v2 minimum weight", filesystem: cpuWeightFS("1"), want: 2.0 / 1024},
+		{name: "v2 200m", filesystem: cpuWeightFS("29"), want: 207.11 / 1024},
+		{name: "v2 1 core", filesystem: cpuWeightFS("100"), want: 1},
+		{name: "v2 4 cores", filesystem: cpuWeightFS("303"), want: 4108.27 / 1024},
+		{name: "v2 maximum weight", filesystem: cpuWeightFS("10000"), want: 256},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			above, _, err := cgroupCPURequestAbove(test.filesystem, 200)
+			counter, err := newCGroupProcessorCounter(test.filesystem)
 			require.NoError(t, err)
-			assert.Equal(t, test.above, above)
+			got, err := counter.cpuRequestCores()
+			require.NoError(t, err)
+			assert.InDelta(t, test.want, got, 0.0001)
 		})
 	}
 
-	for _, weight := range []string{"0", "10001", "lots"} {
-		t.Run("invalid weight "+weight, func(t *testing.T) {
-			_, _, err := cgroupCPURequestAbove(cpuWeightFS(weight), 200)
+	for _, test := range []struct {
+		name       string
+		filesystem fstest.MapFS
+	}{
+		{name: "v2 weight 0", filesystem: cpuWeightFS("0")},
+		{name: "v2 weight above maximum", filesystem: cpuWeightFS("10001")},
+		{name: "v2 weight not a number", filesystem: cpuWeightFS("lots")},
+		{name: "v1 shares 0", filesystem: cpuSharesFS("0")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			counter, err := newCGroupProcessorCounter(test.filesystem)
+			require.NoError(t, err)
+			_, err = counter.cpuRequestCores()
 			assert.Error(t, err)
 		})
 	}
@@ -94,6 +103,26 @@ func TestEnsureMallocMmapThreshold(t *testing.T) {
 		got := ensureMallocMmapThreshold(map[string]string{}, cpuWeightFS("29"), 1024*BytesInMebibyte, io.Discard)
 		assert.Equal(t, pinnedThreshold, got[glibcTunablesEnvVar])
 	})
+
+	for _, test := range []struct {
+		name       string
+		filesystem fstest.MapFS
+		pinned     bool
+	}{
+		{name: "v2 50m", filesystem: cpuWeightFS("10"), pinned: true},
+		{name: "v2 200m", filesystem: cpuWeightFS("29"), pinned: true},
+		{name: "v2 210m", filesystem: cpuWeightFS("30"), pinned: false},
+		{name: "v2 1 core", filesystem: cpuWeightFS("100"), pinned: false},
+		{name: "v1 200m", filesystem: cpuSharesFS("204"), pinned: true},
+		{name: "v1 205m", filesystem: cpuSharesFS("209"), pinned: true},
+		{name: "v1 206m", filesystem: cpuSharesFS("210"), pinned: false},
+	} {
+		t.Run("CPU request boundary "+test.name, func(t *testing.T) {
+			got := ensureMallocMmapThreshold(map[string]string{}, test.filesystem, small, io.Discard)
+			_, pinned := got[glibcTunablesEnvVar]
+			assert.Equal(t, test.pinned, pinned)
+		})
+	}
 
 	t.Run("configured tunables are kept", func(t *testing.T) {
 		env := map[string]string{glibcTunablesEnvVar: "glibc.malloc.arena_max=2"}
@@ -120,7 +149,7 @@ func TestEnsureMallocMmapThreshold(t *testing.T) {
 		log        string
 	}{
 		{name: "heap above 1 GiB", filesystem: cpuWeightFS("10"), heap: 1025 * BytesInMebibyte, log: "max heap"},
-		{name: "CPU request above 200m", filesystem: cpuWeightFS("30"), heap: small, log: "CPU request is above 200m"},
+		{name: "CPU request above 200m", filesystem: cpuWeightFS("30"), heap: small, log: "CPU request of 0.211 cores is above 200m"},
 		{name: "cgroup read failure", filesystem: fstest.MapFS{}, heap: small, log: "failed to get cgroup CPU request"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

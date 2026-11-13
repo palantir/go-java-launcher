@@ -73,7 +73,30 @@ func NewCGroupV1ProcessorCounter(filesystem fs.FS) ProcessorCounter {
 	return CGroupProcessorCounter{cgroupPaths: NewCGroupV1Pather(filesystem), fs: filesystem}
 }
 
+const (
+	// cgroup v1 cpu.shares per core, as written by Kubernetes and container runtimes.
+	cpuSharesPerCore = 1024
+	maxCPUShares     = 262144
+	maxCPUWeight     = 10000
+)
+
+// ProcessorCount returns the cgroup CPU request rounded down to whole cores, and at least 1.
 func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
+	cores, err := c.cpuRequestCores()
+	if err != nil {
+		return 0, err
+	}
+	return uint(max(1, math.Floor(cores))), nil
+}
+
+// cpuRequestCores returns the container CPU request in cores, read from cpu.shares on cgroup v1 or cpu.weight on
+// cgroup v2. The value is not rounded, so callers can round, floor or ceil it as needed. Kubernetes writes
+// millicores * 1024 / 1000 shares (at least 2), so a request with no CPU set reads as 2/1024.
+//
+// On cgroup v2 the shares are recovered from the weight, which is lossy since each weight covers a range of shares.
+// The returned value is the top of that range, so it can be slightly above the actual request (e.g. a 200m request
+// reads as about 0.202 cores). Callers comparing against a threshold should account for this.
+func (c CGroupProcessorCounter) cpuRequestCores() (float64, error) {
 	cpuCgroupPath, err := c.cgroupPaths.Path(cpuGroupName)
 	if err != nil {
 		return 0, errors.Wrap(err, "failed to get path to cpu cgroup")
@@ -95,21 +118,29 @@ func (c CGroupProcessorCounter) ProcessorCount() (uint, error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "unable to read %s", cpuRequestName)
 	}
-	cpuShares, err := strconv.Atoi(strings.TrimSpace(string(cpuRequestBytes)))
+	value, err := strconv.Atoi(strings.TrimSpace(string(cpuRequestBytes)))
 	if err != nil {
 		return 0, errors.Errorf("unable to convert %s value to expected type", cpuRequestName)
 	}
-	if cpuShares <= 0 || (c.isCGroupV2 && cpuShares > 10000) {
-		return 0, errors.Errorf("invalid %s value: %d", cpuRequestName, cpuShares)
+	if value <= 0 || (c.isCGroupV2 && value > maxCPUWeight) {
+		return 0, errors.Errorf("invalid %s value: %d", cpuRequestName, value)
 	}
-	if c.isCGroupV2 {
-		// runc >= 1.3.2 and crun >= 1.23 use weight = ceil(10^((l*l+125*l)/612 - 7/34)),
-		// where l = log2(shares). See https://github.com/opencontainers/cgroups/blob/v0.0.4/utils.go.
-		// Invert at the weight bucket's upper bound so runtime rounding does not lose whole cores.
-		// Clamp to the shares maximum before truncating to cores.
-		cpuShares = int(min(262144, math.Exp2((math.Sqrt(16129+2448*math.Log10(float64(cpuShares)))-125)/2)))
+	if !c.isCGroupV2 {
+		return float64(value) / cpuSharesPerCore, nil
 	}
-	return uint(max(1, cpuShares/1024)), nil
+	return cpuWeightToShares(value) / cpuSharesPerCore, nil
+}
+
+// cpuWeightToShares inverts the shares to weight conversion used by runc >= 1.3.2 and crun >= 1.23:
+// weight = ceil(10^((l*l+125*l)/612 - 7/34)), where l = log2(shares).
+// See https://github.com/opencontainers/cgroups/blob/v0.0.4/utils.go.
+//
+// Inverting at the weight itself gives the top of the range of shares that map to it, so runtime rounding never loses
+// part of the request. Older runtimes used a linear mapping that produces a lower weight for the same shares, which
+// reads back as a smaller request. There's no way to tell which runtime wrote the weight, so we assume the current one.
+func cpuWeightToShares(weight int) float64 {
+	// Clamp in case floating point error pushes the maximum weight past the shares maximum.
+	return min(maxCPUShares, math.Exp2((math.Sqrt(16129+2448*math.Log10(float64(weight)))-125)/2))
 }
 
 // clampToCPUQuota matches the JVM's quota-based processor count, without exceeding CPU affinity.

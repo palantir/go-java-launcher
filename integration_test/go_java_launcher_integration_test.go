@@ -33,12 +33,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const avxArgs = `-XX:\+IgnoreUnrecognizedVMOptions -XX:UseAVX=2`
+
 func TestMainMethod(t *testing.T) {
 	output, err := runMainWithArgs(t, "testdata/launcher-static.yml", "testdata/launcher-custom.yml")
 	require.NoError(t, err, "failed: %s", output)
 
 	// part of expected output from launcher
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -Xmx1g `+avxArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }
@@ -115,7 +117,7 @@ func TestMainMethodWithoutCustomConfig(t *testing.T) {
 
 	// part of expected output from launcher
 	assert.Regexp(t, `Failed to read custom config file, assuming no custom config: foo`, output)
-	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+	assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java -Xmx4M `+avxArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	// expected output of Java program
 	assert.Regexp(t, `\nmain method\n`, output)
 }
@@ -285,7 +287,7 @@ func testInContainer(t *testing.T, launcherCustom string, containerSupportMessag
 
 	// part of expected output from launcher
 	if jvmArgs != "" {
-		assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
+		assert.Regexp(t, `Argument list to executable binary: \[.+/bin/java `+jvmArgs+` `+avxArgs+` -classpath .+/go-java-launcher/integration_test/testdata Main arg1\]`, output)
 	}
 	// container support detected and running inside container
 	assert.Regexp(t, containerSupportMessage, output)

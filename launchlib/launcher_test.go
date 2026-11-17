@@ -798,3 +798,26 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 
 	assert.Contains(t, cmd.Args, "-XX:MaximumHeapSizePercent=60")
 }
+
+func TestCompileCmdAppendsUseAVX(t *testing.T) {
+	staticCfg := StaticLauncherConfig{
+		Type: "java",
+		JavaConfig: JavaConfig{
+			JavaHome:  "../integration_test/jdk",
+			MainClass: "Main",
+			Classpath: []string{"."},
+			JvmOpts:   []string{"-XX:UseAVX=3"},
+		},
+	}
+	customCfg := CustomLauncherConfig{
+		Type:    "java",
+		JvmOpts: []string{"-XX:-IgnoreUnrecognizedVMOptions"},
+	}
+	cgroups := map[string]string{}
+	createLogger := func() (io.WriteCloser, error) { return &NoopClosingWriter{io.Discard}, nil }
+
+	cmd, err := compileCmdFromConfig(&staticCfg, &customCfg, &cgroups, createLogger)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"-XX:UseAVX=3", "-XX:-IgnoreUnrecognizedVMOptions", "-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2", "-classpath"}, cmd.Args[1:6])
+}

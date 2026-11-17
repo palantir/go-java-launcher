@@ -128,8 +128,6 @@ and `<custom.xyz>` refer to the options from the two configuration files, respec
   <static.jvmOpts> \
   <custom.jvmOpts> \
   <computed container options> \
-  -XX:+IgnoreUnrecognizedVMOptions \
-  -XX:UseAVX=2 \
   -classpath <classpath entries> \
   <static.mainClass> \
   <static.args>
@@ -138,8 +136,6 @@ and `<custom.xyz>` refer to the options from the two configuration files, respec
 Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typically take precedence; the exact
 behaviour may depend on the Java distribution. When running in a container, some heap options are filtered out of
 both and replaced by `<computed container options>`, see [Java heap and container support](#java-heap-and-container-support).
-Since `-XX:+IgnoreUnrecognizedVMOptions` is always added, unrecognized `-XX:` options in `jvmOpts` are ignored
-rather than failing startup.
 
 If any subProcesses are defined, they will be launched as child processes of the main process, with all of these
 processes occupying their own process group. Additionally, a monitor subProcess will be launched, which terminates

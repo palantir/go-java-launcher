@@ -128,6 +128,7 @@ func compileCmdFromConfig(
 			if err != nil {
 				return nil, err
 			}
+			jvmOpts = append(jvmOpts, "-XX:+IgnoreUnrecognizedVMOptions", "-XX:UseAVX=2")
 
 			executable, executableErr = verifyPathIsSafeForExec(filepath.Join(javaHome, javaExecutablePath))
 			if executableErr != nil {

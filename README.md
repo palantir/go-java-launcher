@@ -21,6 +21,8 @@ The launcher accepts as configuration two YAML files as follows:
 configType: java
 # REQUIRED - The version of the configuration format, must be the integer 1
 configVersion: 1
+# REQUIRED - The name of the service, must match [a-z0-9-]+ and not be the name of a subProcess
+serviceName: my-service
 # REQUIRED - The main class to be run
 mainClass: my.package.Main
 # OPTIONAL - Path to the JRE or environment variable name (e.g. $JAVA_11_HOME). Defaults to the JAVA_HOME environment variable if unset,
@@ -61,6 +63,8 @@ subProcesses:
 configType: executable
 # REQUIRED - The version of the configuration format, must be the integer 1
 configVersion: 1
+# REQUIRED - The name of the service, must match [a-z0-9-]+ and not be the name of a subProcess
+serviceName: my-service
 # OPTIONAL - Environment Variables to be set in the environment (Note: cannot be referenced on args list)
 env:
   CUSTOM_VAR: CUSTOM_VALUE
@@ -123,13 +127,15 @@ and `<custom.xyz>` refer to the options from the two configuration files, respec
 <javaHome>/bin/java \
   <static.jvmOpts> \
   <custom.jvmOpts> \
+  <computed container options> \
   -classpath <classpath entries> \
   <static.mainClass> \
   <static.args>
 ```
 
-Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typically take precendence; the exact
-behaviour may depend on the Java distribution.
+Note that the custom `jvmOpts` appear after the static `jvmOpts` and thus typically take precedence; the exact
+behaviour may depend on the Java distribution. When running in a container, some heap options are filtered out of
+both and replaced by `<computed container options>`, see [Java heap and container support](#java-heap-and-container-support).
 
 If any subProcesses are defined, they will be launched as child processes of the main process, with all of these
 processes occupying their own process group. Additionally, a monitor subProcess will be launched, which terminates
@@ -150,26 +156,28 @@ All output from `go-java-launcher` itself, and from the launch of all processes 
 
 When starting a java process inside a container (as indicated by the presence of ``CONTAINER`` env
 variable):
-1. If the `-XX:ActiveProcessorCount` is unset, it will remain unset.
-1. Args with prefix``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out. If neither
-   ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or custom jvm opts
-   ``-Xmx|-Xms`` will both be set to be 75% of the cgroups memory limit minus 3mb per processor, with a minimum value of
-   50% of the heap.
-
-This will cause the JVM 11+ to discover the ``MaxRAM`` value using Linux cgroups, and calculate the heap sizes as the specified
-percentage of ``MaxRAM`` value, e.g. ``max-heap-size = MaxRAM * MaxRamPercentage``.
+1. Args with prefix ``-Xmx|-Xms`` in both static and custom jvm opts will be filtered out.
+1. If neither ``-XX:MaxRAMPercentage=`` nor ``-XX:InitialRAMPercentage=`` prefixes are present in either static or
+   custom jvm opts, ``-Xmx|-Xms`` will both be set to be 75% of the cgroups memory limit minus 3mb per processor, with a
+   minimum value of 50% of the cgroups memory limit.
+1. If the cgroups memory limit cannot be read (including when it is unlimited), or is unusually high (over 1,000,000
+   MiB, roughly 1TB), the launcher instead sets both ``-XX:InitialRAMPercentage=`` and ``-XX:MaxRAMPercentage=`` to 75%
+   (or `heapPercentage`, see below), unless either is already present. The JVM then discovers the ``MaxRAM`` value
+   using Linux cgroups, and calculates the heap sizes as that percentage of it, e.g.
+   ``max-heap-size = MaxRAM * MaxRAMPercentage``.
 
 ### Overriding default values
 
-To override the heap percentage, developers can set `heapPercentage` in ``launcher-custom.yml``. This will use the cgroups memory limit to calculate the ``-Xmx|-Xms`` values, without the per processor adjustment. Setting ``-Xmx`` and ``-Xms`` to the same value ensures the heap will never shrink. 
+To override the heap percentage, developers can set `heapPercentage` in ``launcher-custom.yml``. This will use the cgroups memory limit to calculate the ``-Xmx|-Xms`` values, without the per processor adjustment. Setting ``-Xmx`` and ``-Xms`` to the same value ensures the heap will never shrink (unless `allowHeapShrink` is set, see below).
 
 Alternatively, developers can override the heap percentage in containers by specifying both ``-XX:MaxRAMPercentage=`` and ``-XX:InitialRAMPercentage=`` and we recommend setting both to the same value. Note that setting ``-XX:MaxRAMPercentage=`` and ``-XX:InitialRAMPercentage=`` to the same value does not prevent the heap from shrinking. 
 
 If either ``-XX:MaxRAMPercentage=`` or ``-XX:InitialRAMPercentage=`` are set, `heapPercentage` will be ignored. 
 
-Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage``
-together with ``-Xmx|-Xms`` overrides safely: ``-Xmx/-Xms`` overrides ALWAYS take precedence and will be filtered out
-when running inside a container, as per logic detailed above.
+Developers can specify both ``MaxRAMPercentage|InitialRAMPercentage`` together with ``-Xmx|-Xms`` overrides
+safely: when running inside a container, ``-Xmx|-Xms`` are always filtered out as per logic detailed above, so the
+RAM percentage options take effect. Outside of a container, or with container support disabled, the options are
+passed through unchanged.
 
 ### Allowing the heap to shrink
 
@@ -192,8 +200,10 @@ the matching ``jvmOpts`` entries, allowing installation-level ratio overrides wi
 launcher requires ``minHeapFreeRatio <= maxHeapFreeRatio``; the JVM validates pairs that mix a dedicated setting with
 ``jvmOpts``.
 
-These settings only take effect in the cgroup-based heap sizing path. They have no effect when container support is
-disabled or a ``-XX:MaxRAM=`` override is present.
+These settings apply whenever the launcher can read the cgroups memory limit in a container, including when
+``-XX:MaxRAMPercentage=`` or ``-XX:InitialRAMPercentage=`` are set. They have no effect outside a container (no
+``CONTAINER`` env variable), when container support is disabled, when a ``-XX:MaxRAM=`` override is present, or when
+the launcher falls back to percentage-based heap sizing because the limit can't be read or is unusually high.
 
 ### Limiting GC threads
 

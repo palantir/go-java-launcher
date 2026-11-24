@@ -75,7 +75,7 @@ func ensureMallocMmapThreshold(env map[string]string, filesystem fs.FS, heapByte
 	if !configured {
 		tunables = os.Getenv(glibcTunablesEnvVar)
 	}
-	for _, tunable := range strings.Split(tunables, ":") {
+	for tunable := range strings.SplitSeq(tunables, ":") {
 		if strings.HasPrefix(tunable, mallocMmapThresholdTunable+"=") {
 			return env
 		}

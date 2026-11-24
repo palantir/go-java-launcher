@@ -801,13 +801,11 @@ func TestCompileCmdNativeExecutionModeHeapPercentage(t *testing.T) {
 
 func TestCompileCmdAppendsUseAVX(t *testing.T) {
 	staticCfg := StaticLauncherConfig{
-		Type: "java",
-		JavaConfig: JavaConfig{
-			JavaHome:  "../integration_test/jdk",
-			MainClass: "Main",
-			Classpath: []string{"."},
-			JvmOpts:   []string{"-XX:UseAVX=3"},
-		},
+		Type:      "java",
+		JavaHome:  "../integration_test/jdk",
+		MainClass: "Main",
+		Classpath: []string{"."},
+		JvmOpts:   []string{"-XX:UseAVX=3"},
 	}
 	customCfg := CustomLauncherConfig{
 		Type:    "java",

@@ -95,10 +95,10 @@ func TestTrimNativeHeapEnabled(t *testing.T) {
 	}{
 		{name: "disabled by default", enabled: false},
 		{name: "enabled in config", config: true, enabled: true},
-		{name: "env enables", env: ptr("true"), enabled: true},
-		{name: "env disables config", config: true, env: ptr("false"), enabled: false},
-		{name: "empty env is ignored", config: true, env: ptr(""), enabled: true},
-		{name: "invalid env is an error", config: true, env: ptr("maybe"), wantErr: true},
+		{name: "env enables", env: new("true"), enabled: true},
+		{name: "env disables config", config: true, env: new("false"), enabled: false},
+		{name: "empty env is ignored", config: true, env: new(""), enabled: true},
+		{name: "invalid env is an error", config: true, env: new("maybe"), wantErr: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if test.env != nil {
@@ -124,6 +124,7 @@ func TestTrimNativeHeapIntervalSeconds(t *testing.T) {
 	assert.Equal(t, 15, trimNativeHeapIntervalSeconds(config))
 }
 
+//go:fix inline
 func ptr(s string) *string {
-	return &s
+	return new(s)
 }
